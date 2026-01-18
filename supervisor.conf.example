@@ -1,0 +1,31 @@
+# Supervisor Configuration for Laravel
+# Copy to: /etc/supervisor/conf.d/zdravlje-bih.conf
+# Update supervisor: sudo supervisorctl reread
+# Start: sudo supervisorctl update
+# Check status: sudo supervisorctl status
+
+# Laravel Queue Worker
+[program:zdravlje-bih-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/zdravlje-bih/backend/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=2
+redirect_stderr=true
+stdout_logfile=/var/www/zdravlje-bih/backend/storage/logs/worker.log
+stopwaitsecs=3600
+
+# Laravel Scheduler (optional, if not using cron)
+[program:zdravlje-bih-scheduler]
+process_name=%(program_name)s
+command=php /var/www/zdravlje-bih/backend/artisan schedule:work
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+redirect_stderr=true
+stdout_logfile=/var/www/zdravlje-bih/backend/storage/logs/scheduler.log

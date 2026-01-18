@@ -1,0 +1,366 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Doktor;
+use App\Models\DoktorKategorijaUsluga;
+use App\Models\Usluga;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+
+class DoctorDashboardController extends Controller
+{
+    /**
+     * Get doctor's profile
+     */
+    public function getProfile(): JsonResponse
+    {
+        $user = auth()->user();
+        $doktor = Doktor::with(['specijalnosti', 'klinika', 'kategorijeUsluga.usluge'])
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$doktor) {
+            return response()->json([
+                'message' => 'Nemate registrovan doktorski profil.',
+            ], 404);
+        }
+
+        return response()->json($doktor);
+    }
+
+    /**
+     * Get service categories
+     */
+    public function getKategorije(): JsonResponse
+    {
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        $kategorije = $doktor->kategorijeUsluga()
+            ->with('usluge')
+            ->ordered()
+            ->get();
+
+        return response()->json($kategorije);
+    }
+
+    /**
+     * Create service category
+     */
+    public function createKategorija(Request $request): JsonResponse
+    {
+        $request->validate([
+            'naziv' => 'required|string|max:255',
+            'opis' => 'nullable|string|max:1000',
+        ]);
+
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        try {
+            DB::beginTransaction();
+
+            // Get max redoslijed
+            $maxRedoslijed = DoktorKategorijaUsluga::where('doktor_id', $doktor->id)
+                ->max('redoslijed') ?? 0;
+
+            $kategorija = DoktorKategorijaUsluga::create([
+                'doktor_id' => $doktor->id,
+                'naziv' => $request->naziv,
+                'opis' => $request->opis,
+                'redoslijed' => $maxRedoslijed + 1,
+                'aktivan' => true,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Kategorija uspješno kreirana',
+                'kategorija' => $kategorija,
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Greška pri kreiranju kategorije',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update service category
+     */
+    public function updateKategorija(int $id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'naziv' => 'sometimes|required|string|max:255',
+            'opis' => 'nullable|string|max:1000',
+            'aktivan' => 'sometimes|boolean',
+        ]);
+
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        $kategorija = DoktorKategorijaUsluga::where('doktor_id', $doktor->id)
+            ->findOrFail($id);
+
+        try {
+            $kategorija->update($request->only(['naziv', 'opis', 'aktivan']));
+
+            return response()->json([
+                'message' => 'Kategorija uspješno ažurirana',
+                'kategorija' => $kategorija->fresh(),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Greška pri ažuriranju kategorije',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete service category
+     */
+    public function deleteKategorija(int $id): JsonResponse
+    {
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        $kategorija = DoktorKategorijaUsluga::where('doktor_id', $doktor->id)
+            ->findOrFail($id);
+
+        try {
+            // Set kategorija_id to null for all services in this category
+            Usluga::where('kategorija_id', $id)->update(['kategorija_id' => null]);
+
+            $kategorija->delete();
+
+            return response()->json([
+                'message' => 'Kategorija uspješno obrisana',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Greška pri brisanju kategorije',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Reorder categories
+     */
+    public function reorderKategorije(Request $request): JsonResponse
+    {
+        $request->validate([
+            'kategorije' => 'required|array',
+            'kategorije.*.id' => 'required|integer',
+            'kategorije.*.redoslijed' => 'required|integer',
+        ]);
+
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        try {
+            DB::beginTransaction();
+
+            foreach ($request->kategorije as $item) {
+                DoktorKategorijaUsluga::where('doktor_id', $doktor->id)
+                    ->where('id', $item['id'])
+                    ->update(['redoslijed' => $item['redoslijed']]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Redoslijed kategorija uspješno ažuriran',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Greška pri ažuriranju redoslijeda',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Reorder services
+     */
+    public function reorderUsluge(Request $request): JsonResponse
+    {
+        $request->validate([
+            'usluge' => 'required|array',
+            'usluge.*.id' => 'required|integer',
+            'usluge.*.redoslijed' => 'required|integer',
+            'usluge.*.kategorija_id' => 'nullable|integer',
+        ]);
+
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        try {
+            DB::beginTransaction();
+
+            foreach ($request->usluge as $item) {
+                Usluga::where('doktor_id', $doktor->id)
+                    ->where('id', $item['id'])
+                    ->update([
+                        'redoslijed' => $item['redoslijed'],
+                        'kategorija_id' => $item['kategorija_id'] ?? null,
+                    ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Redoslijed usluga uspješno ažuriran',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Greška pri ažuriranju redoslijeda',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get services
+     */
+    public function getUsluge(): JsonResponse
+    {
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        $usluge = $doktor->usluge()->with('kategorija')->get();
+
+        return response()->json($usluge);
+    }
+
+    /**
+     * Create service
+     */
+    public function createUsluga(Request $request): JsonResponse
+    {
+        $request->validate([
+            'naziv' => 'required|string|max:255',
+            'opis' => 'nullable|string|max:1000',
+            'cijena' => 'required|numeric|min:0',
+            'cijena_popust' => 'nullable|numeric|min:0',
+            'trajanje_minuti' => 'required|integer|min:1',
+            'kategorija_id' => 'nullable|integer|exists:doktor_kategorije_usluga,id',
+        ]);
+
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        try {
+            DB::beginTransaction();
+
+            // Get max redoslijed
+            $maxRedoslijed = Usluga::where('doktor_id', $doktor->id)
+                ->max('redoslijed') ?? 0;
+
+            $usluga = Usluga::create([
+                'doktor_id' => $doktor->id,
+                'kategorija_id' => $request->kategorija_id,
+                'naziv' => $request->naziv,
+                'opis' => $request->opis,
+                'cijena' => $request->cijena,
+                'cijena_popust' => $request->cijena_popust,
+                'trajanje_minuti' => $request->trajanje_minuti,
+                'redoslijed' => $maxRedoslijed + 1,
+                'aktivan' => true,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Usluga uspješno kreirana',
+                'usluga' => $usluga->load('kategorija'),
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Greška pri kreiranju usluge',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update service
+     */
+    public function updateUsluga(int $id, Request $request): JsonResponse
+    {
+        $request->validate([
+            'naziv' => 'sometimes|required|string|max:255',
+            'opis' => 'nullable|string|max:1000',
+            'cijena' => 'sometimes|required|numeric|min:0',
+            'cijena_popust' => 'nullable|numeric|min:0',
+            'trajanje_minuti' => 'sometimes|required|integer|min:1',
+            'kategorija_id' => 'nullable|integer|exists:doktor_kategorije_usluga,id',
+            'aktivan' => 'sometimes|boolean',
+        ]);
+
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        $usluga = Usluga::where('doktor_id', $doktor->id)
+            ->findOrFail($id);
+
+        try {
+            $usluga->update($request->only([
+                'naziv', 'opis', 'cijena', 'cijena_popust',
+                'trajanje_minuti', 'kategorija_id', 'aktivan'
+            ]));
+
+            return response()->json([
+                'message' => 'Usluga uspješno ažurirana',
+                'usluga' => $usluga->fresh(['kategorija']),
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Greška pri ažuriranju usluge',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete service
+     */
+    public function deleteUsluga(int $id): JsonResponse
+    {
+        $user = auth()->user();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        $usluga = Usluga::where('doktor_id', $doktor->id)
+            ->findOrFail($id);
+
+        try {
+            $usluga->delete();
+
+            return response()->json([
+                'message' => 'Usluga uspješno obrisana',
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Greška pri brisanju usluge',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+}

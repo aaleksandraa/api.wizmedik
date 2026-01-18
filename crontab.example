@@ -1,0 +1,37 @@
+# Crontab Configuration for Zdravlje BiH
+# Install with: crontab crontab.example
+
+# Set environment variables
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+APP_DIR=/var/www/zdravlje-bih
+
+# Database Backup - Daily at 2 AM
+0 2 * * * ${APP_DIR}/backend/scripts/backup-database.sh >> /var/log/backup-db.log 2>&1
+
+# File Backup - Daily at 3 AM
+0 3 * * * ${APP_DIR}/backend/scripts/backup-files.sh >> /var/log/backup-files.log 2>&1
+
+# Health Check - Every 5 minutes
+*/5 * * * * ${APP_DIR}/backend/scripts/health-check.sh >> /var/log/health-check.log 2>&1
+
+# Laravel Scheduler - Every minute
+* * * * * cd ${APP_DIR}/backend && php artisan schedule:run >> /dev/null 2>&1
+
+# Clear expired sessions - Daily at 4 AM
+0 4 * * * cd ${APP_DIR}/backend && php artisan session:gc >> /dev/null 2>&1
+
+# Clear cache - Weekly on Sunday at 5 AM
+0 5 * * 0 cd ${APP_DIR}/backend && php artisan cache:clear >> /dev/null 2>&1
+
+# Optimize application - Weekly on Sunday at 5:30 AM
+30 5 * * 0 cd ${APP_DIR}/backend && php artisan optimize >> /dev/null 2>&1
+
+# Log rotation - Daily at 6 AM
+0 6 * * * find ${APP_DIR}/backend/storage/logs -name "*.log" -mtime +30 -delete
+
+# Monitor disk space - Every hour
+0 * * * * df -h / | awk 'NR==2 {if ($5+0 > 80) print "Disk usage high: " $5}' | mail -s "Disk Alert" admin@example.com
+
+# Monitor memory - Every hour
+0 * * * * free | grep Mem | awk '{if ($3/$2 * 100 > 90) print "Memory usage high: " int($3/$2 * 100) "%"}' | mail -s "Memory Alert" admin@example.com
