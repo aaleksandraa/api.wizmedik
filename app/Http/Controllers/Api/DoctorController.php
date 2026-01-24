@@ -71,9 +71,7 @@ class DoctorController extends Controller
      */
     public function show($slug)
     {
-        $query = Doktor::where('slug', $slug)
-            ->aktivan()
-            ->verifikovan()
+        $doktor = Doktor::where('slug', $slug)
             ->with([
                 'specijalnostModel',
                 'klinika',
@@ -84,9 +82,25 @@ class DoctorController extends Controller
                 'kategorijeUsluga.usluge' => function($query) {
                     $query->where('aktivan', true)->orderBy('redoslijed')->orderBy('naziv');
                 }
-            ]);
+            ])
+            ->first();
 
-        $doktor = $query->firstOrFail();
+        if (!$doktor) {
+            return response()->json([
+                'message' => 'Doktor nije pronađen',
+                'slug' => $slug
+            ], 404);
+        }
+
+        // Check if doctor is active and verified
+        if (!$doktor->aktivan || !$doktor->verifikovan) {
+            return response()->json([
+                'message' => 'Doktor trenutno nije dostupan',
+                'slug' => $slug,
+                'aktivan' => $doktor->aktivan,
+                'verifikovan' => $doktor->verifikovan
+            ], 404);
+        }
 
         // Ensure the relationship is loaded
         $doktor->load(['kategorijeUsluga' => function($query) {

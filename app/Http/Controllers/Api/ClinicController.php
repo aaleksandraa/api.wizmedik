@@ -43,12 +43,28 @@ class ClinicController extends Controller
     public function show($slug)
     {
         $clinic = Klinika::where('slug', $slug)
-            ->active()
-            ->verifikovan()
             ->with(['doktori' => function($q) {
                 $q->aktivan()->verifikovan();
             }])
-            ->firstOrFail();
+            ->first();
+
+        if (!$clinic) {
+            return response()->json([
+                'message' => 'Klinika nije pronađena',
+                'slug' => $slug
+            ], 404);
+        }
+
+        // Check if clinic is active and verified
+        if (!$clinic->aktivan || !$clinic->verifikovan) {
+            return response()->json([
+                'message' => 'Klinika trenutno nije dostupna',
+                'slug' => $slug,
+                'aktivan' => $clinic->aktivan,
+                'verifikovan' => $clinic->verifikovan
+            ], 404);
+        }
+
         return response()->json($clinic);
     }
 }
