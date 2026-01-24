@@ -25,16 +25,16 @@ class TerminZakazan extends Mailable
     public function envelope(): Envelope
     {
         $subjects = [
-            'doctor' => 'Novi termin zakazan - MediBIH',
-            'clinic' => 'Novi termin zakazan u vašoj klinici - MediBIH',
-            'patient' => 'Potvrda zakazanog termina - MediBIH',
+            'doctor' => 'Novi termin zakazan - WizMedik',
+            'clinic' => 'Novi termin zakazan u vašoj klinici - WizMedik',
+            'patient' => 'Potvrda zakazanog termina - WizMedik',
         ];
 
         // Set Reply-To based on who should receive replies
         $replyTo = $this->getReplyToAddress();
 
         return new Envelope(
-            subject: $subjects[$this->recipientType] ?? 'Novi termin - MediBIH',
+            subject: $subjects[$this->recipientType] ?? 'Novi termin - WizMedik',
             replyTo: $replyTo ? [new Address($replyTo['email'], $replyTo['name'])] : [],
         );
     }

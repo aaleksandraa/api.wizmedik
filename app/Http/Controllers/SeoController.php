@@ -115,8 +115,8 @@ class SeoController extends Controller
 
         $title = "Dr. {$doctor->ime} {$doctor->prezime} - {$doctor->specijalnost} | wizMedik";
         $description = "Zakažite pregled kod Dr. {$doctor->ime} {$doctor->prezime}, {$doctor->specijalnost} u {$doctor->grad}. Online zakazivanje termina.";
-        $image = $doctor->slika_profila ?? 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/doktor/{$slug}";
+        $image = $doctor->slika_profila ?? 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/doktor/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -140,8 +140,8 @@ class SeoController extends Controller
 
         $title = "{$clinic->naziv} - Klinika u {$clinic->grad} | wizMedik";
         $description = $clinic->opis ? substr(strip_tags($clinic->opis), 0, 160) : "Zakažite pregled u {$clinic->naziv}, {$clinic->grad}. Online zakazivanje termina.";
-        $image = 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/klinika/{$slug}";
+        $image = 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/klinika/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -169,8 +169,8 @@ class SeoController extends Controller
 
         $title = "{$specialty->naziv} - Pronađite doktora | wizMedik";
         $description = $specialty->seo_opis ?? "Pronađite najboljeg doktora za {$specialty->naziv} u BiH. {$doctorCount}+ doktora dostupno za online zakazivanje.";
-        $image = $specialty->slika_url ?? 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/specijalnost/{$slug}";
+        $image = $specialty->slika_url ?? 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/specijalnost/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -198,8 +198,8 @@ class SeoController extends Controller
 
         $title = "Doktori u {$city->naziv} - Online zakazivanje | wizMedik";
         $description = "Pronađite i zakažite pregled kod doktora u {$city->naziv}. {$doctorCount}+ doktora dostupno za online zakazivanje termina.";
-        $image = 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/grad/{$slug}";
+        $image = 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/grad/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -223,8 +223,8 @@ class SeoController extends Controller
 
         $title = "{$lab->naziv} - Laboratorija u {$lab->grad} | wizMedik";
         $description = $lab->opis ? substr(strip_tags($lab->opis), 0, 160) : "Laboratorijske analize u {$lab->grad}. Provjerite cijene i zakažite termin online.";
-        $image = 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/laboratorija/{$slug}";
+        $image = 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/laboratorija/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -248,8 +248,8 @@ class SeoController extends Controller
 
         $title = "{$spa->naziv} - Banja u {$spa->grad} | wizMedik";
         $description = $spa->opis ? substr(strip_tags($spa->opis), 0, 160) : "Banjsko-klimatsko lječilište {$spa->naziv} u {$spa->grad}. Provjerite ponudu i cijene.";
-        $image = 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/banja/{$slug}";
+        $image = 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/banja/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -273,8 +273,8 @@ class SeoController extends Controller
 
         $title = "{$home->naziv} - Dom njege u {$home->grad} | wizMedik";
         $description = $home->opis ? substr(strip_tags($home->opis), 0, 160) : "Dom za njegu starih i nemoćnih osoba {$home->naziv} u {$home->grad}. Provjerite usluge i cijene.";
-        $image = 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/dom-njega/{$slug}";
+        $image = 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/dom-njega/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -298,8 +298,8 @@ class SeoController extends Controller
 
         $title = "{$post->naslov} | wizMedik Blog";
         $description = $post->kratak_opis ?? substr(strip_tags($post->sadrzaj), 0, 160);
-        $image = $post->slika_url ?? 'https://medibih.ba/og-image.jpg';
-        $url = "https://medibih.ba/blog/{$slug}";
+        $image = $post->slika_url ?? 'https://wizmedik.com/og-image.jpg';
+        $url = "https://wizmedik.com/blog/{$slug}";
 
         return [
             'title' => "<title>{$title}</title>",
@@ -314,8 +314,8 @@ class SeoController extends Controller
     {
         $title = "wizMedik - Pronađite doktore u Bosni i Hercegovini | Online zakazivanje";
         $description = "Vodeća platforma za pronalaženje doktora i online zakazivanje termina u BiH. 500+ doktora, 50+ specijalnosti u Sarajevu, Banja Luci, Tuzli i drugim gradovima.";
-        $image = 'https://medibih.ba/og-image.jpg';
-        $url = 'https://medibih.ba/';
+        $image = 'https://wizmedik.com/og-image.jpg';
+        $url = 'https://wizmedik.com/';
 
         return [
             'title' => "<title>{$title}</title>",

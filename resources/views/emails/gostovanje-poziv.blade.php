@@ -15,7 +15,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>MediBIH</h1>
+        <h1>WizMedik</h1>
         <p>Poziv za gostovanje</p>
     </div>
 
@@ -37,7 +37,7 @@
     </div>
 
     <div class="footer">
-        <p>MediBIH - Vaše zdravlje na prvom mjestu</p>
+        <p>WizMedik - Vaše zdravlje na prvom mjestu</p>
         <p>Ovo je automatska poruka, molimo ne odgovarajte na ovaj email.</p>
     </div>
 </body>

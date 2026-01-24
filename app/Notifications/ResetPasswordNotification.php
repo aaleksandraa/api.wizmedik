@@ -28,7 +28,7 @@ class ResetPasswordNotification extends Notification
         $url = $frontendUrl . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email);
 
         return (new MailMessage)
-            ->subject('Resetovanje lozinke - MediBIH')
+            ->subject('Resetovanje lozinke - WizMedik')
             ->view('emails.reset-lozinke', [
                 'token' => $this->token,
                 'email' => $notifiable->email,

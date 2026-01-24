@@ -16,7 +16,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>MediBIH</h1>
+        <h1>WizMedik</h1>
         @if($recipientType === 'patient')
             <p>Vaš termin je otkazan</p>
         @elseif($recipientType === 'doctor')
@@ -84,8 +84,8 @@
     </div>
 
     <div class="footer">
-        <p>MediBIH - Vaše zdravlje na prvom mjestu</p>
-        <p>Ovo je automatska poruka sa MediBIH platforme.</p>
+        <p>WizMedik - Vaše zdravlje na prvom mjestu</p>
+        <p>Ovo je automatska poruka sa WizMedik platforme.</p>
     </div>
 </body>
 </html>

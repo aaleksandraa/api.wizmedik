@@ -24,7 +24,7 @@
     <div class="container">
         <div class="card">
             <div class="header">
-                <div class="logo">MediBIH</div>
+                <div class="logo">WizMedik</div>
             </div>
 
             <h1>Dobili ste odgovor na vaše pitanje!</h1>
@@ -52,7 +52,7 @@
             </center>
 
             <div class="footer">
-                <p>Hvala što koristite MediBIH platformu.</p>
+                <p>Hvala što koristite WizMedik platformu.</p>
                 <p style="font-size: 12px;">Ovo je automatski generisana poruka. Molimo ne odgovarajte na ovaj email.</p>
             </div>
         </div>

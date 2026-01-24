@@ -342,13 +342,13 @@ class BanjeSeeder extends Seeder
     private function linkBanjaToUser(): void
     {
         // Pronađi ili kreiraj spa_manager korisnika
-        $spaUser = User::where('email', 'banja.test@medibih.ba')->first();
+        $spaUser = User::where('email', 'banja.test@wizmedik.com')->first();
 
         if (!$spaUser) {
             $spaUser = User::create([
                 'name' => 'Banja',
                 'prezime' => 'Manager',
-                'email' => 'banja.test@medibih.ba',
+                'email' => 'banja.test@wizmedik.com',
                 'password' => Hash::make('BanjaTest123!'),
                 'email_verified_at' => now(),
             ]);
@@ -359,7 +359,7 @@ class BanjeSeeder extends Seeder
                 $spaUser->assignRole($role);
             }
 
-            $this->command->info('  ✓ Kreiran spa_manager korisnik: banja.test@medibih.ba');
+            $this->command->info('  ✓ Kreiran spa_manager korisnik: banja.test@wizmedik.com');
         }
 
         // Poveži prvu banju sa korisnikom ako nije već povezana
@@ -369,7 +369,7 @@ class BanjeSeeder extends Seeder
             $banja = Banja::first();
             if ($banja) {
                 $banja->update(['user_id' => $spaUser->id]);
-                $this->command->info("  ✓ Banja '{$banja->naziv}' povezana sa korisnikom banja.test@medibih.ba");
+                $this->command->info("  ✓ Banja '{$banja->naziv}' povezana sa korisnikom banja.test@wizmedik.com");
             }
         } else {
             $this->command->info("  ℹ️ Korisnik već ima banju: {$banja->naziv}");
@@ -379,7 +379,7 @@ class BanjeSeeder extends Seeder
         $this->command->info('========================================');
         $this->command->info('📋 LOGIN PODACI ZA SPA DASHBOARD:');
         $this->command->info('========================================');
-        $this->command->info('   Email: banja.test@medibih.ba');
+        $this->command->info('   Email: banja.test@wizmedik.com');
         $this->command->info('   Password: BanjaTest123!');
         $this->command->info('   Dashboard: /spa-dashboard');
         $this->command->info('========================================');

@@ -1,5 +1,5 @@
-# wizMedik Robots.txt
-# https://medibih.ba
+# WizMedik Robots.txt
+# https://wizmedik.com
 
 User-agent: *
 Allow: /
@@ -63,4 +63,4 @@ User-agent: WhatsApp
 Allow: /
 
 # Sitemap location
-Sitemap: https://medibih.ba/sitemap.xml
+Sitemap: https://wizmedik.com/sitemap.xml

@@ -53,7 +53,7 @@ class BlogPost extends Model
         if ($this->doktor) {
             return 'Dr. ' . $this->doktor->ime . ' ' . $this->doktor->prezime;
         }
-        return $this->autor?->name ?? 'MediBIH';
+        return $this->autor?->name ?? 'WizMedik';
     }
 
     public function getReadingTimeAttribute()

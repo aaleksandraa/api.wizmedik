@@ -17,12 +17,12 @@ class TestManagersSeeder extends Seeder
      * LOGIN PODACI:
      *
      * DOM MANAGER:
-     * Email: dom.test@medibih.ba
+     * Email: dom.test@wizmedik.com
      * Password: DomTest123!
      * Dashboard: /dom-dashboard
      *
      * SPA MANAGER:
-     * Email: banja.test@medibih.ba
+     * Email: banja.test@wizmedik.com
      * Password: BanjaTest123!
      * Dashboard: /spa-dashboard
      */
@@ -34,7 +34,7 @@ class TestManagersSeeder extends Seeder
         // DOM MANAGER
         // ========================================
         $domUser = User::updateOrCreate(
-            ['email' => 'dom.test@medibih.ba'],
+            ['email' => 'dom.test@wizmedik.com'],
             [
                 'name' => 'Dom',
                 'prezime' => 'Manager',
@@ -56,20 +56,20 @@ class TestManagersSeeder extends Seeder
             $dom = Dom::first();
             if ($dom) {
                 $dom->update(['user_id' => $domUser->id]);
-                $this->command->info("✅ Dom '{$dom->naziv}' dodijeljen korisniku dom.test@medibih.ba");
+                $this->command->info("✅ Dom '{$dom->naziv}' dodijeljen korisniku dom.test@wizmedik.com");
             } else {
                 // Kreiraj novi dom ako ne postoji nijedan
                 $this->createTestDom($domUser->id);
             }
         } else {
-            $this->command->info("ℹ️ Korisnik dom.test@medibih.ba već ima dom: {$existingDom->naziv}");
+            $this->command->info("ℹ️ Korisnik dom.test@wizmedik.com već ima dom: {$existingDom->naziv}");
         }
 
         // ========================================
         // SPA MANAGER
         // ========================================
         $spaUser = User::updateOrCreate(
-            ['email' => 'banja.test@medibih.ba'],
+            ['email' => 'banja.test@wizmedik.com'],
             [
                 'name' => 'Banja',
                 'prezime' => 'Manager',
@@ -91,13 +91,13 @@ class TestManagersSeeder extends Seeder
             $banja = Banja::first();
             if ($banja) {
                 $banja->update(['user_id' => $spaUser->id]);
-                $this->command->info("✅ Banja '{$banja->naziv}' dodijeljena korisniku banja.test@medibih.ba");
+                $this->command->info("✅ Banja '{$banja->naziv}' dodijeljena korisniku banja.test@wizmedik.com");
             } else {
                 // Kreiraj novu banju ako ne postoji nijedna
                 $this->createTestBanja($spaUser->id);
             }
         } else {
-            $this->command->info("ℹ️ Korisnik banja.test@medibih.ba već ima banju: {$existingBanja->naziv}");
+            $this->command->info("ℹ️ Korisnik banja.test@wizmedik.com već ima banju: {$existingBanja->naziv}");
         }
 
         $this->command->newLine();
@@ -106,12 +106,12 @@ class TestManagersSeeder extends Seeder
         $this->command->info('========================================');
         $this->command->newLine();
         $this->command->info('🏠 DOM MANAGER:');
-        $this->command->info('   Email: dom.test@medibih.ba');
+        $this->command->info('   Email: dom.test@wizmedik.com');
         $this->command->info('   Password: DomTest123!');
         $this->command->info('   Dashboard: /dom-dashboard');
         $this->command->newLine();
         $this->command->info('🏨 SPA/BANJA MANAGER:');
-        $this->command->info('   Email: banja.test@medibih.ba');
+        $this->command->info('   Email: banja.test@wizmedik.com');
         $this->command->info('   Password: BanjaTest123!');
         $this->command->info('   Dashboard: /spa-dashboard');
         $this->command->info('========================================');

@@ -24,7 +24,7 @@ class ResetLozinke extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Resetovanje lozinke - MediBIH',
+            subject: 'Resetovanje lozinke - WizMedik',
         );
     }
 

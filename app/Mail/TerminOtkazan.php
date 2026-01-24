@@ -27,16 +27,16 @@ class TerminOtkazan extends Mailable
     public function envelope(): Envelope
     {
         $subjects = [
-            'doctor' => 'Termin otkazan - MediBIH',
-            'clinic' => 'Termin otkazan u vašoj klinici - MediBIH',
-            'patient' => 'Vaš termin je otkazan - MediBIH',
+            'doctor' => 'Termin otkazan - WizMedik',
+            'clinic' => 'Termin otkazan u vašoj klinici - WizMedik',
+            'patient' => 'Vaš termin je otkazan - WizMedik',
         ];
 
         // Set Reply-To based on who should receive replies
         $replyTo = $this->getReplyToAddress();
 
         return new Envelope(
-            subject: $subjects[$this->recipientType] ?? 'Termin otkazan - MediBIH',
+            subject: $subjects[$this->recipientType] ?? 'Termin otkazan - WizMedik',
             replyTo: $replyTo ? [new Address($replyTo['email'], $replyTo['name'])] : [],
         );
     }
