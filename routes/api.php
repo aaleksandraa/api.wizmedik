@@ -15,7 +15,9 @@ use App\Http\Controllers\Api\{
     SettingsController,
     HomepageController,
     NotifikacijaController,
-    DoctorDashboardController
+    DoctorDashboardController,
+    LogoSettingsController,
+    CalendarSyncController
 };
 
 /*
@@ -37,12 +39,18 @@ Route::post('/password/reset', [AuthController::class, 'resetPassword'])
 // Public doctor routes
 Route::get('/doctors', [DoctorController::class, 'index']);
 Route::get('/doctors/slug/{slug}', [DoctorController::class, 'show']);
-Route::get('/doctors/{id}', [DoctorController::class, 'showById']);
-Route::get('/doctors/{id}/available-slots', [DoctorController::class, 'availableSlots']);
-Route::get('/doctors/{id}/booked-slots', [DoctorController::class, 'bookedSlots']);
+// Specific routes MUST come before wildcard {id} route
+Route::get('/doctors/{id}/available-slots', [DoctorController::class, 'availableSlots'])->where('id', '[0-9]+');
+Route::get('/doctors/{id}/booked-slots', [DoctorController::class, 'bookedSlots'])->where('id', '[0-9]+');
+Route::get('/doctors/{id}/guest-visits', [DoctorController::class, 'publicGuestVisits'])->where('id', '[0-9]+');
+// Wildcard route MUST be last - only matches numeric IDs
+Route::get('/doctors/{id}', [DoctorController::class, 'showById'])->where('id', '[0-9]+');
 
 // Public appointment routes (guest booking)
 Route::post('/appointments/guest', [AppointmentController::class, 'storeGuest']);
+
+// Public calendar sync route (iCal feed)
+Route::get('/calendar/ical/{token}', [CalendarSyncController::class, 'generateICalFeed']);
 
 // Public lookup routes
 Route::get('/cities', [CityController::class, 'index']);
@@ -67,6 +75,9 @@ Route::get('/settings/colors', [SettingsController::class, 'getGlobalColors']);
 Route::get('/settings/specialty-template', [SettingsController::class, 'getSpecialtyTemplate']);
 Route::get('/settings/blog-typography', [SettingsController::class, 'getBlogTypography']);
 Route::get('/settings/listing-template', [SettingsController::class, 'getListingTemplate']);
+
+// Logo settings (public)
+Route::get('/logo-settings', [LogoSettingsController::class, 'index']);
 
 // Public reviews (using RecenzijaController)
 Route::get('/recenzije/doktor/{doktorId}', [RecenzijaController::class, 'getByDoktor']);
@@ -139,6 +150,23 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/doctors/me/profile', [DoctorController::class, 'updateProfile']);
         Route::put('/doctors/me/schedule', [DoctorController::class, 'updateSchedule']);
 
+        // Doctor clinic management - specific routes before wildcards
+        Route::get('/doctors/search-clinics', [DoctorDashboardController::class, 'searchClinics']);
+        Route::get('/doctors/clinic-invitations', [DoctorDashboardController::class, 'getClinicInvitations']);
+        Route::post('/doctors/clinic-requests', [DoctorDashboardController::class, 'requestToJoinClinic']);
+        Route::delete('/doctors/clinic-requests/{id}', [DoctorDashboardController::class, 'cancelClinicRequest']);
+        Route::put('/doctors/clinic-invitations/{id}/respond', [DoctorDashboardController::class, 'respondToInvitation']);
+        Route::post('/doctors/leave-clinic', [DoctorDashboardController::class, 'leaveClinic']);
+
+        // Guest visits management
+        Route::get('/doctors/my-guest-visits', [DoctorDashboardController::class, 'getMyGuestVisits']);
+        Route::get('/doctors/guest-visits/{id}/services', [DoctorDashboardController::class, 'getGuestVisitServices']);
+        Route::post('/doctors/guest-visits/{id}/services', [DoctorDashboardController::class, 'addGuestVisitService']);
+        Route::put('/doctors/guest-visits/{gostovanjeId}/services/{uslugaId}', [DoctorDashboardController::class, 'updateGuestVisitService']);
+        Route::delete('/doctors/guest-visits/{gostovanjeId}/services/{uslugaId}', [DoctorDashboardController::class, 'deleteGuestVisitService']);
+        Route::put('/doctors/guest-visits/{id}/respond', [DoctorDashboardController::class, 'respondToGuestVisit']);
+        Route::delete('/doctors/guest-visits/{id}', [DoctorDashboardController::class, 'cancelGuestVisit']);
+
         // Doctor appointments
         Route::get('/appointments/doctor', [AppointmentController::class, 'doctorAppointments']);
         Route::post('/appointments/doctor/manual', [AppointmentController::class, 'storeManual']);
@@ -153,6 +181,12 @@ Route::middleware('auth:sanctum')->group(function () {
         // Doctor Dashboard - Service Categories
         Route::prefix('doctor')->group(function () {
             Route::get('/profile', [DoctorDashboardController::class, 'getProfile']);
+
+            // Calendar sync
+            Route::get('/calendar-sync', [CalendarSyncController::class, 'getSettings']);
+            Route::put('/calendar-sync', [CalendarSyncController::class, 'updateSettings']);
+            Route::post('/calendar-sync/regenerate-token', [CalendarSyncController::class, 'regenerateToken']);
+
             Route::get('/kategorije', [DoctorDashboardController::class, 'getKategorije']);
             Route::post('/kategorije', [DoctorDashboardController::class, 'createKategorija']);
             Route::put('/kategorije/{id}', [DoctorDashboardController::class, 'updateKategorija']);
@@ -164,6 +198,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::delete('/usluge/{id}', [DoctorDashboardController::class, 'deleteUsluga']);
             Route::post('/usluge/reorder', [DoctorDashboardController::class, 'reorderUsluge']);
         });
+
     });
 
     // Clinic Dashboard (clinic staff only)
@@ -174,6 +209,27 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getDoctors']);
         Route::put('/appointments/{id}/status', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'updateAppointmentStatus']);
         Route::get('/statistics', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getStatistics']);
+
+        // Doctor invitations and requests
+        Route::get('/invitations', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getInvitations']);
+        Route::get('/doctor-requests', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getDoctorRequests']);
+        Route::post('/invitations', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'inviteDoctor']);
+        Route::delete('/invitations/{id}', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'cancelInvitation']);
+        Route::put('/doctor-requests/{id}/respond', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'respondToDoctorRequest']);
+        Route::delete('/doctors/{id}', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'removeDoctor']);
+
+        // Guest doctors (gostujući doktori)
+        Route::get('/guest-doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getGuestDoctors']);
+        Route::post('/guest-doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'addGuestDoctor']);
+        Route::put('/guest-doctors/{id}', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'updateGuestDoctor']);
+        Route::delete('/guest-doctors/{id}', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'cancelGuestDoctor']);
+        Route::get('/search-doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'searchDoctors']);
+        Route::get('/search-existing-doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'searchDoctors']); // Alias
+
+        // Calendar and appointments
+        Route::get('/calendar-data', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getCalendarData']);
+        Route::get('/appointments-by-date', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getAppointmentsByDate']);
+        Route::post('/appointments/manual', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'createManualAppointment']);
     });
 
     // Appointments
@@ -398,6 +454,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/laboratorije/kategorije', [\App\Http\Controllers\Api\AdminLaboratorijaController::class, 'storeKategorija']);
         Route::put('/laboratorije/kategorije/{id}', [\App\Http\Controllers\Api\AdminLaboratorijaController::class, 'updateKategorija']);
         Route::delete('/laboratorije/kategorije/{id}', [\App\Http\Controllers\Api\AdminLaboratorijaController::class, 'destroyKategorija']);
+
+        // Logo Settings (admin only)
+        Route::get('/logo-settings', [LogoSettingsController::class, 'index']);
+        Route::put('/logo-settings', [LogoSettingsController::class, 'update']);
     });
 });
 

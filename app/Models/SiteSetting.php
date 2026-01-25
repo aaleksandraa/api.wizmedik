@@ -3,23 +3,49 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
 
 class SiteSetting extends Model
 {
-    protected $fillable = ['key', 'value'];
+    protected $table = 'site_settings';
 
-    public static function get(string $key, $default = null)
+    protected $fillable = [
+        'key',
+        'value',
+    ];
+
+    /**
+     * Get a setting value by key
+     */
+    public static function getValue(string $key, $default = null)
     {
-        return Cache::remember("setting_{$key}", 3600, function () use ($key, $default) {
-            $setting = self::where('key', $key)->first();
-            return $setting ? $setting->value : $default;
-        });
+        $setting = static::where('key', $key)->first();
+        return $setting ? $setting->value : $default;
     }
 
+    /**
+     * Set a setting value by key
+     */
+    public static function setValue(string $key, $value): void
+    {
+        static::updateOrCreate(
+            ['key' => $key],
+            ['value' => $value]
+        );
+    }
+
+    /**
+     * Alias for getValue (for backward compatibility)
+     */
+    public static function get(string $key, $default = null)
+    {
+        return static::getValue($key, $default);
+    }
+
+    /**
+     * Alias for setValue (for backward compatibility)
+     */
     public static function set(string $key, $value): void
     {
-        self::updateOrCreate(['key' => $key], ['value' => $value]);
-        Cache::forget("setting_{$key}");
+        static::setValue($key, $value);
     }
 }

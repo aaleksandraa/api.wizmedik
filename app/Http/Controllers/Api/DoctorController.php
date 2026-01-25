@@ -283,6 +283,9 @@ class DoctorController extends Controller
         $validated = $request->validate([
             'telefon' => 'sometimes|string|max:20',
             'opis' => 'sometimes|string',
+            'youtube_linkovi' => 'sometimes|nullable|array',
+            'youtube_linkovi.*.url' => 'nullable|url',
+            'youtube_linkovi.*.naslov' => 'nullable|string|max:255',
             'lokacija' => 'sometimes|string',
             'postanski_broj' => 'sometimes|string|max:10',
             'mjesto' => 'sometimes|string',
@@ -300,7 +303,16 @@ class DoctorController extends Controller
             'radno_vrijeme' => 'sometimes|array',
             'pauze' => 'sometimes|array',
             'odmori' => 'sometimes|array',
+            'telemedicine_enabled' => 'sometimes|boolean',
+            'telemedicine_phone' => 'sometimes|nullable|string|max:50',
         ]);
+
+        // Filter out empty YouTube links
+        if (isset($validated['youtube_linkovi'])) {
+            $validated['youtube_linkovi'] = array_values(array_filter($validated['youtube_linkovi'], function($item) {
+                return !empty($item['url']) && !empty($item['naslov']);
+            }));
+        }
 
         $specialtyIds = $validated['specialty_ids'] ?? null;
         unset($validated['specialty_ids']);
@@ -557,5 +569,22 @@ class DoctorController extends Controller
         $doktor->update(['klinika_id' => null]);
 
         return response()->json(['message' => 'Uspješno ste napustili kliniku']);
+    }
+
+    /**
+     * Get public guest visits for a doctor
+     */
+    public function publicGuestVisits(int $id)
+    {
+        $doktor = Doktor::findOrFail($id);
+
+        $gostovanja = \App\Models\DoktorGostovanje::with(['klinika'])
+            ->where('doktor_id', $id)
+            ->where('status', 'confirmed')
+            ->where('datum_od', '>=', now())
+            ->orderBy('datum_od')
+            ->get();
+
+        return response()->json($gostovanja);
     }
 }

@@ -729,4 +729,130 @@ class ClinicDashboardController extends Controller
             'zahtjev' => $zahtjev->load('doktor:id,ime,prezime,specijalnost')
         ]);
     }
+
+    /**
+     * Get guest doctors (gostujući doktori)
+     */
+    public function getGuestDoctors(Request $request)
+    {
+        $user = $request->user();
+        $klinika = Klinika::where('user_id', $user->id)->firstOrFail();
+
+        $query = \App\Models\DoktorGostovanje::with(['doktor'])
+            ->where('klinika_id', $klinika->id);
+
+        if ($request->boolean('upcoming')) {
+            $query->where('datum_od', '>=', now());
+        }
+
+        $gostovanja = $query->orderBy('datum_od', 'desc')->get();
+
+        return response()->json($gostovanja);
+    }
+
+    /**
+     * Add guest doctor
+     */
+    public function addGuestDoctor(Request $request)
+    {
+        $validated = $request->validate([
+            'doktor_id' => 'required|exists:doktori,id',
+            'datum_od' => 'required|date',
+            'datum_do' => 'required|date|after:datum_od',
+            'napomena' => 'nullable|string|max:500',
+        ]);
+
+        $user = $request->user();
+        $klinika = Klinika::where('user_id', $user->id)->firstOrFail();
+
+        $gostovanje = \App\Models\DoktorGostovanje::create([
+            'doktor_id' => $validated['doktor_id'],
+            'klinika_id' => $klinika->id,
+            'datum_od' => $validated['datum_od'],
+            'datum_do' => $validated['datum_do'],
+            'napomena' => $validated['napomena'] ?? null,
+            'initiated_by' => 'clinic',
+            'status' => 'pending',
+        ]);
+
+        return response()->json([
+            'message' => 'Poziv za gostovanje poslan',
+            'data' => $gostovanje->load('doktor'),
+        ], 201);
+    }
+
+    /**
+     * Update guest doctor
+     */
+    public function updateGuestDoctor(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'datum_od' => 'sometimes|required|date',
+            'datum_do' => 'sometimes|required|date|after:datum_od',
+            'napomena' => 'nullable|string|max:500',
+            'status' => 'sometimes|in:pending,confirmed,cancelled,completed',
+        ]);
+
+        $user = $request->user();
+        $klinika = Klinika::where('user_id', $user->id)->firstOrFail();
+
+        $gostovanje = \App\Models\DoktorGostovanje::where('id', $id)
+            ->where('klinika_id', $klinika->id)
+            ->firstOrFail();
+
+        $gostovanje->update($validated);
+
+        return response()->json([
+            'message' => 'Gostovanje ažurirano',
+            'data' => $gostovanje->fresh(['doktor']),
+        ]);
+    }
+
+    /**
+     * Cancel guest doctor
+     */
+    public function cancelGuestDoctor(Request $request, $id)
+    {
+        $user = $request->user();
+        $klinika = Klinika::where('user_id', $user->id)->firstOrFail();
+
+        $gostovanje = \App\Models\DoktorGostovanje::where('id', $id)
+            ->where('klinika_id', $klinika->id)
+            ->firstOrFail();
+
+        $gostovanje->update([
+            'status' => 'cancelled',
+            'napomena' => $request->input('napomena'),
+        ]);
+
+        return response()->json([
+            'message' => 'Gostovanje otkazano',
+        ]);
+    }
+
+    /**
+     * Search doctors for guest visits
+     */
+    public function searchDoctors(Request $request)
+    {
+        $search = $request->input('search', '');
+
+        if (strlen($search) < 2) {
+            return response()->json([]);
+        }
+
+        $doctors = Doktor::where('aktivan', true)
+            ->where('verifikovan', true)
+            ->where(function ($query) use ($search) {
+                $query->where('ime', 'ILIKE', "%{$search}%")
+                    ->orWhere('prezime', 'ILIKE', "%{$search}%")
+                    ->orWhere('specijalnost', 'ILIKE', "%{$search}%")
+                    ->orWhere('grad', 'ILIKE', "%{$search}%");
+            })
+            ->select('id', 'ime', 'prezime', 'specijalnost', 'grad', 'slika_profila', 'slug')
+            ->limit(10)
+            ->get();
+
+        return response()->json($doctors);
+    }
 }

@@ -31,6 +31,7 @@ class Doktor extends Model
         'telefon',
         'email',
         'opis',
+        'youtube_linkovi',
         'ocjena',
         'broj_ocjena',
         'slika_profila',
@@ -45,12 +46,20 @@ class Doktor extends Model
         'verifikovan',
         'verifikovan_at',
         'verifikovan_by',
+        'telemedicine_enabled',
+        'telemedicine_phone',
+        'calendar_sync_token',
+        'calendar_sync_enabled',
+        'google_calendar_url',
+        'outlook_calendar_url',
+        'calendar_last_synced',
     ];
 
     protected $casts = [
         'radno_vrijeme' => 'array',
         'pauze' => 'array',
         'odmori' => 'array',
+        'youtube_linkovi' => 'array',
         'prihvata_online' => 'boolean',
         'auto_potvrda' => 'boolean',
         'slot_trajanje_minuti' => 'integer',
@@ -61,6 +70,8 @@ class Doktor extends Model
         'aktivan' => 'boolean',
         'verifikovan' => 'boolean',
         'verifikovan_at' => 'datetime',
+        'calendar_sync_enabled' => 'boolean',
+        'calendar_last_synced' => 'datetime',
     ];
 
     protected $appends = ['slika_url', 'klinika_naziv', 'klinika_adresa'];

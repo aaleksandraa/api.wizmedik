@@ -13,8 +13,8 @@ class UploadController extends Controller
     {
         try {
             $request->validate([
-                'image'  => 'required|image|mimes:jpeg,png,jpg,webp|max:5120', // 5MB max
-                'folder' => 'required|in:doctors,clinics,cities,covers,blog,laboratories,spas',
+                'image'  => 'required|image|mimes:jpeg,png,jpg,webp,svg|max:5120', // 5MB max
+                'folder' => 'required|in:doctors,clinics,cities,covers,blog,laboratories,spas,logos',
             ]);
 
             $folder = $request->folder;
@@ -22,7 +22,7 @@ class UploadController extends Controller
 
             // Security: Verify it's actually an image
             $mimeType = $imageFile->getMimeType();
-            $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/svg+xml'];
 
             if (!in_array($mimeType, $allowedMimes)) {
                 return response()->json(['error' => 'Invalid file type'], 400);
@@ -49,26 +49,87 @@ class UploadController extends Controller
             }
 
             // Unique ime fajla
+            $extension = $imageFile->getClientOriginalExtension();
+
+            // For SVG files, keep original format
+            if (strtolower($extension) === 'svg') {
+                $filename = time() . '_' . uniqid() . '.svg';
+                $publicPath = "{$folder}/{$filename}";
+
+                // Save SVG directly without processing
+                Storage::disk('public')->put($publicPath, file_get_contents($imageFile->getRealPath()));
+
+                $url = asset(Storage::disk('public')->url($publicPath));
+
+                \Log::info('SVG uploaded successfully', [
+                    'path' => $publicPath,
+                    'url'  => $url,
+                    'folder' => $folder
+                ]);
+
+                return response()->json([
+                    'message' => 'Image uploaded successfully',
+                    'url'     => $url,
+                    'path'    => $publicPath,
+                ]);
+            }
+
             $filename = time() . '_' . uniqid() . '.webp';
             $path = "public/{$folder}/{$filename}";
 
             /*
                 -- Obrada slike:
                 1) Učitaj
-                2) Resize max 800x800, zadrži proporciju, ne povećavaj male slike
+                2) Resize based on folder:
+                   - logos: max width 220px (height proportional to maintain original aspect ratio)
+                   - blog: keep original size
+                   - others: max 800x800
                 3) Convert to WebP (80% quality)
             */
 
             $img = Image::read($imageFile);
 
-            // For blog images, keep original size but optimize
-            // For other folders, resize to max 800x800
-            if ($folder !== 'blog') {
+            // Resize based on folder type
+            if ($folder === 'logos') {
+                // Get original dimensions
+                $originalWidth = $img->width();
+                $originalHeight = $img->height();
+                $originalRatio = $originalWidth / $originalHeight;
+
+                \Log::info('Logo resize - BEFORE', [
+                    'width' => $originalWidth,
+                    'height' => $originalHeight,
+                    'ratio' => $originalRatio
+                ]);
+
+                // Logo optimization: max width 220px, height proportional (maintains aspect ratio)
+                // If logo is 16:9, result will be 220x123.75px
+                // If logo is 4:1, result will be 220x55px
+                // If logo is 1:1, result will be 220x220px
+                $img->resize(220, null, function ($constraint) {
+                    $constraint->aspectRatio();  // Height calculated proportionally from original ratio
+                    $constraint->upsize();       // Don't upscale small images
+                });
+
+                // Get new dimensions
+                $newWidth = $img->width();
+                $newHeight = $img->height();
+                $newRatio = $newWidth / $newHeight;
+
+                \Log::info('Logo resize - AFTER', [
+                    'width' => $newWidth,
+                    'height' => $newHeight,
+                    'ratio' => $newRatio,
+                    'ratio_maintained' => abs($originalRatio - $newRatio) < 0.01
+                ]);
+            } elseif ($folder !== 'blog') {
+                // Standard images: max 800x800
                 $img->resize(800, 800, function ($constraint) {
                     $constraint->aspectRatio();
                     $constraint->upsize();
                 });
             }
+            // Blog images keep original size
 
             // WebP encoding
             $encoded = $img->toWebp(quality: 80);
