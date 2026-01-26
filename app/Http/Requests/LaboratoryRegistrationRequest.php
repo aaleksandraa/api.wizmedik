@@ -85,6 +85,7 @@ class LaboratoryRegistrationRequest extends FormRequest
             'password.required' => 'Lozinka je obavezna.',
             'password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
             'password.confirmed' => 'Lozinke se ne poklapaju.',
+            'password.uncompromised' => 'Ova lozinka je pronađena u poznatim sigurnosnim probojima. Molimo koristite drugu, sigurniju lozinku.',
             'prihvatam_uslove.accepted' => 'Morate prihvatiti uslove korištenja.',
         ];
     }

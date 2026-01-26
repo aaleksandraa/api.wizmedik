@@ -66,7 +66,8 @@ class DoctorRegistrationRequest extends FormRequest
                 Password::min(12)
                     ->mixedCase()
                     ->numbers()
-                    ->symbols(),
+                    ->symbols()
+                    ->uncompromised(),
             ],
 
             // Professional info
@@ -146,6 +147,7 @@ class DoctorRegistrationRequest extends FormRequest
             'telefon.regex' => 'Broj telefona nije u validnom formatu.',
             'password.required' => 'Lozinka je obavezna.',
             'password.confirmed' => 'Lozinke se ne poklapaju.',
+            'password.uncompromised' => 'Ova lozinka je pronađena u poznatim sigurnosnim probojima. Molimo koristite drugu, sigurniju lozinku.',
             'specialty_ids.required' => 'Morate odabrati najmanje jednu specijalnost.',
             'specialty_ids.*.exists' => 'Odabrana specijalnost ne postoji.',
             'specijalnost_id.required' => 'Specijalnost je obavezna.',

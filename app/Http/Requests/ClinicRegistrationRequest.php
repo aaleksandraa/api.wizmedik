@@ -139,6 +139,7 @@ class ClinicRegistrationRequest extends FormRequest
             'telefon.regex' => 'Broj telefona nije u validnom formatu.',
             'password.required' => 'Lozinka je obavezna.',
             'password.confirmed' => 'Lozinke se ne poklapaju.',
+            'password.uncompromised' => 'Ova lozinka je pronađena u poznatim sigurnosnim probojima. Molimo koristite drugu, sigurniju lozinku.',
             'adresa.required' => 'Adresa je obavezna.',
             'grad.required' => 'Grad je obavezan.',
             'website.url' => 'Website mora biti validna URL adresa.',
