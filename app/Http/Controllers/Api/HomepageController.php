@@ -33,6 +33,7 @@ class HomepageController extends Controller
      */
     private function fetchHomepageData()
     {
+        try {
             // Get template settings from site_settings table using SiteSetting model
             $settings = [
                 'doctor_profile_template' => \App\Models\SiteSetting::get('doctor_profile_template', 'classic'),
@@ -294,6 +295,15 @@ class HomepageController extends Controller
                     'cities' => $allCities,
                 ],
             ]);
+        } catch (\Exception $e) {
+            \Log::error('Homepage data fetch error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'error' => 'Failed to fetch homepage data',
+                'message' => config('app.debug') ? $e->getMessage() : 'An error occurred'
+            ], 500);
+        }
     }
 
     /**
