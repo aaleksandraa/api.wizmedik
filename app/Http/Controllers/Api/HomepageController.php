@@ -49,8 +49,9 @@ class HomepageController extends Controller
                 ->limit(8)
                 ->get();
 
-            // Get top 12 featured doctors (highest rated)
+            // Get top 12 featured doctors (highest rated) - only active
             $doctors = DB::table('doktori')
+                ->where('aktivan', true)
                 ->whereNull('deleted_at')
                 ->select(
                     'id',
@@ -72,15 +73,17 @@ class HomepageController extends Controller
                 ->limit(12)
                 ->get();
 
-            // Get doctor counts by specialty
+            // Get doctor counts by specialty - only active
             $doctorCounts = DB::table('doktori')
+                ->where('aktivan', true)
                 ->whereNull('deleted_at')
                 ->select('specijalnost', DB::raw('count(*) as count'))
                 ->groupBy('specijalnost')
                 ->pluck('count', 'specijalnost');
 
-            // Get top 6 featured clinics
+            // Get top 6 featured clinics - only active
             $clinics = DB::table('klinike')
+                ->where('aktivan', true)
                 ->whereNull('deleted_at')
                 ->select(
                     'id',
@@ -103,8 +106,9 @@ class HomepageController extends Controller
                     return $clinic;
                 });
 
-            // Get top 4 featured banje (spas)
+            // Get top 4 featured banje (spas) - only active
             $banje = DB::table('banje')
+                ->where('aktivan', true)
                 ->whereNull('deleted_at')
                 ->select(
                     'id',
@@ -129,8 +133,9 @@ class HomepageController extends Controller
                     return $banja;
                 });
 
-            // Get top 4 featured domovi (care homes)
+            // Get top 4 featured domovi (care homes) - only active
             $domovi = DB::table('domovi_njega')
+                ->where('aktivan', true)
                 ->whereNull('deleted_at')
                 ->select(
                     'id',
@@ -188,8 +193,9 @@ class HomepageController extends Controller
                 ->orderBy('naziv', 'asc')
                 ->get();
 
-            // Get recent questions
+            // Get recent questions - only public
             $pitanja = DB::table('pitanja')
+                ->where('je_javno', true)
                 ->select('id', 'naslov', 'slug', 'sadrzaj', 'broj_pregleda', 'je_odgovoreno', 'created_at')
                 ->orderBy('created_at', 'desc')
                 ->limit(4)
