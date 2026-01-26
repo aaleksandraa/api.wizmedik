@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'audit' => \App\Http\Middleware\AuditLogMiddleware::class,
             'cache.response' => \App\Http\Middleware\CacheResponseMiddleware::class,
             'compress' => \App\Http\Middleware\CompressResponse::class,
+            'detect.bots' => \App\Http\Middleware\DetectBots::class,
+            'registration.throttle' => \App\Http\Middleware\RegistrationThrottle::class,
         ]);
 
         // Return JSON for unauthenticated API requests instead of redirecting

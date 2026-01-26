@@ -37,17 +37,14 @@ Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:5,60'); // 5 attempts per 60 minutes
 
-// Registration routes (for different entity types)
-Route::post('/register/doctor', [RegistrationController::class, 'registerDoctor'])
-    ->middleware('throttle:5,60');
-Route::post('/register/clinic', [RegistrationController::class, 'registerClinic'])
-    ->middleware('throttle:5,60');
-Route::post('/register/laboratory', [RegistrationController::class, 'registerLaboratory'])
-    ->middleware('throttle:5,60');
-Route::post('/register/spa', [RegistrationController::class, 'registerSpa'])
-    ->middleware('throttle:5,60');
-Route::post('/register/care-home', [RegistrationController::class, 'registerCareHome'])
-    ->middleware('throttle:5,60');
+// Registration routes (for different entity types) with bot detection
+Route::middleware(['throttle:5,60', 'detect.bots'])->group(function () {
+    Route::post('/register/doctor', [RegistrationController::class, 'registerDoctor']);
+    Route::post('/register/clinic', [RegistrationController::class, 'registerClinic']);
+    Route::post('/register/laboratory', [RegistrationController::class, 'registerLaboratory']);
+    Route::post('/register/spa', [RegistrationController::class, 'registerSpa']);
+    Route::post('/register/care-home', [RegistrationController::class, 'registerCareHome']);
+});
 
 // Email verification routes
 Route::get('/verify-email/{token}', [RegistrationController::class, 'verifyEmail']);
