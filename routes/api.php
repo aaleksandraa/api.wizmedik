@@ -88,6 +88,7 @@ Route::get('/recenzije/{type}/{id}/stats', [RecenzijaController::class, 'getRati
 Route::get('/blog', [\App\Http\Controllers\Api\BlogController::class, 'index']);
 Route::get('/blog/homepage', [\App\Http\Controllers\Api\BlogController::class, 'homepage']);
 Route::get('/blog/categories', [\App\Http\Controllers\Api\BlogController::class, 'categories']);
+Route::get('/blog/authors', [\App\Http\Controllers\Api\BlogController::class, 'authors']);
 Route::get('/blog/doctor/{doctorSlug}', [\App\Http\Controllers\Api\BlogController::class, 'doctorPosts']);
 Route::get('/blog/{slug}', [\App\Http\Controllers\Api\BlogController::class, 'show']);
 

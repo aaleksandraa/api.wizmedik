@@ -23,6 +23,10 @@ class BlogController extends Controller
             $query->whereHas('categories', fn($q) => $q->where('slug', $request->category));
         }
 
+        if ($request->author) {
+            $query->whereHas('doktor', fn($q) => $q->where('slug', $request->author));
+        }
+
         if ($request->search) {
             $search = $request->search;
             $query->where(fn($q) => $q->where('naslov', 'ilike', "%{$search}%")
@@ -77,6 +81,28 @@ class BlogController extends Controller
     public function categories()
     {
         return response()->json(BlogCategory::withCount(['posts' => fn($q) => $q->published()])->get());
+    }
+
+    public function authors()
+    {
+        $authors = Doktor::whereHas('blogPosts', function($q) {
+            $q->published();
+        })
+        ->withCount(['blogPosts' => fn($q) => $q->published()])
+        ->select('id', 'ime', 'prezime', 'slug')
+        ->orderBy('ime')
+        ->get()
+        ->map(function($doktor) {
+            return [
+                'id' => $doktor->id,
+                'ime' => $doktor->ime,
+                'prezime' => $doktor->prezime,
+                'slug' => $doktor->slug,
+                'posts_count' => $doktor->blog_posts_count
+            ];
+        });
+
+        return response()->json($authors);
     }
 
     public function doctorPosts($doctorSlug)
