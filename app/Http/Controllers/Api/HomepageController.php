@@ -169,7 +169,7 @@ class HomepageController extends Controller
                 ->filter()
                 ->values();
 
-            // Get cities with doctor counts for homepage
+            // Get cities with doctor counts for homepage display (top 20)
             $citiesWithCounts = DB::table('gradovi')
                 ->leftJoin('doktori', function($join) {
                     $join->on('gradovi.naziv', '=', 'doktori.grad')
@@ -179,6 +179,12 @@ class HomepageController extends Controller
                 ->groupBy('gradovi.id', 'gradovi.naziv', 'gradovi.slug')
                 ->orderBy('broj_doktora', 'desc')
                 ->limit(20)
+                ->get();
+
+            // Get ALL cities for dropdown filters (no limit)
+            $allCitiesForDropdown = DB::table('gradovi')
+                ->select('id', 'naziv', 'slug')
+                ->orderBy('naziv', 'asc')
                 ->get();
 
             // Get recent questions
@@ -251,7 +257,8 @@ class HomepageController extends Controller
                 'clinics' => $clinics,
                 'banje' => $banje,
                 'domovi' => $domovi,
-                'cities' => $citiesWithCounts,
+                'cities' => $citiesWithCounts, // Top 20 cities with doctor counts for display
+                'all_cities' => $allCitiesForDropdown, // ALL cities for dropdown filters
                 'pitanja' => $pitanja,
                 'blog_posts' => $blogPosts,
                 'homepage_custom_settings' => $homepageCustomSettings,
