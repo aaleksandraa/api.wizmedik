@@ -102,6 +102,58 @@ class HomepageController extends Controller
                     return $clinic;
                 });
 
+            // Get top 4 featured banje (spas)
+            $banje = DB::table('banje')
+                ->whereNull('deleted_at')
+                ->select(
+                    'id',
+                    'slug',
+                    'naziv',
+                    'opis',
+                    'adresa',
+                    'grad',
+                    'telefon',
+                    'email',
+                    'website',
+                    'galerija',
+                    'radno_vrijeme'
+                )
+                ->limit(4)
+                ->get()
+                ->map(function ($banja) {
+                    // Map galerija to slike for consistency with clinics
+                    $banja->slike = json_decode($banja->galerija, true) ?? [];
+                    $banja->radno_vrijeme = json_decode($banja->radno_vrijeme, true) ?? [];
+                    unset($banja->galerija); // Remove galerija after mapping
+                    return $banja;
+                });
+
+            // Get top 4 featured domovi (care homes)
+            $domovi = DB::table('domovi_njega')
+                ->whereNull('deleted_at')
+                ->select(
+                    'id',
+                    'slug',
+                    'naziv',
+                    'opis',
+                    'adresa',
+                    'grad',
+                    'telefon',
+                    'email',
+                    'website',
+                    'galerija',
+                    'radno_vrijeme'
+                )
+                ->limit(4)
+                ->get()
+                ->map(function ($dom) {
+                    // Map galerija to slike for consistency with clinics
+                    $dom->slike = json_decode($dom->galerija, true) ?? [];
+                    $dom->radno_vrijeme = json_decode($dom->radno_vrijeme, true) ?? [];
+                    unset($dom->galerija); // Remove galerija after mapping
+                    return $dom;
+                });
+
             // Get unique specialties and cities for filters
             $allSpecialties = DB::table('doktori')
                 ->whereNull('deleted_at')
@@ -197,6 +249,8 @@ class HomepageController extends Controller
                 }),
                 'doctors' => $doctors,
                 'clinics' => $clinics,
+                'banje' => $banje,
+                'domovi' => $domovi,
                 'cities' => $citiesWithCounts,
                 'pitanja' => $pitanja,
                 'blog_posts' => $blogPosts,

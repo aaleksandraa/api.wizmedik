@@ -37,6 +37,7 @@ class SettingsController extends Controller
                     ['id' => 'custom', 'name' => 'Custom', 'description' => 'Prilagođeni dizajn - podesi u "Početna" tabu'],
                     ['id' => 'custom2-cyan', 'name' => 'Custom 2 Cyan', 'description' => 'ZocDoc stil sa svijetlo plavom/cyan bojom'],
                     ['id' => 'custom2-yellow', 'name' => 'Custom 2 Yellow', 'description' => 'ZocDoc stil sa žutom bojom'],
+                    ['id' => 'custom3-cyan', 'name' => 'Custom 3 Cyan', 'description' => 'Minimalistički centrisani dizajn sa cyan bojom'],
                     ['id' => 'pro', 'name' => 'Pro', 'description' => 'Profesionalni dizajn sa ljepšim klinikama i mobile responsive'],
                     ['id' => 'medical', 'name' => 'Medical', 'description' => 'Kompletan medicinski portal sa svim sekcijama'],
                     ['id' => 'modern', 'name' => 'Modern', 'description' => 'Moderan dizajn sa teal bojama i video sekcijom'],
@@ -62,7 +63,7 @@ class SettingsController extends Controller
         $request->validate([
             'doctor_profile_template' => 'sometimes|string|in:classic,modern,card,minimal',
             'clinic_profile_template' => 'sometimes|string|in:classic,modern,corporate',
-            'homepage_template' => 'sometimes|string|in:soft,clean,custom,custom2-cyan,custom2-yellow,pro,medical,modern,classic,zocdoc,zocdoc-bih,warm,ocean,lime,teal,rose,sunset,minimal,bold,cards',
+            'homepage_template' => 'sometimes|string|in:soft,clean,custom,custom2-cyan,custom2-yellow,custom3-cyan,pro,medical,modern,classic,zocdoc,zocdoc-bih,warm,ocean,lime,teal,rose,sunset,minimal,bold,cards',
             'navbar_style' => 'sometimes|string|in:auto,default,colored',
             'doctors_split_view_enabled' => 'sometimes|boolean',
             'modern_cover_type' => 'sometimes|string|in:gradient,image',
