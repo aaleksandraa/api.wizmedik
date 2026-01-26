@@ -163,8 +163,14 @@ class ClinicRegistrationRequest extends FormRequest
             'telefon' => preg_replace('/[^0-9+\-\s()]/', '', $this->telefon),
             'adresa' => strip_tags($this->adresa),
             'grad' => strip_tags($this->grad),
-            'website' => filter_var($this->website, FILTER_SANITIZE_URL),
             'message' => strip_tags($this->message),
         ]);
+
+        // Auto-add https:// to website if missing protocol
+        if ($this->website && !preg_match('/^https?:\/\//i', $this->website)) {
+            $this->merge([
+                'website' => 'https://' . $this->website,
+            ]);
+        }
     }
 }

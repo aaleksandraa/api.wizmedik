@@ -78,6 +78,7 @@ class CareHomeRegistrationRequest extends FormRequest
             'email.unique' => 'Ova email adresa je već registrovana.',
             'telefon.required' => 'Broj telefona je obavezan.',
             'telefon.regex' => 'Broj telefona nije u validnom formatu.',
+            'website.url' => 'Website mora biti validna URL adresa (npr. wizmedik.com).',
             'adresa.required' => 'Adresa je obavezna.',
             'grad.required' => 'Grad je obavezan.',
             'kontakt_ime.required' => 'Ime kontakt osobe je obavezno.',
@@ -108,5 +109,18 @@ class CareHomeRegistrationRequest extends FormRequest
             'kontakt_ime' => 'ime kontakt osobe',
             'password' => 'lozinka',
         ];
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        // Auto-add https:// to website if missing protocol
+        if ($this->website && !preg_match('/^https?:\/\//i', $this->website)) {
+            $this->merge([
+                'website' => 'https://' . $this->website,
+            ]);
+        }
     }
 }
