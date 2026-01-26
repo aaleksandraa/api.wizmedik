@@ -19,6 +19,9 @@ class SettingsController extends Controller
             'doctors_split_view_enabled' => SiteSetting::get('doctors_split_view_enabled', true),
             'modern_cover_type' => SiteSetting::get('modern_cover_type', 'gradient'),
             'modern_cover_value' => SiteSetting::get('modern_cover_value', 'from-primary via-primary/90 to-primary/80'),
+            'custom3_hero_bg_enabled' => SiteSetting::get('custom3_hero_bg_enabled', false),
+            'custom3_hero_bg_image' => SiteSetting::get('custom3_hero_bg_image', null),
+            'custom3_hero_bg_opacity' => SiteSetting::get('custom3_hero_bg_opacity', 20),
             'available_templates' => [
                 'doctor' => [
                     ['id' => 'classic', 'name' => 'Klasični', 'description' => 'Tradicionalni prikaz sa svim informacijama'],
@@ -68,6 +71,9 @@ class SettingsController extends Controller
             'doctors_split_view_enabled' => 'sometimes|boolean',
             'modern_cover_type' => 'sometimes|string|in:gradient,image',
             'modern_cover_value' => 'sometimes|nullable|string',
+            'custom3_hero_bg_enabled' => 'sometimes|boolean',
+            'custom3_hero_bg_image' => 'sometimes|nullable|string',
+            'custom3_hero_bg_opacity' => 'sometimes|integer|min:0|max:100',
         ]);
 
         if ($request->has('doctor_profile_template')) {
@@ -96,6 +102,18 @@ class SettingsController extends Controller
 
         if ($request->has('modern_cover_value')) {
             SiteSetting::set('modern_cover_value', $request->modern_cover_value);
+        }
+
+        if ($request->has('custom3_hero_bg_enabled')) {
+            SiteSetting::set('custom3_hero_bg_enabled', $request->custom3_hero_bg_enabled);
+        }
+
+        if ($request->has('custom3_hero_bg_image')) {
+            SiteSetting::set('custom3_hero_bg_image', $request->custom3_hero_bg_image);
+        }
+
+        if ($request->has('custom3_hero_bg_opacity')) {
+            SiteSetting::set('custom3_hero_bg_opacity', $request->custom3_hero_bg_opacity);
         }
 
         // Clear homepage cache so changes are immediately visible

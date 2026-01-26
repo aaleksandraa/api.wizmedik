@@ -14,7 +14,7 @@ class UploadController extends Controller
         try {
             $request->validate([
                 'image'  => 'required|image|mimes:jpeg,png,jpg,webp,svg|max:5120', // 5MB max
-                'folder' => 'required|in:doctors,clinics,cities,covers,blog,laboratories,spas,logos',
+                'folder' => 'required|in:doctors,clinics,cities,covers,blog,laboratories,spas,logos,backgrounds',
             ]);
 
             $folder = $request->folder;
