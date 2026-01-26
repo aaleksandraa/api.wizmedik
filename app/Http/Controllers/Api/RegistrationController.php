@@ -23,30 +23,41 @@ class RegistrationController extends Controller
      */
     public function registerDoctor(DoctorRegistrationRequest $request)
     {
-        // Rate limiting
-        $key = 'register-doctor:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
+        try {
+            // Rate limiting
+            $key = 'register-doctor:' . $request->ip();
+            if (RateLimiter::tooManyAttempts($key, 5)) {
+                $seconds = RateLimiter::availableIn($key);
+                return response()->json([
+                    'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
+                ], 429);
+            }
+
+            RateLimiter::hit($key, 3600); // 1 hour
+
+            // Create registration request
+            $registrationRequest = $this->createRegistrationRequest('doctor', $request);
+
+            // Send verification email
+            $this->sendVerificationEmail($registrationRequest);
+
+            // Send confirmation email
+            $this->sendConfirmationEmail($registrationRequest);
+
             return response()->json([
-                'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
-            ], 429);
+                'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
+                'request_id' => $registrationRequest->id,
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Doctor registration error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error_id' => \Str::uuid(),
+            ], 500);
         }
-
-        RateLimiter::hit($key, 3600); // 1 hour
-
-        // Create registration request
-        $registrationRequest = $this->createRegistrationRequest('doctor', $request);
-
-        // Send verification email
-        $this->sendVerificationEmail($registrationRequest);
-
-        // Send confirmation email
-        $this->sendConfirmationEmail($registrationRequest);
-
-        return response()->json([
-            'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
-            'request_id' => $registrationRequest->id,
-        ], 201);
     }
 
     /**
@@ -54,30 +65,41 @@ class RegistrationController extends Controller
      */
     public function registerClinic(ClinicRegistrationRequest $request)
     {
-        // Rate limiting
-        $key = 'register-clinic:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
+        try {
+            // Rate limiting
+            $key = 'register-clinic:' . $request->ip();
+            if (RateLimiter::tooManyAttempts($key, 5)) {
+                $seconds = RateLimiter::availableIn($key);
+                return response()->json([
+                    'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
+                ], 429);
+            }
+
+            RateLimiter::hit($key, 3600);
+
+            // Create registration request
+            $registrationRequest = $this->createRegistrationRequest('clinic', $request);
+
+            // Send verification email
+            $this->sendVerificationEmail($registrationRequest);
+
+            // Send confirmation email
+            $this->sendConfirmationEmail($registrationRequest);
+
             return response()->json([
-                'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
-            ], 429);
+                'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
+                'request_id' => $registrationRequest->id,
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Clinic registration error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error_id' => \Str::uuid(),
+            ], 500);
         }
-
-        RateLimiter::hit($key, 3600);
-
-        // Create registration request
-        $registrationRequest = $this->createRegistrationRequest('clinic', $request);
-
-        // Send verification email
-        $this->sendVerificationEmail($registrationRequest);
-
-        // Send confirmation email
-        $this->sendConfirmationEmail($registrationRequest);
-
-        return response()->json([
-            'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
-            'request_id' => $registrationRequest->id,
-        ], 201);
     }
 
     /**
@@ -85,30 +107,41 @@ class RegistrationController extends Controller
      */
     public function registerLaboratory(\App\Http\Requests\LaboratoryRegistrationRequest $request)
     {
-        // Rate limiting
-        $key = 'register-laboratory:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
+        try {
+            // Rate limiting
+            $key = 'register-laboratory:' . $request->ip();
+            if (RateLimiter::tooManyAttempts($key, 5)) {
+                $seconds = RateLimiter::availableIn($key);
+                return response()->json([
+                    'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
+                ], 429);
+            }
+
+            RateLimiter::hit($key, 3600);
+
+            // Create registration request
+            $registrationRequest = $this->createRegistrationRequest('laboratory', $request);
+
+            // Send verification email
+            $this->sendVerificationEmail($registrationRequest);
+
+            // Send confirmation email
+            $this->sendConfirmationEmail($registrationRequest);
+
             return response()->json([
-                'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
-            ], 429);
+                'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
+                'request_id' => $registrationRequest->id,
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Laboratory registration error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error_id' => \Str::uuid(),
+            ], 500);
         }
-
-        RateLimiter::hit($key, 3600);
-
-        // Create registration request
-        $registrationRequest = $this->createRegistrationRequest('laboratory', $request);
-
-        // Send verification email
-        $this->sendVerificationEmail($registrationRequest);
-
-        // Send confirmation email
-        $this->sendConfirmationEmail($registrationRequest);
-
-        return response()->json([
-            'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
-            'request_id' => $registrationRequest->id,
-        ], 201);
     }
 
     /**
@@ -116,30 +149,41 @@ class RegistrationController extends Controller
      */
     public function registerSpa(\App\Http\Requests\SpaRegistrationRequest $request)
     {
-        // Rate limiting
-        $key = 'register-spa:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
+        try {
+            // Rate limiting
+            $key = 'register-spa:' . $request->ip();
+            if (RateLimiter::tooManyAttempts($key, 5)) {
+                $seconds = RateLimiter::availableIn($key);
+                return response()->json([
+                    'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
+                ], 429);
+            }
+
+            RateLimiter::hit($key, 3600);
+
+            // Create registration request
+            $registrationRequest = $this->createRegistrationRequest('spa', $request);
+
+            // Send verification email
+            $this->sendVerificationEmail($registrationRequest);
+
+            // Send confirmation email
+            $this->sendConfirmationEmail($registrationRequest);
+
             return response()->json([
-                'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
-            ], 429);
+                'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
+                'request_id' => $registrationRequest->id,
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Spa registration error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error_id' => \Str::uuid(),
+            ], 500);
         }
-
-        RateLimiter::hit($key, 3600);
-
-        // Create registration request
-        $registrationRequest = $this->createRegistrationRequest('spa', $request);
-
-        // Send verification email
-        $this->sendVerificationEmail($registrationRequest);
-
-        // Send confirmation email
-        $this->sendConfirmationEmail($registrationRequest);
-
-        return response()->json([
-            'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
-            'request_id' => $registrationRequest->id,
-        ], 201);
     }
 
     /**
@@ -147,30 +191,41 @@ class RegistrationController extends Controller
      */
     public function registerCareHome(\App\Http\Requests\CareHomeRegistrationRequest $request)
     {
-        // Rate limiting
-        $key = 'register-care-home:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
+        try {
+            // Rate limiting
+            $key = 'register-care-home:' . $request->ip();
+            if (RateLimiter::tooManyAttempts($key, 5)) {
+                $seconds = RateLimiter::availableIn($key);
+                return response()->json([
+                    'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
+                ], 429);
+            }
+
+            RateLimiter::hit($key, 3600);
+
+            // Create registration request
+            $registrationRequest = $this->createRegistrationRequest('care_home', $request);
+
+            // Send verification email
+            $this->sendVerificationEmail($registrationRequest);
+
+            // Send confirmation email
+            $this->sendConfirmationEmail($registrationRequest);
+
             return response()->json([
-                'message' => "Previše pokušaja. Pokušajte ponovo za {$seconds} sekundi."
-            ], 429);
+                'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
+                'request_id' => $registrationRequest->id,
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Care home registration error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error_id' => \Str::uuid(),
+            ], 500);
         }
-
-        RateLimiter::hit($key, 3600);
-
-        // Create registration request
-        $registrationRequest = $this->createRegistrationRequest('care_home', $request);
-
-        // Send verification email
-        $this->sendVerificationEmail($registrationRequest);
-
-        // Send confirmation email
-        $this->sendConfirmationEmail($registrationRequest);
-
-        return response()->json([
-            'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
-            'request_id' => $registrationRequest->id,
-        ], 201);
     }
 
     /**

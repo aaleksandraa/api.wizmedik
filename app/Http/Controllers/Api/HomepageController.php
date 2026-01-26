@@ -149,7 +149,8 @@ class HomepageController extends Controller
                     'email',
                     'website',
                     'galerija',
-                    'radno_vrijeme'
+                    'radno_vrijeme',
+                    'aktivan'
                 )
                 ->limit(4)
                 ->get()

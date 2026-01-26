@@ -17,7 +17,8 @@ use App\Http\Controllers\Api\{
     NotifikacijaController,
     DoctorDashboardController,
     LogoSettingsController,
-    CalendarSyncController
+    CalendarSyncController,
+    RegistrationController
 };
 
 /*
@@ -35,6 +36,25 @@ Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])
     ->middleware('throttle:3,60'); // 3 attempts per 60 minutes
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:5,60'); // 5 attempts per 60 minutes
+
+// Registration routes (for different entity types)
+Route::post('/register/doctor', [RegistrationController::class, 'registerDoctor'])
+    ->middleware('throttle:5,60');
+Route::post('/register/clinic', [RegistrationController::class, 'registerClinic'])
+    ->middleware('throttle:5,60');
+Route::post('/register/laboratory', [RegistrationController::class, 'registerLaboratory'])
+    ->middleware('throttle:5,60');
+Route::post('/register/spa', [RegistrationController::class, 'registerSpa'])
+    ->middleware('throttle:5,60');
+Route::post('/register/care-home', [RegistrationController::class, 'registerCareHome'])
+    ->middleware('throttle:5,60');
+
+// Email verification routes
+Route::get('/verify-email/{token}', [RegistrationController::class, 'verifyEmail']);
+Route::post('/verify-email-code', [RegistrationController::class, 'verifyEmailWithCode'])
+    ->middleware('throttle:10,60');
+Route::post('/resend-verification', [RegistrationController::class, 'resendVerification'])
+    ->middleware('throttle:3,60');
 
 // Public doctor routes
 Route::get('/doctors', [DoctorController::class, 'index']);
