@@ -59,7 +59,8 @@ class UploadController extends Controller
                 // Save SVG directly without processing
                 Storage::disk('public')->put($publicPath, file_get_contents($imageFile->getRealPath()));
 
-                $url = asset(Storage::disk('public')->url($publicPath));
+                // Generate full URL using APP_URL from config
+                $url = config('app.url') . '/storage/' . $publicPath;
 
                 \Log::info('SVG uploaded successfully', [
                     'path' => $publicPath,
@@ -158,8 +159,8 @@ class UploadController extends Controller
                 ], 500);
             }
 
-            // Generiši puni URL za frontend
-            $url = asset(Storage::disk('public')->url($publicPath));
+            // Generate full URL using APP_URL from config
+            $url = config('app.url') . '/storage/' . $publicPath;
 
             \Log::info('Image uploaded successfully', [
                 'path' => $publicPath,
