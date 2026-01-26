@@ -416,6 +416,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/blog/posts/{id}', [\App\Http\Controllers\Api\BlogController::class, 'adminDestroy']);
         Route::post('/blog/categories', [\App\Http\Controllers\Api\BlogController::class, 'adminStoreCategory']);
         Route::put('/blog/categories/{id}', [\App\Http\Controllers\Api\BlogController::class, 'adminUpdateCategory']);
+        Route::put('/blog/categories-order', [\App\Http\Controllers\Api\BlogController::class, 'adminUpdateCategoriesOrder']);
         Route::delete('/blog/categories/{id}', [\App\Http\Controllers\Api\BlogController::class, 'adminDestroyCategory']);
         Route::get('/blog/settings', [\App\Http\Controllers\Api\BlogController::class, 'getSettings']);
         Route::put('/blog/settings', [\App\Http\Controllers\Api\BlogController::class, 'updateSettings']);
@@ -486,4 +487,21 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/clinics/{id}/activate', [\App\Http\Controllers\Api\AdminClinicController::class, 'activate']);
     Route::post('/clinics/{id}/deactivate', [\App\Http\Controllers\Api\AdminClinicController::class, 'deactivate']);
     Route::get('/clinics/statistics', [\App\Http\Controllers\Api\AdminClinicController::class, 'statistics']);
+
+    // Admin Entities Management
+    Route::get('/laboratories', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getLaboratories']);
+    Route::put('/laboratories/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateLaboratory']);
+    Route::delete('/laboratories/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteLaboratory']);
+
+    Route::get('/spas', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getSpas']);
+    Route::put('/spas/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateSpa']);
+    Route::delete('/spas/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteSpa']);
+
+    Route::get('/care-homes', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getCareHomes']);
+    Route::put('/care-homes/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateCareHome']);
+    Route::delete('/care-homes/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteCareHome']);
+
+    Route::get('/pitanja', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getQuestions']);
+    Route::put('/pitanja/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateQuestion']);
+    Route::delete('/pitanja/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteQuestion']);
 });

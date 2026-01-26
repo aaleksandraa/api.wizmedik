@@ -80,7 +80,12 @@ class BlogController extends Controller
 
     public function categories()
     {
-        return response()->json(BlogCategory::withCount(['posts' => fn($q) => $q->published()])->get());
+        return response()->json(
+            BlogCategory::withCount(['posts' => fn($q) => $q->published()])
+                ->orderBy('sort_order', 'asc')
+                ->orderBy('naziv', 'asc')
+                ->get()
+        );
     }
 
     public function authors()
@@ -333,8 +338,25 @@ class BlogController extends Controller
         $cat->update($request->validate([
             'naziv' => 'sometimes|string|max:100',
             'opis' => 'nullable|string',
+            'sort_order' => 'sometimes|integer|min:0',
         ]));
         return response()->json($cat);
+    }
+
+    public function adminUpdateCategoriesOrder(Request $request)
+    {
+        $request->validate([
+            'categories' => 'required|array',
+            'categories.*.id' => 'required|exists:blog_categories,id',
+            'categories.*.sort_order' => 'required|integer|min:0',
+        ]);
+
+        foreach ($request->categories as $categoryData) {
+            BlogCategory::where('id', $categoryData['id'])
+                ->update(['sort_order' => $categoryData['sort_order']]);
+        }
+
+        return response()->json(['message' => 'Redoslijed kategorija ažuriran']);
     }
 
     public function adminDestroyCategory($id)
