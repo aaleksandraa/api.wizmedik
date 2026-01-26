@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use App\Models\BlogPost;
 
 class HomepageController extends Controller
 {
@@ -205,28 +206,48 @@ class HomepageController extends Controller
                     return $pitanje;
                 });
 
-            // Get recent blog posts (if table exists)
+            // Get recent blog posts using BlogPost model
             $blogPosts = [];
             try {
-                $blogPosts = DB::table('blog_postovi')
+                $posts = BlogPost::with(['doktor:id,ime,prezime,slug', 'categories'])
                     ->where('status', 'published')
-                    ->select('id', 'naslov', 'slug', 'kratak_opis', 'sadrzaj', 'slika_url', 'kategorija_id', 'created_at')
-                    ->orderBy('created_at', 'desc')
+                    ->where('published_at', '<=', now())
+                    ->orderBy('published_at', 'desc')
                     ->limit(3)
-                    ->get()
-                    ->map(function ($post) {
-                        // Get category
-                        if ($post->kategorija_id) {
-                            $kategorija = DB::table('blog_kategorije')
-                                ->where('id', $post->kategorija_id)
-                                ->select('id', 'naziv', 'slug')
-                                ->first();
-                            $post->kategorija = $kategorija;
-                        }
-                        return $post;
-                    });
+                    ->get();
+
+                $blogPosts = $posts->map(function ($post) {
+                    // Get thumbnail URL
+                    $thumbnailUrl = $post->thumbnail;
+                    if ($thumbnailUrl && !filter_var($thumbnailUrl, FILTER_VALIDATE_URL)) {
+                        $thumbnailUrl = config('app.url') . '/storage/' . $thumbnailUrl;
+                    }
+
+                    return [
+                        'id' => $post->id,
+                        'naslov' => $post->naslov,
+                        'slug' => $post->slug,
+                        'kratak_opis' => $post->excerpt,
+                        'sadrzaj' => $post->sadrzaj,
+                        'slika_url' => $thumbnailUrl,
+                        'doktor' => $post->doktor ? [
+                            'id' => $post->doktor->id,
+                            'ime' => $post->doktor->ime,
+                            'prezime' => $post->doktor->prezime,
+                            'slug' => $post->doktor->slug,
+                        ] : null,
+                        'kategorija' => $post->categories->first() ? [
+                            'id' => $post->categories->first()->id,
+                            'naziv' => $post->categories->first()->naziv,
+                            'slug' => $post->categories->first()->slug,
+                        ] : null,
+                        'created_at' => $post->published_at ?? $post->created_at,
+                    ];
+                })->toArray();
             } catch (\Exception $e) {
-                // Table doesn't exist yet, return empty array
+                // Log error for debugging
+                \Log::error('Blog posts fetch error: ' . $e->getMessage());
+                \Log::error($e->getTraceAsString());
                 $blogPosts = [];
             }
 
