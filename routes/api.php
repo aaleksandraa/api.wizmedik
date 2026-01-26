@@ -65,7 +65,6 @@ Route::get('/specialties/{slug}', [SpecialtyController::class, 'show']);
 
 // Homepage data
 Route::get('/homepage', [HomepageController::class, 'getData']);
-Route::post('/homepage/clear-cache', [HomepageController::class, 'clearCache']);
 
 // Settings (public)
 Route::get('/settings/templates', [SettingsController::class, 'getTemplates']);
