@@ -86,6 +86,27 @@ class GenerateSitemap extends Command
             } catch (\Exception $e) {
                 $this->error("   ❌ Failed: {$filename}");
                 $this->error("   Error: " . $e->getMessage());
+
+                // Create empty sitemap to prevent 404 errors
+                $baseUrl = config('app.frontend_url', 'https://wizmedik.com');
+                $emptyXml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+
+                if ($filename === 'sitemap.xml') {
+                    // Empty sitemap index
+                    $emptyXml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+                    $emptyXml .= '<!-- This sitemap is empty due to generation error -->' . "\n";
+                    $emptyXml .= '</sitemapindex>';
+                } else {
+                    // Empty urlset
+                    $emptyXml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+                    $emptyXml .= '<!-- This sitemap is empty due to generation error -->' . "\n";
+                    $emptyXml .= '</urlset>';
+                }
+
+                $filepath = "{$outputDir}/{$filename}";
+                file_put_contents($filepath, $emptyXml);
+                $this->warn("   ⚠️  Created empty sitemap to prevent 404 errors");
+
                 $errorCount++;
             }
         }

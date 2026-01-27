@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\DB;
+use App\Models\BlogPost;
 
 class SitemapController extends Controller
 {
@@ -307,9 +308,10 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
-        $posts = DB::table('blog_postovi')
-            ->where('status', 'published')
+        // Use BlogPost model with published scope for better maintainability
+        $posts = BlogPost::published()
             ->select('slug', 'updated_at')
+            ->orderBy('updated_at', 'desc')
             ->get();
 
         foreach ($posts as $post) {
