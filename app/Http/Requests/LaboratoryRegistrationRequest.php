@@ -120,4 +120,18 @@ class LaboratoryRegistrationRequest extends FormRequest
             ]);
         }
     }
+
+    /**
+     * Handle a failed validation attempt.
+     */
+    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator)
+    {
+        throw new \Illuminate\Http\Exceptions\HttpResponseException(
+            response()->json([
+                'success' => false,
+                'message' => 'Greške u validaciji. Molimo provjerite unesene podatke.',
+                'errors' => $validator->errors()->toArray(),
+            ], 422)
+        );
+    }
 }
