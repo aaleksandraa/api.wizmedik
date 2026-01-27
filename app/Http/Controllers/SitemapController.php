@@ -112,7 +112,7 @@ class SitemapController extends Controller
         foreach ($doctors as $doctor) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/doktor/' . htmlspecialchars($doctor->slug) . '</loc>';
-            $xml .= '<lastmod>' . $doctor->updated_at . '</lastmod>';
+            $xml .= '<lastmod>' . date('c', strtotime($doctor->updated_at)) . '</lastmod>'; // ISO 8601 format
             $xml .= '<changefreq>weekly</changefreq>';
             $xml .= '<priority>0.8</priority>';
             $xml .= '</url>';
@@ -143,7 +143,7 @@ class SitemapController extends Controller
         foreach ($clinics as $clinic) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/klinika/' . htmlspecialchars($clinic->slug) . '</loc>';
-            $xml .= '<lastmod>' . $clinic->updated_at . '</lastmod>';
+            $xml .= '<lastmod>' . date('c', strtotime($clinic->updated_at)) . '</lastmod>'; // ISO 8601 format
             $xml .= '<changefreq>weekly</changefreq>';
             $xml .= '<priority>0.8</priority>';
             $xml .= '</url>';
@@ -171,7 +171,7 @@ class SitemapController extends Controller
         foreach ($specialties as $specialty) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/specijalnost/' . htmlspecialchars($specialty->slug) . '</loc>';
-            $xml .= '<lastmod>' . $specialty->updated_at . '</lastmod>';
+            $xml .= '<lastmod>' . date('c', strtotime($specialty->updated_at)) . '</lastmod>'; // ISO 8601 format
             $xml .= '<changefreq>monthly</changefreq>';
             $xml .= '<priority>0.7</priority>';
             $xml .= '</url>';
@@ -199,7 +199,7 @@ class SitemapController extends Controller
         foreach ($cities as $city) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/grad/' . htmlspecialchars($city->slug) . '</loc>';
-            $xml .= '<lastmod>' . $city->updated_at . '</lastmod>';
+            $xml .= '<lastmod>' . date('c', strtotime($city->updated_at)) . '</lastmod>'; // ISO 8601 format
             $xml .= '<changefreq>monthly</changefreq>';
             $xml .= '<priority>0.7</priority>';
             $xml .= '</url>';
@@ -229,7 +229,7 @@ class SitemapController extends Controller
         foreach ($laboratories as $lab) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/laboratorija/' . htmlspecialchars($lab->slug) . '</loc>';
-            $xml .= '<lastmod>' . $lab->updated_at . '</lastmod>';
+            $xml .= '<lastmod>' . date('c', strtotime($lab->updated_at)) . '</lastmod>'; // ISO 8601 format
             $xml .= '<changefreq>weekly</changefreq>';
             $xml .= '<priority>0.7</priority>';
             $xml .= '</url>';
@@ -259,7 +259,7 @@ class SitemapController extends Controller
         foreach ($spas as $spa) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/banja/' . htmlspecialchars($spa->slug) . '</loc>';
-            $xml .= '<lastmod>' . $spa->updated_at . '</lastmod>';
+            $xml .= '<lastmod>' . date('c', strtotime($spa->updated_at)) . '</lastmod>'; // ISO 8601 format
             $xml .= '<changefreq>monthly</changefreq>';
             $xml .= '<priority>0.7</priority>';
             $xml .= '</url>';
@@ -289,7 +289,7 @@ class SitemapController extends Controller
         foreach ($homes as $home) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/dom-njega/' . htmlspecialchars($home->slug) . '</loc>';
-            $xml .= '<lastmod>' . $home->updated_at . '</lastmod>';
+            $xml .= '<lastmod>' . date('c', strtotime($home->updated_at)) . '</lastmod>'; // ISO 8601 format
             $xml .= '<changefreq>monthly</changefreq>';
             $xml .= '<priority>0.7</priority>';
             $xml .= '</url>';
