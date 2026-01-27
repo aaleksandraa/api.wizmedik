@@ -45,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SecurityHeadersMiddleware::class,
             \App\Http\Middleware\AuditLogMiddleware::class,
             \App\Http\Middleware\CompressResponse::class,
+            \App\Http\Middleware\SetCacheHeaders::class, // Performance optimization - cache headers
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
