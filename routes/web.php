@@ -33,6 +33,7 @@ Route::get('/storage/{folder}/{filename}', function ($folder, $filename) {
 
 // SEO-friendly catch-all route (must be last)
 // Serves index.html with dynamic meta tags for all SPA routes
+// IMPORTANT: Exclude sitemap.xml and other XML files
 Route::get('/{any}', [SeoController::class, 'index'])
-    ->where('any', '.*')
+    ->where('any', '^(?!sitemap).*')  // Exclude sitemap routes
     ->middleware('web');
