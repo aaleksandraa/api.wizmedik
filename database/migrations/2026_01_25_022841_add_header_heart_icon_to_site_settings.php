@@ -12,13 +12,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Add show_heart_icon_header setting
-        DB::table('site_settings')->insert([
-            'key' => 'show_heart_icon_header',
-            'value' => '1', // Default enabled
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // Add show_heart_icon_header setting (use updateOrInsert to avoid duplicate key error)
+        DB::table('site_settings')->updateOrInsert(
+            ['key' => 'show_heart_icon_header'],
+            [
+                'value' => '1', // Default enabled
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
     }
 
     /**

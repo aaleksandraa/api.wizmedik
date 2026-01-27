@@ -15,12 +15,21 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Insert default template settings
-        DB::table('site_settings')->insert([
-            ['key' => 'doctor_profile_template', 'value' => 'classic', 'created_at' => now(), 'updated_at' => now()],
-            ['key' => 'clinic_profile_template', 'value' => 'classic', 'created_at' => now(), 'updated_at' => now()],
-            ['key' => 'homepage_template', 'value' => 'classic', 'created_at' => now(), 'updated_at' => now()],
-        ]);
+        // Insert default template settings (use insertOrIgnore to avoid duplicates)
+        $settings = [
+            ['key' => 'doctor_profile_template', 'value' => 'classic'],
+            ['key' => 'clinic_profile_template', 'value' => 'classic'],
+            ['key' => 'homepage_template', 'value' => 'classic'],
+        ];
+
+        foreach ($settings as $setting) {
+            DB::table('site_settings')->insertOrIgnore([
+                'key' => $setting['key'],
+                'value' => $setting['value'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     public function down(): void

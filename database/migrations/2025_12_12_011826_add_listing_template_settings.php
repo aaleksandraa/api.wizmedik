@@ -11,33 +11,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Insert default listing template settings
-        DB::table('site_settings')->insert([
-            [
-                'key' => 'doctors_listing_template',
-                'value' => 'default',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'key' => 'clinics_listing_template',
-                'value' => 'default',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'key' => 'cities_listing_template',
-                'value' => 'default',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'key' => 'laboratories_listing_template',
-                'value' => 'default',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
+        // Insert default listing template settings (use insertOrIgnore to avoid duplicates)
+        $settings = [
+            ['key' => 'doctors_listing_template', 'value' => 'default'],
+            ['key' => 'clinics_listing_template', 'value' => 'default'],
+            ['key' => 'cities_listing_template', 'value' => 'default'],
+            ['key' => 'laboratories_listing_template', 'value' => 'default'],
+        ];
+
+        foreach ($settings as $setting) {
+            DB::table('site_settings')->updateOrInsert(
+                ['key' => $setting['key']],
+                [
+                    'value' => $setting['value'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
     }
 
     /**
