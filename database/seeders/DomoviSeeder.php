@@ -338,24 +338,41 @@ class DomoviSeeder extends Seeder
             ]
         ];
 
-        // Insert domovi
+        // Insert or update domovi
         foreach ($domovi as $dom) {
+            $slug = $dom['slug'];
+
             // Convert arrays to JSON for PostgreSQL
             $dom['accepts_tags'] = json_encode($dom['accepts_tags']);
             $dom['galerija'] = json_encode($dom['galerija']);
             $dom['radno_vrijeme'] = json_encode($dom['radno_vrijeme']);
             $dom['faqs'] = json_encode($dom['faqs']);
 
-            $domId = DB::table('domovi_njega')->insertGetId($dom);
+            // Check if dom already exists
+            $existingDom = DB::table('domovi_njega')->where('slug', $slug)->first();
+
+            if ($existingDom) {
+                // Update existing dom
+                DB::table('domovi_njega')->where('slug', $slug)->update($dom);
+                $domId = $existingDom->id;
+
+                // Delete existing relations
+                DB::table('dom_programi_njege')->where('dom_id', $domId)->delete();
+                DB::table('dom_medicinske_usluge')->where('dom_id', $domId)->delete();
+                DB::table('dom_smjestaj_uslovi')->where('dom_id', $domId)->delete();
+            } else {
+                // Insert new dom
+                $domId = DB::table('domovi_njega')->insertGetId($dom);
+            }
 
             // Add programs for each dom
-            $this->attachPrograms($domId, $dom['slug'], $programiNjege);
+            $this->attachPrograms($domId, $slug, $programiNjege);
 
             // Add medical services for each dom
-            $this->attachMedicalServices($domId, $dom['slug'], $medicinskUsluge);
+            $this->attachMedicalServices($domId, $slug, $medicinskUsluge);
 
             // Add accommodation conditions for each dom
-            $this->attachAccommodationConditions($domId, $dom['slug'], $smjestajUslovi);
+            $this->attachAccommodationConditions($domId, $slug, $smjestajUslovi);
         }
 
         $this->command->info('✅ Domovi uspješno kreirani sa vezama!');
