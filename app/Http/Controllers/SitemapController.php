@@ -40,7 +40,7 @@ class SitemapController extends Controller
         foreach ($sitemaps as $sitemap) {
             $xml .= '<sitemap>';
             $xml .= '<loc>' . $baseUrl . '/' . $sitemap . '</loc>';
-            $xml .= '<lastmod>' . now()->toAtomString() . '</lastmod>';
+            $xml .= '<lastmod>' . now()->format('c') . '</lastmod>'; // ISO 8601 format
             $xml .= '</sitemap>';
         }
 
@@ -76,10 +76,12 @@ class SitemapController extends Controller
             ['url' => '/politika-privatnosti', 'priority' => '0.5', 'changefreq' => 'yearly'],
         ];
 
+        $lastmod = now()->format('c'); // ISO 8601 format
+
         foreach ($pages as $page) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . $page['url'] . '</loc>';
-            $xml .= '<lastmod>' . now()->toAtomString() . '</lastmod>';
+            $xml .= '<lastmod>' . $lastmod . '</lastmod>';
             $xml .= '<changefreq>' . $page['changefreq'] . '</changefreq>';
             $xml .= '<priority>' . $page['priority'] . '</priority>';
             $xml .= '</url>';
@@ -306,20 +308,43 @@ class SitemapController extends Controller
         $baseUrl = $this->getBaseUrl();
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" ';
+        $xml .= 'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">';
 
-        // Use BlogPost model with published scope for better maintainability
+        // Use BlogPost model with published scope
         $posts = BlogPost::published()
-            ->select('slug', 'updated_at')
+            ->select('slug', 'updated_at', 'published_at', 'thumbnail', 'naslov', 'excerpt')
             ->orderBy('updated_at', 'desc')
             ->get();
 
         foreach ($posts as $post) {
             $xml .= '<url>';
             $xml .= '<loc>' . $baseUrl . '/blog/' . htmlspecialchars($post->slug) . '</loc>';
-            $xml .= '<lastmod>' . $post->updated_at . '</lastmod>';
+
+            // Use ISO 8601 format (W3C Datetime) - required by sitemap standard
+            $lastmod = $post->updated_at->format('c'); // ISO 8601 format with timezone
+            $xml .= '<lastmod>' . $lastmod . '</lastmod>';
+
             $xml .= '<changefreq>monthly</changefreq>';
             $xml .= '<priority>0.6</priority>';
+
+            // Add image information if thumbnail exists (helps with Google Images indexing)
+            if ($post->thumbnail) {
+                $imageUrl = $post->thumbnail;
+                // Convert relative URLs to absolute
+                if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                    $imageUrl = config('app.url') . '/storage/' . ltrim($imageUrl, '/');
+                }
+
+                $xml .= '<image:image>';
+                $xml .= '<image:loc>' . htmlspecialchars($imageUrl) . '</image:loc>';
+                $xml .= '<image:title>' . htmlspecialchars($post->naslov) . '</image:title>';
+                if ($post->excerpt) {
+                    $xml .= '<image:caption>' . htmlspecialchars(strip_tags($post->excerpt)) . '</image:caption>';
+                }
+                $xml .= '</image:image>';
+            }
+
             $xml .= '</url>';
         }
 
