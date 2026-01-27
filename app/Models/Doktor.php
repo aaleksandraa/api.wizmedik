@@ -149,6 +149,11 @@ class Doktor extends Model
         return $this->belongsTo(User::class, 'verifikovan_by');
     }
 
+    public function blogPosts()
+    {
+        return $this->hasMany(BlogPost::class, 'doktor_id');
+    }
+
 
     /*
     |--------------------------------------------------------------------------
