@@ -94,7 +94,6 @@ Route::get('/settings/colors', [SettingsController::class, 'getGlobalColors']);
 Route::get('/settings/specialty-template', [SettingsController::class, 'getSpecialtyTemplate']);
 Route::get('/settings/blog-typography', [SettingsController::class, 'getBlogTypography']);
 Route::get('/settings/listing-template', [SettingsController::class, 'getListingTemplate']);
-Route::get('/settings/cookie', [SettingsController::class, 'getCookieSettings']);
 
 // Logo settings (public)
 Route::get('/logo-settings', [LogoSettingsController::class, 'index']);

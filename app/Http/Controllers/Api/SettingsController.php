@@ -558,15 +558,4 @@ class SettingsController extends Controller
 
         return response()->json(['message' => 'Template ažuriran']);
     }
-
-    // Cookie consent settings
-    public function getCookieSettings()
-    {
-        return response()->json([
-            'enabled' => SiteSetting::get('cookie_consent_enabled', false),
-            'text' => SiteSetting::get('cookie_consent_text', 'Koristimo kolačiće kako bismo poboljšali vaše iskustvo na našoj web stranici. Nastavkom korištenja stranice prihvatate našu upotrebu kolačića.'),
-            'accept_button' => SiteSetting::get('cookie_consent_accept', 'Prihvatam'),
-            'reject_button' => SiteSetting::get('cookie_consent_reject', 'Odbij'),
-        ]);
-    }
 }
