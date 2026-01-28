@@ -523,17 +523,15 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/pitanja', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getQuestions']);
     Route::put('/pitanja/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateQuestion']);
     Route::delete('/pitanja/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteQuestion']);
+
+    // Medical Calendar - Admin routes
+    Route::get('/medical-calendar', [MedicalCalendarController::class, 'adminIndex']);
+    Route::post('/medical-calendar', [MedicalCalendarController::class, 'store']);
+    Route::put('/medical-calendar/{id}', [MedicalCalendarController::class, 'update']);
+    Route::delete('/medical-calendar/{id}', [MedicalCalendarController::class, 'destroy']);
 });
 
 // Medical Calendar - Public routes
 Route::get('/medical-calendar', [MedicalCalendarController::class, 'index']);
 Route::get('/medical-calendar/{id}', [MedicalCalendarController::class, 'show']);
 Route::get('/medical-calendar/categories/list', [MedicalCalendarController::class, 'getCategories']);
-
-// Medical Calendar - Admin routes
-Route::prefix('admin')->middleware('role:admin')->group(function () {
-    Route::get('/medical-calendar', [MedicalCalendarController::class, 'adminIndex']);
-    Route::post('/medical-calendar', [MedicalCalendarController::class, 'store']);
-    Route::put('/medical-calendar/{id}', [MedicalCalendarController::class, 'update']);
-    Route::delete('/medical-calendar/{id}', [MedicalCalendarController::class, 'destroy']);
-});
