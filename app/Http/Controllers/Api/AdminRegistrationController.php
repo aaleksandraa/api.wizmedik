@@ -289,7 +289,7 @@ class AdminRegistrationController extends Controller
                 'slug' => Str::slug($registrationRequest->ime . '-' . $registrationRequest->prezime . '-' . $user->id),
                 'email' => $registrationRequest->email,
                 'telefon' => $registrationRequest->telefon,
-                'adresa' => $registrationRequest->adresa,
+                'lokacija' => $registrationRequest->adresa ?? $registrationRequest->grad, // Use adresa as lokacija, fallback to grad
                 'grad' => $registrationRequest->grad,
                 'specijalnost' => $registrationRequest->specialty->naziv ?? '',
                 'specijalnost_id' => $registrationRequest->specijalnost_id,
