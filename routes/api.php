@@ -49,6 +49,7 @@ Route::middleware(['throttle:5,60', 'detect.bots'])->group(function () {
 
 // Email verification routes
 Route::get('/verify-email/{token}', [RegistrationController::class, 'verifyEmail']);
+Route::get('/register/verify/{token}', [RegistrationController::class, 'verifyEmail']); // Alias for email link
 Route::post('/verify-email-code', [RegistrationController::class, 'verifyEmailWithCode'])
     ->middleware('throttle:10,60');
 Route::post('/resend-verification', [RegistrationController::class, 'resendVerification'])
