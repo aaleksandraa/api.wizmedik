@@ -548,4 +548,104 @@ class AdminController extends Controller
             ], 500);
         }
     }
+
+    // Admin Profile Management
+
+    /**
+     * Get current admin profile
+     */
+    public function getProfile(Request $request)
+    {
+        return response()->json([
+            'user' => $request->user()->only(['id', 'name', 'email', 'role', 'created_at']),
+        ]);
+    }
+
+    /**
+     * Update admin profile (name and email)
+     */
+    public function updateProfile(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email,' . $request->user()->id,
+            'current_password' => 'required|string',
+        ], [
+            'name.required' => 'Ime je obavezno.',
+            'email.required' => 'Email je obavezan.',
+            'email.email' => 'Email nije validan.',
+            'email.unique' => 'Ovaj email je već u upotrebi.',
+            'current_password.required' => 'Trenutna lozinka je obavezna za izmjenu profila.',
+        ]);
+
+        // Verify current password
+        if (!Hash::check($validated['current_password'], $request->user()->password)) {
+            return response()->json([
+                'message' => 'Trenutna lozinka nije tačna.',
+                'errors' => [
+                    'current_password' => ['Trenutna lozinka nije tačna.']
+                ]
+            ], 422);
+        }
+
+        $request->user()->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ]);
+
+        return response()->json([
+            'message' => 'Profil je uspješno ažuriran.',
+            'user' => $request->user()->only(['id', 'name', 'email', 'role']),
+        ]);
+    }
+
+    /**
+     * Change admin password
+     */
+    public function changePassword(Request $request)
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => [
+                'required',
+                'confirmed',
+                'min:12',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]+$/',
+            ],
+        ], [
+            'current_password.required' => 'Trenutna lozinka je obavezna.',
+            'new_password.required' => 'Nova lozinka je obavezna.',
+            'new_password.confirmed' => 'Lozinke se ne poklapaju.',
+            'new_password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
+            'new_password.regex' => 'Lozinka mora sadržati velika i mala slova, brojeve i specijalne karaktere.',
+        ]);
+
+        // Verify current password
+        if (!Hash::check($validated['current_password'], $request->user()->password)) {
+            return response()->json([
+                'message' => 'Trenutna lozinka nije tačna.',
+                'errors' => [
+                    'current_password' => ['Trenutna lozinka nije tačna.']
+                ]
+            ], 422);
+        }
+
+        // Check if new password is same as current
+        if (Hash::check($validated['new_password'], $request->user()->password)) {
+            return response()->json([
+                'message' => 'Nova lozinka mora biti različita od trenutne.',
+                'errors' => [
+                    'new_password' => ['Nova lozinka mora biti različita od trenutne.']
+                ]
+            ], 422);
+        }
+
+        $request->user()->update([
+            'password' => Hash::make($validated['new_password']),
+        ]);
+
+        return response()->json([
+            'message' => 'Lozinka je uspješno promijenjena.',
+        ]);
+    }
 }

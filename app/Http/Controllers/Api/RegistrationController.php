@@ -9,6 +9,7 @@ use App\Models\RegistrationRequest;
 use App\Models\SiteSetting;
 use App\Mail\RegistrationVerificationMail;
 use App\Mail\RegistrationReceivedMail;
+use App\Mail\NewRegistrationRequestMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -43,6 +44,9 @@ class RegistrationController extends Controller
 
             // Send confirmation email
             $this->sendConfirmationEmail($registrationRequest);
+
+            // Send admin notification
+            $this->sendAdminNotification($registrationRequest);
 
             return response()->json([
                 'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
@@ -86,6 +90,9 @@ class RegistrationController extends Controller
             // Send confirmation email
             $this->sendConfirmationEmail($registrationRequest);
 
+            // Send admin notification
+            $this->sendAdminNotification($registrationRequest);
+
             return response()->json([
                 'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
                 'request_id' => $registrationRequest->id,
@@ -127,6 +134,9 @@ class RegistrationController extends Controller
 
             // Send confirmation email
             $this->sendConfirmationEmail($registrationRequest);
+
+            // Send admin notification
+            $this->sendAdminNotification($registrationRequest);
 
             return response()->json([
                 'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
@@ -170,6 +180,9 @@ class RegistrationController extends Controller
             // Send confirmation email
             $this->sendConfirmationEmail($registrationRequest);
 
+            // Send admin notification
+            $this->sendAdminNotification($registrationRequest);
+
             return response()->json([
                 'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
                 'request_id' => $registrationRequest->id,
@@ -211,6 +224,9 @@ class RegistrationController extends Controller
 
             // Send confirmation email
             $this->sendConfirmationEmail($registrationRequest);
+
+            // Send admin notification
+            $this->sendAdminNotification($registrationRequest);
 
             return response()->json([
                 'message' => 'Zahtjev za registraciju je uspješno poslat. Molimo provjerite vaš email za verifikaciju.',
@@ -556,6 +572,23 @@ class RegistrationController extends Controller
         Mail::to($registrationRequest->email)->send(
             new RegistrationReceivedMail($registrationRequest)
         );
+    }
+
+    /**
+     * Send admin notification email
+     */
+    private function sendAdminNotification(RegistrationRequest $registrationRequest): void
+    {
+        try {
+            $adminEmail = SiteSetting::get('registration_admin_email', 'info@wizmedik.com');
+
+            Mail::to($adminEmail)->send(
+                new NewRegistrationRequestMail($registrationRequest)
+            );
+        } catch (\Exception $e) {
+            \Log::error('Failed to send admin notification email: ' . $e->getMessage());
+            // Don't throw exception - registration should still succeed even if admin email fails
+        }
     }
 
     /**

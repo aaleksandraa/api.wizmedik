@@ -53,7 +53,16 @@ class ClinicRegistrationRequest extends FormRequest
                 'max:255',
                 'unique:users,email',
                 'unique:klinike,email',
-                'unique:registration_requests,email',
+                function ($attribute, $value, $fail) {
+                    // Check if email exists in registration_requests with status other than 'rejected'
+                    $exists = \App\Models\RegistrationRequest::where('email', $value)
+                        ->where('status', '!=', 'rejected')
+                        ->exists();
+
+                    if ($exists) {
+                        $fail('Ova email adresa je već registrovana.');
+                    }
+                },
             ],
             'telefon' => [
                 'required',

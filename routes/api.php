@@ -493,6 +493,11 @@ Route::middleware('auth:sanctum')->group(function () {
 */
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    // Admin Profile Management
+    Route::get('/profile', [AdminController::class, 'getProfile']);
+    Route::put('/profile', [AdminController::class, 'updateProfile']);
+    Route::put('/password', [AdminController::class, 'changePassword']);
+
     // Admin Doctor Management
     Route::get('/doctors', [\App\Http\Controllers\Api\AdminDoctorController::class, 'index']);
     Route::post('/doctors/{id}/verify', [\App\Http\Controllers\Api\AdminDoctorController::class, 'verify']);
