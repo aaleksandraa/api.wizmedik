@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Laboratorija;
 use App\Models\Banja;
-use App\Models\DomZaNjegu;
+use App\Models\Dom;
 use App\Models\Pitanje;
 use Illuminate\Http\Request;
 
@@ -64,7 +64,7 @@ class AdminEntitiesController extends Controller
     // CARE HOMES
     public function getCareHomes(Request $request)
     {
-        $query = DomZaNjegu::query();
+        $query = Dom::query();
 
         if ($request->per_page) {
             return response()->json($query->paginate($request->per_page));
@@ -75,21 +75,21 @@ class AdminEntitiesController extends Controller
 
     public function updateCareHome(Request $request, $id)
     {
-        $home = DomZaNjegu::findOrFail($id);
+        $home = Dom::findOrFail($id);
         $home->update($request->only(['aktivan']));
         return response()->json($home);
     }
 
     public function deleteCareHome($id)
     {
-        DomZaNjegu::findOrFail($id)->delete();
+        Dom::findOrFail($id)->delete();
         return response()->json(['message' => 'Dom obrisan']);
     }
 
     // QUESTIONS
     public function getQuestions(Request $request)
     {
-        $query = Pitanje::with('korisnik:id,ime,prezime,email')
+        $query = Pitanje::with('user:id,ime,prezime,email')
             ->orderBy('created_at', 'desc');
 
         if ($request->per_page) {
