@@ -258,6 +258,17 @@ class AdminRegistrationController extends Controller
      */
     private function createUserAndProfile(RegistrationRequest $registrationRequest): array
     {
+        // Determine role based on type
+        $roleMapping = [
+            'doctor' => 'doctor',
+            'clinic' => 'clinic',
+            'laboratory' => 'laboratory',
+            'spa' => 'spa_manager',
+            'care_home' => 'dom_manager',
+        ];
+
+        $roleName = $roleMapping[$registrationRequest->type] ?? 'patient';
+
         // Create user
         $user = User::create([
             'name' => $registrationRequest->type === 'doctor'
@@ -265,12 +276,12 @@ class AdminRegistrationController extends Controller
                 : $registrationRequest->naziv,
             'email' => $registrationRequest->email,
             'password' => $registrationRequest->password, // Already hashed
-            'role' => $registrationRequest->type === 'doctor' ? 'doctor' :
-                     ($registrationRequest->type === 'laboratory' ? 'laboratory' :
-                     ($registrationRequest->type === 'spa' ? 'spa_manager' :
-                     ($registrationRequest->type === 'care_home' ? 'dom_manager' : 'clinic'))),
+            'role' => $roleName, // Keep for backward compatibility
             'email_verified_at' => now(),
         ]);
+
+        // ✅ CRITICAL: Assign Spatie Permission role
+        $user->assignRole($roleName);
 
         if ($registrationRequest->type === 'doctor') {
             // Parse message to get specialty_ids if available
