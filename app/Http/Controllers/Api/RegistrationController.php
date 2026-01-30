@@ -559,9 +559,9 @@ class RegistrationController extends Controller
      */
     private function sendVerificationEmail(RegistrationRequest $registrationRequest): void
     {
-        Mail::to($registrationRequest->email)->send(
-            new RegistrationVerificationMail($registrationRequest)
-        );
+        // Queue email with delay to prevent simultaneous sending
+        Mail::to($registrationRequest->email)
+            ->later(now()->addSeconds(2), new RegistrationVerificationMail($registrationRequest));
     }
 
     /**
@@ -569,9 +569,9 @@ class RegistrationController extends Controller
      */
     private function sendConfirmationEmail(RegistrationRequest $registrationRequest): void
     {
-        Mail::to($registrationRequest->email)->send(
-            new RegistrationReceivedMail($registrationRequest)
-        );
+        // Queue email with delay to prevent simultaneous sending
+        Mail::to($registrationRequest->email)
+            ->later(now()->addSeconds(5), new RegistrationReceivedMail($registrationRequest));
     }
 
     /**
@@ -580,13 +580,36 @@ class RegistrationController extends Controller
     private function sendAdminNotification(RegistrationRequest $registrationRequest): void
     {
         try {
-            $adminEmail = SiteSetting::get('registration_admin_email', 'info@wizmedik.com');
+            // Get admin email from settings, fallback to info@wizmedik.com
+            $adminEmail = SiteSetting::get('registration_admin_email');
 
-            Mail::to($adminEmail)->send(
-                new NewRegistrationRequestMail($registrationRequest)
-            );
+            // If not set in settings, use default
+            if (empty($adminEmail)) {
+                $adminEmail = config('mail.admin_email', 'info@wizmedik.com');
+            }
+
+            \Log::info('Sending admin notification', [
+                'admin_email' => $adminEmail,
+                'registration_id' => $registrationRequest->id,
+                'type' => $registrationRequest->type,
+                'user_email' => $registrationRequest->email,
+            ]);
+
+            // Queue email with delay to prevent simultaneous sending
+            // Admin notification sent last with 10 second delay
+            Mail::to($adminEmail)
+                ->later(now()->addSeconds(10), new NewRegistrationRequestMail($registrationRequest));
+
+            \Log::info('Admin notification queued successfully', [
+                'admin_email' => $adminEmail,
+                'registration_id' => $registrationRequest->id,
+            ]);
         } catch (\Exception $e) {
-            \Log::error('Failed to send admin notification email: ' . $e->getMessage());
+            \Log::error('Failed to send admin notification email', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'registration_id' => $registrationRequest->id,
+            ]);
             // Don't throw exception - registration should still succeed even if admin email fails
         }
     }
