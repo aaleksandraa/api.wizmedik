@@ -24,6 +24,12 @@ class LogoSettingsController extends Controller
         $showHeartIcon = SiteSetting::where('key', 'show_heart_icon')->value('value');
         $showHeartIconHeader = SiteSetting::where('key', 'show_heart_icon_header')->value('value');
 
+        // Logo height settings
+        $logoHeightDesktop = SiteSetting::where('key', 'logo_height_desktop')->value('value') ?: 70;
+        $logoHeightMobile = SiteSetting::where('key', 'logo_height_mobile')->value('value') ?: 50;
+        $footerLogoHeightDesktop = SiteSetting::where('key', 'footer_logo_height_desktop')->value('value') ?: 70;
+        $footerLogoHeightMobile = SiteSetting::where('key', 'footer_logo_height_mobile')->value('value') ?: 50;
+
         // Convert string to boolean properly
         $isEnabled = false;
         if ($logoEnabled === '1' || $logoEnabled === 'true' || $logoEnabled === true || $logoEnabled === 1) {
@@ -54,6 +60,10 @@ class LogoSettingsController extends Controller
             'footer_logo_type' => $footerLogoType ?: 'text',
             'show_heart_icon' => $isHeartIconEnabled,
             'show_heart_icon_header' => $isHeartIconHeaderEnabled,
+            'logo_height_desktop' => (int)$logoHeightDesktop,
+            'logo_height_mobile' => (int)$logoHeightMobile,
+            'footer_logo_height_desktop' => (int)$footerLogoHeightDesktop,
+            'footer_logo_height_mobile' => (int)$footerLogoHeightMobile,
         ]);
     }
 
@@ -71,6 +81,10 @@ class LogoSettingsController extends Controller
             'footer_logo_type' => 'required|in:image,text',
             'show_heart_icon' => 'required|boolean',
             'show_heart_icon_header' => 'required|boolean',
+            'logo_height_desktop' => 'required|integer|min:20|max:200',
+            'logo_height_mobile' => 'required|integer|min:20|max:200',
+            'footer_logo_height_desktop' => 'required|integer|min:20|max:200',
+            'footer_logo_height_mobile' => 'required|integer|min:20|max:200',
         ]);
 
         // Update or create logo_url
@@ -169,6 +183,54 @@ class LogoSettingsController extends Controller
             ]);
         }
 
+        // Update or create logo_height_desktop
+        $logoHeightDesktop = SiteSetting::where('key', 'logo_height_desktop')->first();
+        if ($logoHeightDesktop) {
+            $logoHeightDesktop->value = (string)$validated['logo_height_desktop'];
+            $logoHeightDesktop->save();
+        } else {
+            SiteSetting::create([
+                'key' => 'logo_height_desktop',
+                'value' => (string)$validated['logo_height_desktop']
+            ]);
+        }
+
+        // Update or create logo_height_mobile
+        $logoHeightMobile = SiteSetting::where('key', 'logo_height_mobile')->first();
+        if ($logoHeightMobile) {
+            $logoHeightMobile->value = (string)$validated['logo_height_mobile'];
+            $logoHeightMobile->save();
+        } else {
+            SiteSetting::create([
+                'key' => 'logo_height_mobile',
+                'value' => (string)$validated['logo_height_mobile']
+            ]);
+        }
+
+        // Update or create footer_logo_height_desktop
+        $footerLogoHeightDesktop = SiteSetting::where('key', 'footer_logo_height_desktop')->first();
+        if ($footerLogoHeightDesktop) {
+            $footerLogoHeightDesktop->value = (string)$validated['footer_logo_height_desktop'];
+            $footerLogoHeightDesktop->save();
+        } else {
+            SiteSetting::create([
+                'key' => 'footer_logo_height_desktop',
+                'value' => (string)$validated['footer_logo_height_desktop']
+            ]);
+        }
+
+        // Update or create footer_logo_height_mobile
+        $footerLogoHeightMobile = SiteSetting::where('key', 'footer_logo_height_mobile')->first();
+        if ($footerLogoHeightMobile) {
+            $footerLogoHeightMobile->value = (string)$validated['footer_logo_height_mobile'];
+            $footerLogoHeightMobile->save();
+        } else {
+            SiteSetting::create([
+                'key' => 'footer_logo_height_mobile',
+                'value' => (string)$validated['footer_logo_height_mobile']
+            ]);
+        }
+
         return response()->json([
             'message' => 'Logo postavke ažurirane',
             'settings' => [
@@ -180,6 +242,10 @@ class LogoSettingsController extends Controller
                 'footer_logo_type' => $validated['footer_logo_type'],
                 'show_heart_icon' => $validated['show_heart_icon'],
                 'show_heart_icon_header' => $validated['show_heart_icon_header'],
+                'logo_height_desktop' => $validated['logo_height_desktop'],
+                'logo_height_mobile' => $validated['logo_height_mobile'],
+                'footer_logo_height_desktop' => $validated['footer_logo_height_desktop'],
+                'footer_logo_height_mobile' => $validated['footer_logo_height_mobile'],
             ],
         ]);
     }
