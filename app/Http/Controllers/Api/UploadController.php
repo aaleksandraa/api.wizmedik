@@ -106,12 +106,13 @@ class UploadController extends Controller
                     'ratio' => $originalRatio
                 ]);
 
-                // Logo optimization: max width 220px, height proportional (maintains aspect ratio)
-                // If logo is 16:9, result will be 220x123.75px
-                // If logo is 4:1, result will be 220x55px
-                // If logo is 1:1, result will be 220x220px
-                $img->resize(220, null, function ($constraint) {
-                    $constraint->aspectRatio();  // Height calculated proportionally from original ratio
+                // Logo optimization: FIXED HEIGHT 70px, width proportional (maintains aspect ratio)
+                // This ensures logo never distorts - width adjusts automatically based on original ratio
+                // If logo is 4:1 (400x100), result will be 280x70px
+                // If logo is 1:1 (200x200), result will be 70x70px
+                // If logo is 16:9 (1600x900), result will be 124x70px
+                $img->resize(null, 70, function ($constraint) {
+                    $constraint->aspectRatio();  // Width calculated proportionally from original ratio
                     $constraint->upsize();       // Don't upscale small images
                 });
 
