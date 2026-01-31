@@ -106,25 +106,33 @@ class UploadController extends Controller
                     'ratio' => $originalRatio
                 ]);
 
-                // Logo optimization: FIXED HEIGHT 70px, width proportional (maintains aspect ratio)
-                // This ensures logo never distorts - width adjusts automatically based on original ratio
-                // If logo is 4:1 (400x100), result will be 280x70px
-                // If logo is 1:1 (200x200), result will be 70x70px
-                // If logo is 16:9 (1600x900), result will be 124x70px
-                $img->resize(null, 70, function ($constraint) {
-                    $constraint->aspectRatio();  // Width calculated proportionally from original ratio
+                // PROFESSIONAL LOGO RESIZE STRATEGY
+                // Fixed height: 70px (desktop navbar height)
+                // Width: Automatically calculated to maintain aspect ratio
+                // This prevents ANY distortion regardless of original logo dimensions
+
+                // Calculate target dimensions
+                $targetHeight = 70;
+                $targetWidth = round(($originalWidth / $originalHeight) * $targetHeight);
+
+                // Apply resize with explicit dimensions (more reliable than null parameter)
+                $img->resize($targetWidth, $targetHeight, function ($constraint) {
+                    $constraint->aspectRatio();  // Maintain aspect ratio
                     $constraint->upsize();       // Don't upscale small images
                 });
 
-                // Get new dimensions
+                // Get new dimensions for verification
                 $newWidth = $img->width();
                 $newHeight = $img->height();
                 $newRatio = $newWidth / $newHeight;
 
                 \Log::info('Logo resize - AFTER', [
-                    'width' => $newWidth,
-                    'height' => $newHeight,
-                    'ratio' => $newRatio,
+                    'target_width' => $targetWidth,
+                    'target_height' => $targetHeight,
+                    'actual_width' => $newWidth,
+                    'actual_height' => $newHeight,
+                    'original_ratio' => $originalRatio,
+                    'new_ratio' => $newRatio,
                     'ratio_maintained' => abs($originalRatio - $newRatio) < 0.01
                 ]);
             } elseif ($folder !== 'blog') {
