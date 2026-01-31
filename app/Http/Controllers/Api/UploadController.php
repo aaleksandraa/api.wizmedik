@@ -59,13 +59,16 @@ class UploadController extends Controller
                 // Save SVG directly without processing
                 Storage::disk('public')->put($publicPath, file_get_contents($imageFile->getRealPath()));
 
-                // Generate full URL using APP_URL from config
-                $url = config('app.url') . '/storage/' . $publicPath;
+                // Generate full URL
+                // Use request host to generate correct URL for current environment
+                $baseUrl = $request->getSchemeAndHttpHost();
+                $url = $baseUrl . '/storage/' . $publicPath;
 
                 \Log::info('SVG uploaded successfully', [
                     'path' => $publicPath,
                     'url'  => $url,
-                    'folder' => $folder
+                    'folder' => $folder,
+                    'base_url' => $baseUrl
                 ]);
 
                 return response()->json([
@@ -159,13 +162,16 @@ class UploadController extends Controller
                 ], 500);
             }
 
-            // Generate full URL using APP_URL from config
-            $url = config('app.url') . '/storage/' . $publicPath;
+            // Generate full URL
+            // Use request host to generate correct URL for current environment
+            $baseUrl = $request->getSchemeAndHttpHost();
+            $url = $baseUrl . '/storage/' . $publicPath;
 
             \Log::info('Image uploaded successfully', [
                 'path' => $publicPath,
                 'url'  => $url,
-                'folder' => $folder
+                'folder' => $folder,
+                'base_url' => $baseUrl
             ]);
 
             return response()->json([
