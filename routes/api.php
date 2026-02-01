@@ -148,6 +148,16 @@ Route::post('/banje/{id}/recenzija', [\App\Http\Controllers\Api\BanjaController:
 // Public laboratory routes
 Route::get('/laboratorije', [\App\Http\Controllers\Api\LaboratorijaController::class, 'index']);
 Route::get('/laboratorije/gradovi/all', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getGradovi']);
+
+// Public MKB-10 routes
+Route::get('/mkb10/kategorije', [\App\Http\Controllers\Api\Mkb10Controller::class, 'kategorije']);
+Route::get('/mkb10/statistika', [\App\Http\Controllers\Api\Mkb10Controller::class, 'statistika']);
+Route::get('/mkb10/search', [\App\Http\Controllers\Api\Mkb10Controller::class, 'pretraga']);
+Route::get('/mkb10/dijagnoze', [\App\Http\Controllers\Api\Mkb10Controller::class, 'dijagnoze']);
+Route::get('/mkb10/dijagnoze/{kod}', [\App\Http\Controllers\Api\Mkb10Controller::class, 'dijagnoza']);
+Route::get('/mkb10/podkategorije/{kategorijaId}', [\App\Http\Controllers\Api\Mkb10Controller::class, 'podkategorije']);
+Route::get('/mkb10/settings', [\App\Http\Controllers\Api\Mkb10Controller::class, 'settings']);
+
 Route::get('/laboratorije/kategorije/all', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getKategorije']);
 Route::get('/laboratorije/statistics', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getAllStatistics']);
 Route::get('/laboratorije/popularne-analize', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getPopularneAnalize']);
@@ -429,6 +439,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/registration-requests/{id}', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'show']);
         Route::post('/registration-requests/{id}/approve', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'approve']);
         Route::post('/registration-requests/{id}/reject', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'reject']);
+        Route::delete('/registration-requests/{id}', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'delete']);
         Route::get('/registration-settings', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'getSettings']);
         Route::put('/registration-settings', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'updateSettings']);
 

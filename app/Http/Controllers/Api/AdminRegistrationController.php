@@ -165,6 +165,60 @@ class AdminRegistrationController extends Controller
     }
 
     /**
+     * Delete registration request completely (including user if created)
+     */
+    public function delete(int $id)
+    {
+        $registrationRequest = RegistrationRequest::findOrFail($id);
+
+        DB::beginTransaction();
+        try {
+            // Delete associated user and profile if they exist
+            if ($registrationRequest->user_id) {
+                $user = User::find($registrationRequest->user_id);
+                if ($user) {
+                    // Delete profile based on type
+                    if ($registrationRequest->doctor_id) {
+                        Doktor::where('id', $registrationRequest->doctor_id)->delete();
+                    }
+                    if ($registrationRequest->clinic_id) {
+                        Klinika::where('id', $registrationRequest->clinic_id)->delete();
+                    }
+                    if ($registrationRequest->laboratory_id) {
+                        \App\Models\Laboratorija::where('id', $registrationRequest->laboratory_id)->delete();
+                    }
+                    if ($registrationRequest->spa_id) {
+                        \App\Models\Banja::where('id', $registrationRequest->spa_id)->delete();
+                    }
+                    if ($registrationRequest->care_home_id) {
+                        \App\Models\Dom::where('id', $registrationRequest->care_home_id)->delete();
+                    }
+
+                    // Delete user (this will cascade delete related data)
+                    $user->delete();
+                }
+            }
+
+            // Delete registration request
+            $registrationRequest->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Zahtjev i svi povezani podaci su potpuno obrisani.'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Registration deletion failed: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Greška prilikom brisanja zahtjeva: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Update registration settings
      */
     public function updateSettings(Request $request)
