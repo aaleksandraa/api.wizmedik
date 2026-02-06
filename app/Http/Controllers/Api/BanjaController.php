@@ -216,8 +216,12 @@ class BanjaController extends Controller
 
             // Send email notification to banja
             if ($banja->email) {
-                // TODO: Implement email notification
-                // Mail::to($banja->email)->send(new BanjaUpitMail($upit));
+                try {
+                    \Mail::to($banja->email)->send(new \App\Mail\BanjaUpitMail($upit));
+                } catch (\Exception $mailError) {
+                    \Log::error('Error sending banja inquiry email: ' . $mailError->getMessage());
+                    // Don't fail the request if email fails
+                }
             }
 
             // Send email notification to admin

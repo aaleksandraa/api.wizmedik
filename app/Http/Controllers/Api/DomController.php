@@ -262,8 +262,12 @@ class DomController extends Controller
 
             // Send email notification to dom
             if ($dom->email) {
-                // TODO: Implement email notification
-                // Mail::to($dom->email)->send(new DomUpitMail($upit));
+                try {
+                    \Mail::to($dom->email)->send(new \App\Mail\DomUpitMail($upit));
+                } catch (\Exception $mailError) {
+                    \Log::error('Error sending dom inquiry email: ' . $mailError->getMessage());
+                    // Don't fail the request if email fails
+                }
             }
 
             // Send email notification to admin
