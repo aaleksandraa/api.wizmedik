@@ -9,13 +9,13 @@
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .header { text-align: center; margin-bottom: 30px; }
-        .logo { font-size: 24px; font-weight: bold; color: #0ea5e9; }
+        .logo { font-size: 24px; font-weight: bold; color: #0891b2; }
         h1 { color: #1e293b; font-size: 22px; margin-bottom: 20px; }
-        .question-box { background: #f8fafc; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+        .question-box { background: #f8fafc; border-left: 4px solid #0891b2; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0; }
         .question-title { font-weight: bold; color: #1e293b; margin-bottom: 5px; }
         .answer-box { background: #f0fdf4; border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0; }
         .doctor-name { font-weight: bold; color: #22c55e; margin-bottom: 10px; }
-        .btn { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 20px; }
+        .btn { display: inline-block; background: #0891b2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin-top: 20px; }
         .btn:hover { background: #0284c7; }
         .footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 14px; }
     </style>

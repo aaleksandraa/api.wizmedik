@@ -27,7 +27,7 @@ class KategorijeAnalizaSeeder extends Seeder
                 'naziv' => 'Biohemija',
                 'opis' => 'Biohemijske analize - šećer, holesterol, jetra, bubrezi',
                 'ikona' => 'flask',
-                'boja' => '#3B82F6',
+                'boja' => '#0891b2',
                 'redoslijed' => 2,
                 'meta_title' => 'Biohemijske analize - Laboratorija',
                 'meta_description' => 'Šećer, holesterol, jetra, bubrezi i druge biohemijske analize',

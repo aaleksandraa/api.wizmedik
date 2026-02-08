@@ -38,6 +38,9 @@ Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:5,60'); // 5 attempts per 60 minutes
 
+// Test email endpoint (local only)
+Route::post('/test-email', [AuthController::class, 'testEmail']);
+
 // Registration routes (for different entity types) with bot detection
 Route::middleware(['throttle:5,60', 'detect.bots'])->group(function () {
     Route::post('/register/doctor', [RegistrationController::class, 'registerDoctor']);

@@ -60,7 +60,7 @@ class Mkb10KategorijeSeeder extends Seeder
                 'kod_do' => 'G99',
                 'naziv' => 'Bolesti nervnog sistema',
                 'opis' => 'Neurološke bolesti, epilepsija, Parkinsonova bolest',
-                'boja' => '#0ea5e9',
+                'boja' => '#0891b2',
                 'ikona' => 'cpu',
                 'redoslijed' => 6,
             ],

@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
 
             // Global colors
-            $table->string('primary_color')->default('#0ea5e9');
+            $table->string('primary_color')->default('#0891b2');
             $table->string('secondary_color')->default('#8b5cf6');
             $table->string('accent_color')->default('#10b981');
             $table->string('background_color')->default('#ffffff');

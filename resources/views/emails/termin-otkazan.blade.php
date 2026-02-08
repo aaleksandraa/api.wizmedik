@@ -10,7 +10,7 @@
         .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; }
         .info-box { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ef4444; }
         .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
-        .btn { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
+        .btn { display: inline-block; background: #0891b2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
         .cancelled-by { background: #fef2f2; padding: 10px 15px; border-radius: 6px; margin: 15px 0; color: #991b1b; }
     </style>
 </head>

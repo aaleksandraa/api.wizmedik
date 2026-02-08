@@ -132,7 +132,7 @@ class SettingsController extends Controller
             'showSpecialty' => SiteSetting::get('doctor_card_show_specialty', 'true') === 'true',
             'showOnlineStatus' => SiteSetting::get('doctor_card_show_online_status', 'true') === 'true',
             'showBookButton' => SiteSetting::get('doctor_card_show_book_button', 'true') === 'true',
-            'primaryColor' => SiteSetting::get('doctor_card_primary_color', '#0ea5e9'),
+            'primaryColor' => SiteSetting::get('doctor_card_primary_color', '#0891b2'),
             'accentColor' => SiteSetting::get('doctor_card_accent_color', '#10b981'),
         ]);
     }
@@ -195,7 +195,7 @@ class SettingsController extends Controller
             'showWorkingHours' => SiteSetting::get('clinic_card_show_working_hours', 'true') === 'true',
             'showDoctorsCount' => SiteSetting::get('clinic_card_show_doctors_count', 'true') === 'true',
             'showDistance' => SiteSetting::get('clinic_card_show_distance', 'true') === 'true',
-            'primaryColor' => SiteSetting::get('clinic_card_primary_color', '#0ea5e9'),
+            'primaryColor' => SiteSetting::get('clinic_card_primary_color', '#0891b2'),
             'accentColor' => SiteSetting::get('clinic_card_accent_color', '#8b5cf6'),
         ]);
     }

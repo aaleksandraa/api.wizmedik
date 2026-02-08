@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Log;
@@ -203,27 +204,99 @@ class AuthController extends Controller
     }
 
     /**
-     * Send password reset link
+     * Test email configuration
      */
-    public function forgotPassword(Request $request)
+    public function testEmail(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-        ]);
-
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
-
-        if ($status === Password::RESET_LINK_SENT) {
-            return response()->json([
-                'message' => 'Link za resetovanje lozinke je poslat na vaš email.',
-            ]);
+        if (!app()->environment('local')) {
+            return response()->json(['message' => 'Test endpoint only available in local environment'], 403);
         }
 
-        throw ValidationException::withMessages([
-            'email' => [__($status)],
-        ]);
+        try {
+            $testEmail = $request->input('email', 'test@example.com');
+
+            // Test basic mail configuration
+            $mailConfig = [
+                'mailer' => config('mail.default'),
+                'host' => config('mail.mailers.smtp.host'),
+                'port' => config('mail.mailers.smtp.port'),
+                'username' => config('mail.mailers.smtp.username'),
+                'from_address' => config('mail.from.address'),
+                'from_name' => config('mail.from.name'),
+            ];
+
+            // Try to send a test email
+            \Mail::raw('Test email from WizMedik', function ($message) use ($testEmail) {
+                $message->to($testEmail)
+                        ->subject('Test Email - WizMedik');
+            });
+
+            return response()->json([
+                'message' => 'Test email sent successfully',
+                'config' => $mailConfig,
+                'sent_to' => $testEmail
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Email test failed',
+                'error' => $e->getMessage(),
+                'config' => $mailConfig ?? []
+            ], 500);
+        }
+    }
+    public function forgotPassword(Request $request)
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email',
+            ]);
+
+            // Check if user exists first
+            $user = \App\Models\User::where('email', $request->email)->first();
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Ako email postoji u našoj bazi, link za resetovanje lozinke će biti poslat.',
+                ], 200);
+            }
+
+            $status = Password::sendResetLink(
+                $request->only('email')
+            );
+
+            if ($status === Password::RESET_LINK_SENT) {
+                return response()->json([
+                    'message' => 'Link za resetovanje lozinke je poslat na vaš email.',
+                ]);
+            }
+
+            // Log the actual error for debugging
+            \Log::error('Password reset failed', [
+                'email' => $request->email,
+                'status' => $status,
+                'mail_config' => [
+                    'mailer' => config('mail.default'),
+                    'from_address' => config('mail.from.address'),
+                ]
+            ]);
+
+            // Return generic success message for security
+            return response()->json([
+                'message' => 'Ako email postoji u našoj bazi, link za resetovanje lozinke će biti poslat.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Password reset exception', [
+                'email' => $request->email ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
+                'error_id' => \Str::uuid()
+            ], 500);
+        }
     }
 
     /**

@@ -6,11 +6,11 @@
     <title>Resetovanje lozinke</title>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #0ea5e9, #06b6d4); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header { background: linear-gradient(135deg, #0891b2, #06b6d4); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
         .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; }
-        .info-box { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #0ea5e9; text-align: center; }
+        .info-box { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #0891b2; text-align: center; }
         .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
-        .btn { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
+        .btn { display: inline-block; background: #0891b2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
     </style>
 </head>
 <body>

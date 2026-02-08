@@ -36,7 +36,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Svjetski dan Brailleovog pisma',
                 'type' => 'day',
                 'category' => 'disability',
-                'color' => '#0ea5e9'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-01-31',
@@ -114,7 +114,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Svjetski dan Down sindroma',
                 'type' => 'day',
                 'category' => 'genetic',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-03-24',
@@ -132,7 +132,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Svjetski dan svjesnosti o autizmu',
                 'type' => 'day',
                 'category' => 'neurological',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-04-07',
@@ -210,7 +210,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Mjesec muškog zdravlja',
                 'type' => 'month',
                 'category' => 'mens-health',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-06-05',
@@ -269,7 +269,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Svjetski dan populacije',
                 'type' => 'day',
                 'category' => 'public-health',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-07-28',
@@ -407,7 +407,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Svjetski dan artritisa',
                 'type' => 'day',
                 'category' => 'rheumatology',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-10-15',
@@ -458,7 +458,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Mjesec svjesnosti o pravima osoba sa invaliditetom',
                 'type' => 'month',
                 'category' => 'disability',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-11-14',
@@ -466,7 +466,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Svjetski dan dijabetesa',
                 'type' => 'day',
                 'category' => 'metabolic',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-11-17',
@@ -517,7 +517,7 @@ class MedicalCalendarSeeder extends Seeder
                 'description' => 'Međunarodni dan osoba sa invaliditetom',
                 'type' => 'day',
                 'category' => 'disability',
-                'color' => '#3b82f6'
+                'color' => '#0891b2'
             ],
             [
                 'date' => '2026-12-10',

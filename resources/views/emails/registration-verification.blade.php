@@ -5,10 +5,10 @@
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #0ea5e9; color: white; padding: 20px; text-align: center; }
+        .header { background: #0891b2; color: white; padding: 20px; text-align: center; }
         .content { background: #f9fafb; padding: 30px; }
-        .button { display: inline-block; background: #0ea5e9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .code { font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #0ea5e9; text-align: center; padding: 20px; background: white; border: 2px dashed #0ea5e9; margin: 20px 0; }
+        .button { display: inline-block; background: #0891b2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .code { font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #0891b2; text-align: center; padding: 20px; background: white; border: 2px dashed #0891b2; margin: 20px 0; }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
     </style>
 </head>

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->enum('type', ['day', 'week', 'month', 'campaign'])->default('day');
             $table->date('end_date')->nullable(); // Za sedmice, mjesece i kampanje
             $table->string('category')->nullable(); // npr. 'cancer', 'mental-health', 'vaccination'
-            $table->string('color')->default('#3b82f6'); // Hex boja za kalendar
+            $table->string('color')->default('#0891b2'); // Hex boja za kalendar
             $table->boolean('is_active')->default(true);
             $table->integer('sort_order')->default(0);
             $table->timestamps();

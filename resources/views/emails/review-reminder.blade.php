@@ -6,7 +6,7 @@
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #2563eb;">Poštovani/a {{ $ime }},</h2>
+        <h2 style="color: #0891b2;">Poštovani/a {{ $ime }},</h2>
         
         <p>Hvala Vam što ste koristili Zdravlje BiH platformu za zakazivanje termina.</p>
         
@@ -16,7 +16,7 @@
         
         <p style="text-align: center; margin: 30px 0;">
             <a href="{{ config('app.frontend_url') }}/dashboard" 
-               style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+               style="background-color: #0891b2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
                 Ostavite recenziju
             </a>
         </p>

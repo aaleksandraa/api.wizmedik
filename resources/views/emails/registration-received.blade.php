@@ -5,9 +5,9 @@
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #0ea5e9; color: white; padding: 20px; text-align: center; }
+        .header { background: #0891b2; color: white; padding: 20px; text-align: center; }
         .content { background: #f9fafb; padding: 30px; }
-        .info-box { background: white; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0; }
+        .info-box { background: white; border-left: 4px solid #0891b2; padding: 15px; margin: 20px 0; }
         .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
     </style>
 </head>
