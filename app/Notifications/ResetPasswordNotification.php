@@ -21,8 +21,8 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
     public function __construct($token)
     {
         $this->token = $token;
-        $this->onQueue('high'); // Use high priority queue for password resets
-        $this->delay(now()->addSeconds(2)); // Small delay for security
+        $this->onQueue('high'); // Use high priority queue for password resets - optimized for Horizon
+        $this->delay(now()->addSeconds(1)); // Minimal delay for Horizon performance
     }
 
     public function via($notifiable): array
@@ -32,9 +32,10 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
 
     public function toMail($notifiable): MailMessage
     {
-        Log::info('Sending password reset email', [
+        Log::info('Sending password reset email via Horizon', [
             'email' => $notifiable->email,
-            'queue' => 'high'
+            'queue' => 'high',
+            'system' => 'Laravel Horizon'
         ]);
 
         $frontendUrl = env('APP_FRONTEND_URL', 'http://localhost:5173');
@@ -50,9 +51,10 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
 
     public function failed($exception)
     {
-        Log::error('Password reset email failed', [
+        Log::error('Password reset email failed in Horizon', [
             'token' => $this->token,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
+            'system' => 'Laravel Horizon'
         ]);
     }
 }
