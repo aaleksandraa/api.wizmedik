@@ -26,7 +26,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email' => $this->email
         ]);
 
-        $this->notify(new \Illuminate\Auth\Notifications\VerifyEmail());
+        $this->notify(new \App\Notifications\EmailVerificationNotification());
 
         Log::info('Email verification notification sent successfully', [
             'user_id' => $this->id,

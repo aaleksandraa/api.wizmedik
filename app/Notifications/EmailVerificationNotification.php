@@ -2,31 +2,18 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Carbon;
 
-class EmailVerificationNotification extends Notification implements ShouldQueue
+class EmailVerificationNotification extends Notification
 {
-    use Queueable, SerializesModels;
-
-    public $tries = 3;
-    public $timeout = 60;
-    public $maxExceptions = 2;
-
     public function __construct()
     {
-        $this->onQueue('high'); // Use high priority queue for email verification
-        $this->delay(now()->addSeconds(1)); // Minimal delay for Horizon performance
-
-        Log::info('EmailVerificationNotification created', [
-            'queue' => 'high',
-            'system' => 'Laravel Horizon'
+        Log::info('EmailVerificationNotification created (direct mail)', [
+            'system' => 'Direct Mail (no queue)'
         ]);
     }
 
@@ -42,10 +29,9 @@ class EmailVerificationNotification extends Notification implements ShouldQueue
 
     public function toMail($notifiable): MailMessage
     {
-        Log::info('Sending email verification via Horizon', [
+        Log::info('Sending email verification directly', [
             'email' => $notifiable->email,
-            'queue' => 'high',
-            'system' => 'Laravel Horizon'
+            'system' => 'Direct Mail (no queue)'
         ]);
 
         $verificationUrl = $this->verificationUrl($notifiable);
@@ -79,13 +65,5 @@ class EmailVerificationNotification extends Notification implements ShouldQueue
         $verificationUrl = str_replace($backendUrl, $frontendUrl, $url);
 
         return $verificationUrl . '&redirect=verify-email';
-    }
-
-    public function failed($exception)
-    {
-        Log::error('Email verification failed in Horizon', [
-            'error' => $exception->getMessage(),
-            'system' => 'Laravel Horizon'
-        ]);
     }
 }

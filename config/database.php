@@ -232,6 +232,18 @@ return [
             'persistent' => true,
         ],
 
+        'horizon' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_HORIZON_DB', '4'),
+            'read_timeout' => 60,
+            'timeout' => 5,
+            'persistent' => true,
+        ],
+
     ],
 
 ];

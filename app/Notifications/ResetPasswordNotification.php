@@ -2,33 +2,21 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class ResetPasswordNotification extends Notification implements ShouldQueue
+class ResetPasswordNotification extends Notification
 {
-    use Queueable, SerializesModels;
-
-    public $tries = 3;
-    public $timeout = 60;
-    public $maxExceptions = 2;
-
     public $token;
 
     public function __construct($token)
     {
         $this->token = $token;
-        $this->onQueue('high'); // Use high priority queue for password resets - optimized for Horizon
-        $this->delay(now()->addSeconds(1)); // Minimal delay for Horizon performance
 
-        Log::info('ResetPasswordNotification created', [
+        Log::info('ResetPasswordNotification created (direct mail)', [
             'token_length' => strlen($token),
-            'queue' => 'high',
-            'system' => 'Laravel Horizon'
+            'system' => 'Direct Mail (no queue)'
         ]);
     }
 
@@ -44,13 +32,12 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
 
     public function toMail($notifiable): MailMessage
     {
-        Log::info('Sending password reset email via Horizon', [
+        Log::info('Sending password reset email directly', [
             'email' => $notifiable->email,
-            'queue' => 'high',
-            'system' => 'Laravel Horizon'
+            'system' => 'Direct Mail (no queue)'
         ]);
 
-        $frontendUrl = env('APP_FRONTEND_URL', 'http://localhost:5173');
+        $frontendUrl = env('APP_FRONTEND_URL', 'https://wizmedik.com');
         $url = $frontendUrl . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email);
 
         return (new MailMessage)
@@ -59,14 +46,5 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
                 'token' => $this->token,
                 'email' => $notifiable->email,
             ]);
-    }
-
-    public function failed($exception)
-    {
-        Log::error('Password reset email failed in Horizon', [
-            'token' => $this->token,
-            'error' => $exception->getMessage(),
-            'system' => 'Laravel Horizon'
-        ]);
     }
 }
