@@ -6,11 +6,12 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 class ResetPasswordNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, SerializesModels;
 
     public $tries = 3;
     public $timeout = 60;
@@ -23,10 +24,21 @@ class ResetPasswordNotification extends Notification implements ShouldQueue
         $this->token = $token;
         $this->onQueue('high'); // Use high priority queue for password resets - optimized for Horizon
         $this->delay(now()->addSeconds(1)); // Minimal delay for Horizon performance
+
+        Log::info('ResetPasswordNotification created', [
+            'token_length' => strlen($token),
+            'queue' => 'high',
+            'system' => 'Laravel Horizon'
+        ]);
     }
 
     public function via($notifiable): array
     {
+        Log::info('ResetPasswordNotification via() called', [
+            'email' => $notifiable->email,
+            'channels' => ['mail']
+        ]);
+
         return ['mail'];
     }
 

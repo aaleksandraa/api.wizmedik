@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Notifications\ResetPasswordNotification;
@@ -20,7 +21,18 @@ class User extends Authenticatable
      */
     public function sendPasswordResetNotification($token): void
     {
+        Log::info('User sendPasswordResetNotification called', [
+            'user_id' => $this->id,
+            'email' => $this->email,
+            'token_length' => strlen($token)
+        ]);
+
         $this->notify(new ResetPasswordNotification($token));
+
+        Log::info('User notify() called successfully', [
+            'user_id' => $this->id,
+            'email' => $this->email
+        ]);
     }
 
     /**
