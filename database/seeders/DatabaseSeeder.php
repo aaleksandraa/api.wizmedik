@@ -83,6 +83,12 @@ class DatabaseSeeder extends Seeder
             // MKB-10 (ICD-10) system
             Mkb10KategorijeSeeder::class,
             Mkb10DijagnozeSeeder::class,
+
+            // Blog system
+            BlogPostsSeeder::class,
+
+            // Medical Calendar
+            MedicalCalendarSeeder::class,
         ]);
 
         // Create test users for each entity type AFTER seeders

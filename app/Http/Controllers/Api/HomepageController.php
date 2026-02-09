@@ -104,11 +104,11 @@ class HomepageController extends Controller
                 $response['specialties'] = [];
             }
 
-            // Try to get cities
+            // Try to get cities - ALL cities for dropdown
             try {
                 $cities = DB::table('gradovi')
                     ->select('id', 'naziv', 'slug')
-                    ->limit(20)
+                    ->orderBy('naziv', 'asc')
                     ->get();
 
                 $response['cities'] = $cities->toArray();

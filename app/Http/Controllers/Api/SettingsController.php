@@ -11,97 +11,26 @@ class SettingsController extends Controller
 {
     public function getTemplates()
     {
+        // Custom 3 Cyan is now the only template - hardcoded
         return response()->json([
-            'doctor_profile_template' => SiteSetting::get('doctor_profile_template', 'classic'),
-            'clinic_profile_template' => SiteSetting::get('clinic_profile_template', 'classic'),
-            'homepage_template' => SiteSetting::get('homepage_template', 'classic'),
-            'navbar_style' => SiteSetting::get('navbar_style', 'auto'),
             'doctors_split_view_enabled' => SiteSetting::get('doctors_split_view_enabled', true),
-            'modern_cover_type' => SiteSetting::get('modern_cover_type', 'gradient'),
-            'modern_cover_value' => SiteSetting::get('modern_cover_value', 'from-primary via-primary/90 to-primary/80'),
             'custom3_hero_bg_enabled' => SiteSetting::get('custom3_hero_bg_enabled', false),
             'custom3_hero_bg_image' => SiteSetting::get('custom3_hero_bg_image', null),
             'custom3_hero_bg_opacity' => SiteSetting::get('custom3_hero_bg_opacity', 20),
-            'available_templates' => [
-                'doctor' => [
-                    ['id' => 'classic', 'name' => 'Klasični', 'description' => 'Tradicionalni prikaz sa svim informacijama'],
-                    ['id' => 'modern', 'name' => 'Moderni', 'description' => 'Čist dizajn sa fokusom na booking'],
-                    ['id' => 'card', 'name' => 'Card', 'description' => 'Kompaktni card-based layout'],
-                    ['id' => 'minimal', 'name' => 'Minimalistički', 'description' => 'Jednostavan i elegantan'],
-                ],
-                'clinic' => [
-                    ['id' => 'classic', 'name' => 'Klasični', 'description' => 'Tradicionalni prikaz klinike'],
-                    ['id' => 'modern', 'name' => 'Moderni', 'description' => 'Savremeni dizajn sa galerijom'],
-                    ['id' => 'corporate', 'name' => 'Korporativni', 'description' => 'Profesionalni poslovni izgled'],
-                ],
-                'homepage' => [
-                    ['id' => 'soft', 'name' => 'Soft', 'description' => 'Blage boje, tab pretraga i istaknute blog teme sa ilustracijama'],
-                    ['id' => 'clean', 'name' => 'Clean', 'description' => 'Čist i moderan dizajn sa teal bojama, tab pretraga i blog sekcijom'],
-                    ['id' => 'custom', 'name' => 'Custom', 'description' => 'Prilagođeni dizajn - podesi u "Početna" tabu'],
-                    ['id' => 'custom2-cyan', 'name' => 'Custom 2 Cyan', 'description' => 'ZocDoc stil sa svijetlo plavom/cyan bojom'],
-                    ['id' => 'custom2-yellow', 'name' => 'Custom 2 Yellow', 'description' => 'ZocDoc stil sa žutom bojom'],
-                    ['id' => 'custom3-cyan', 'name' => 'Custom 3 Cyan', 'description' => 'Minimalistički centrisani dizajn sa cyan bojom'],
-                    ['id' => 'pro', 'name' => 'Pro', 'description' => 'Profesionalni dizajn sa ljepšim klinikama i mobile responsive'],
-                    ['id' => 'medical', 'name' => 'Medical', 'description' => 'Kompletan medicinski portal sa svim sekcijama'],
-                    ['id' => 'modern', 'name' => 'Modern', 'description' => 'Moderan dizajn sa teal bojama i video sekcijom'],
-                    ['id' => 'classic', 'name' => 'Klasični', 'description' => 'Trenutni dizajn početne stranice'],
-                    ['id' => 'zocdoc', 'name' => 'ZocDoc', 'description' => 'Moderan dizajn sa zelenim tonovima'],
-                    ['id' => 'zocdoc-bih', 'name' => 'ZocDoc BiH', 'description' => 'ZocDoc stil prilagođen za BiH tržište'],
-                    ['id' => 'warm', 'name' => 'Topli', 'description' => 'Elegantan dizajn sa žuto-bež nijansama'],
-                    ['id' => 'ocean', 'name' => 'Ocean', 'description' => 'Svjež dizajn sa plavim nijansama'],
-                    ['id' => 'lime', 'name' => 'Lime', 'description' => 'Prirodan dizajn zeleno-žute nijanse'],
-                    ['id' => 'teal', 'name' => 'Teal', 'description' => 'Plavo-zeleni moderni dizajn'],
-                    ['id' => 'rose', 'name' => 'Rose', 'description' => 'Nježan dizajn sa ružičastim tonovima'],
-                    ['id' => 'sunset', 'name' => 'Sunset', 'description' => 'Topao dizajn sa narandžastim nijansama'],
-                    ['id' => 'minimal', 'name' => 'Minimal', 'description' => 'Ultra jednostavan, čist dizajn'],
-                    ['id' => 'bold', 'name' => 'Bold', 'description' => 'Tamni, moderan dizajn sa gradijentima'],
-                    ['id' => 'cards', 'name' => 'Cards', 'description' => 'Dashboard stil sa karticama'],
-                ],
-            ]
         ]);
     }
 
     public function updateTemplates(Request $request)
     {
         $request->validate([
-            'doctor_profile_template' => 'sometimes|string|in:classic,modern,card,minimal',
-            'clinic_profile_template' => 'sometimes|string|in:classic,modern,corporate',
-            'homepage_template' => 'sometimes|string|in:soft,clean,custom,custom2-cyan,custom2-yellow,custom3-cyan,pro,medical,modern,classic,zocdoc,zocdoc-bih,warm,ocean,lime,teal,rose,sunset,minimal,bold,cards',
-            'navbar_style' => 'sometimes|string|in:auto,default,colored',
             'doctors_split_view_enabled' => 'sometimes|boolean',
-            'modern_cover_type' => 'sometimes|string|in:gradient,image',
-            'modern_cover_value' => 'sometimes|nullable|string',
             'custom3_hero_bg_enabled' => 'sometimes|boolean',
             'custom3_hero_bg_image' => 'sometimes|nullable|string',
             'custom3_hero_bg_opacity' => 'sometimes|integer|min:0|max:100',
         ]);
 
-        if ($request->has('doctor_profile_template')) {
-            SiteSetting::set('doctor_profile_template', $request->doctor_profile_template);
-        }
-
-        if ($request->has('clinic_profile_template')) {
-            SiteSetting::set('clinic_profile_template', $request->clinic_profile_template);
-        }
-
-        if ($request->has('homepage_template')) {
-            SiteSetting::set('homepage_template', $request->homepage_template);
-        }
-
-        if ($request->has('navbar_style')) {
-            SiteSetting::set('navbar_style', $request->navbar_style);
-        }
-
         if ($request->has('doctors_split_view_enabled')) {
             SiteSetting::set('doctors_split_view_enabled', $request->doctors_split_view_enabled);
-        }
-
-        if ($request->has('modern_cover_type')) {
-            SiteSetting::set('modern_cover_type', $request->modern_cover_type);
-        }
-
-        if ($request->has('modern_cover_value')) {
-            SiteSetting::set('modern_cover_value', $request->modern_cover_value);
         }
 
         if ($request->has('custom3_hero_bg_enabled')) {
@@ -119,7 +48,7 @@ class SettingsController extends Controller
         // Clear homepage cache so changes are immediately visible
         \Cache::forget('homepage_data');
 
-        return response()->json(['message' => 'Template postavke ažurirane']);
+        return response()->json(['message' => 'Postavke ažurirane']);
     }
 
     public function getDoctorCardSettings()
