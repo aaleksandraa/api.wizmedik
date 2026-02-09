@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,10 +11,28 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Notifications\ResetPasswordNotification;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasApiTokens, HasRoles;
+
+    /**
+     * Send the email verification notification.
+     */
+    public function sendEmailVerificationNotification()
+    {
+        Log::info('User sendEmailVerificationNotification called', [
+            'user_id' => $this->id,
+            'email' => $this->email
+        ]);
+
+        $this->notify(new \Illuminate\Auth\Notifications\VerifyEmail());
+
+        Log::info('Email verification notification sent successfully', [
+            'user_id' => $this->id,
+            'email' => $this->email
+        ]);
+    }
 
     /**
      * Send the password reset notification.

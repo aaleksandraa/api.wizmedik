@@ -20,7 +20,7 @@ class HorizonServiceProvider extends ServiceProvider
         // Only configure Horizon if it's available
         if (class_exists(\Laravel\Horizon\Horizon::class)) {
             \Laravel\Horizon\Horizon::auth(function ($request) {
-                // Za production - samo admin korisnici
+                // For production - admin users only
                 if (app()->environment('production')) {
                     return auth()->check() &&
                            auth()->user() &&
@@ -28,7 +28,7 @@ class HorizonServiceProvider extends ServiceProvider
                             (method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin()));
                 }
 
-                // Za local/staging - svi
+                // For local/staging - all users
                 return true;
             });
 
