@@ -15,10 +15,12 @@ return [
     'allowed_origins' => env('APP_ENV') === 'production'
         ? [env('APP_FRONTEND_URL')]
         : [
-            env('APP_FRONTEND_URL', 'http://localhost:5173'),
-            'http://localhost:8080', // Vite dev server
-            'http://localhost:5173', // Alternative port
-            'http://localhost:3000', // Alternative port
+            'http://localhost:5173', // Primary Vite dev server
+            env('APP_FRONTEND_URL', 'http://localhost:8080'),
+            'http://localhost:8080', // Alternative Vite port
+            'http://localhost:3000', // React dev server
+            'http://127.0.0.1:5173', // IPv4 localhost
+            'http://127.0.0.1:8080', // IPv4 localhost alternative
         ],
 
     'allowed_origins_patterns' => env('APP_ENV') === 'production'

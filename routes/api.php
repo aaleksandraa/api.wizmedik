@@ -21,12 +21,17 @@ use App\Http\Controllers\Api\{
     RegistrationController,
     MedicalCalendarController
 };
+use App\Http\Controllers\HealthCheckController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
 */
+
+// Health check endpoints (no authentication required)
+Route::get('/health', [HealthCheckController::class, 'check']);
+Route::get('/ping', [HealthCheckController::class, 'ping']);
 
 // Public routes with rate limiting
 Route::post('/register', [AuthController::class, 'register'])

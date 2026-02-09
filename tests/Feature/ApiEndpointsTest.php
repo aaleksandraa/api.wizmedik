@@ -227,9 +227,19 @@ class ApiEndpointsTest extends TestCase
 
     public function test_api_has_cors_headers(): void
     {
-        $response = $this->getJson('/api/doctors');
+        $response = $this->withHeaders(['Origin' => 'http://localhost:5173'])
+                         ->getJson('/api/doctors');
+
         // CORS headers should be present
         $response->assertStatus(200);
+        $response->assertHeader('Access-Control-Allow-Origin');
+
+        // Verify the origin is allowed
+        $allowedOrigin = $response->headers->get('Access-Control-Allow-Origin');
+        $this->assertTrue(
+            $allowedOrigin === 'http://localhost:5173' || $allowedOrigin === '*',
+            'localhost:5173 should be allowed as origin'
+        );
     }
 
     // ==================== VALIDATION ====================

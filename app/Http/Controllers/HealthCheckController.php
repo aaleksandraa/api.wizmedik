@@ -29,7 +29,7 @@ class HealthCheckController extends Controller
             'timestamp' => now()->toIso8601String(),
             'checks' => $checks,
             'version' => config('app.version', '1.0.0'),
-        ], $status);
+        ], $status)->header('Access-Control-Allow-Origin', '*');
     }
 
     /**
@@ -40,7 +40,7 @@ class HealthCheckController extends Controller
         return response()->json([
             'status' => 'ok',
             'timestamp' => now()->toIso8601String(),
-        ]);
+        ])->header('Access-Control-Allow-Origin', '*');
     }
 
     /**
