@@ -2,41 +2,45 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
-use Laravel\Horizon\Horizon;
-use Laravel\Horizon\HorizonApplicationServiceProvider;
 
-class HorizonServiceProvider extends HorizonApplicationServiceProvider
+class HorizonServiceProvider extends ServiceProvider
 {
-    public function boot()
+    public function register()
     {
-        parent::boot();
-
-        // Horizon pristup samo za admin korisnike ili local environment
-        Horizon::auth(function ($request) {
-            // Za production - samo admin korisnici
-            if (app()->environment('production')) {
-                return auth()->check() &&
-                       auth()->user() &&
-                       (auth()->user()->role === 'admin' ||
-                        (method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin()));
-            }
-
-            // Za local/staging - svi
-            return true;
-        });
+        // Only register Horizon if the package is installed
+        if (class_exists(\Laravel\Horizon\HorizonApplicationServiceProvider::class)) {
+            $this->app->register(\Laravel\Horizon\HorizonApplicationServiceProvider::class);
+        }
     }
 
-    protected function gate()
+    public function boot()
     {
-        Gate::define('viewHorizon', function ($user = null) {
-            if (app()->environment('production')) {
-                return $user &&
-                       ($user->role === 'admin' ||
-                        (method_exists($user, 'isAdmin') && $user->isAdmin()));
-            }
+        // Only configure Horizon if it's available
+        if (class_exists(\Laravel\Horizon\Horizon::class)) {
+            \Laravel\Horizon\Horizon::auth(function ($request) {
+                // Za production - samo admin korisnici
+                if (app()->environment('production')) {
+                    return auth()->check() &&
+                           auth()->user() &&
+                           (auth()->user()->role === 'admin' ||
+                            (method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin()));
+                }
 
-            return true;
-        });
+                // Za local/staging - svi
+                return true;
+            });
+
+            Gate::define('viewHorizon', function ($user = null) {
+                if (app()->environment('production')) {
+                    return $user &&
+                           ($user->role === 'admin' ||
+                            (method_exists($user, 'isAdmin') && $user->isAdmin()));
+                }
+
+                return true;
+            });
+        }
     }
 }
