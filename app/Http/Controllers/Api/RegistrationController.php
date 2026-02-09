@@ -10,6 +10,7 @@ use App\Models\SiteSetting;
 use App\Mail\RegistrationVerificationMail;
 use App\Mail\RegistrationReceivedMail;
 use App\Mail\NewRegistrationRequestMail;
+use App\Services\EmailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -402,6 +403,13 @@ class RegistrationController extends Controller
         // Send verification email
         $this->sendVerificationEmail($registrationRequest);
 
+        // Use EmailService to send all emails with proper delays
+        EmailService::sendHighPriority(
+            $registrationRequest->email,
+            new RegistrationVerificationMail($registrationRequest),
+            2
+        );
+
         return response()->json([
             'message' => 'Verifikacioni email je ponovo poslat.'
         ]);
@@ -559,9 +567,12 @@ class RegistrationController extends Controller
      */
     private function sendVerificationEmail(RegistrationRequest $registrationRequest): void
     {
-        // Queue email with delay to prevent simultaneous sending
-        Mail::to($registrationRequest->email)
-            ->later(now()->addSeconds(2), new RegistrationVerificationMail($registrationRequest));
+        // High priority - verification emails should be sent quickly
+        EmailService::sendHighPriority(
+            $registrationRequest->email,
+            new RegistrationVerificationMail($registrationRequest),
+            2 // 2 second delay
+        );
     }
 
     /**
@@ -569,9 +580,12 @@ class RegistrationController extends Controller
      */
     private function sendConfirmationEmail(RegistrationRequest $registrationRequest): void
     {
-        // Queue email with delay to prevent simultaneous sending
-        Mail::to($registrationRequest->email)
-            ->later(now()->addSeconds(5), new RegistrationReceivedMail($registrationRequest));
+        // Default priority - confirmation emails
+        EmailService::sendDefault(
+            $registrationRequest->email,
+            new RegistrationReceivedMail($registrationRequest),
+            5 // 5 second delay to stagger with verification email
+        );
     }
 
     /**
@@ -588,24 +602,26 @@ class RegistrationController extends Controller
                 $adminEmail = config('mail.admin_email', 'info@wizmedik.com');
             }
 
-            \Log::info('Sending admin notification', [
+            \Log::info('Queueing admin notification', [
                 'admin_email' => $adminEmail,
                 'registration_id' => $registrationRequest->id,
                 'type' => $registrationRequest->type,
                 'user_email' => $registrationRequest->email,
             ]);
 
-            // Queue email with delay to prevent simultaneous sending
-            // Admin notification sent last with 10 second delay
-            Mail::to($adminEmail)
-                ->later(now()->addSeconds(10), new NewRegistrationRequestMail($registrationRequest));
+            // Default priority - admin notifications
+            EmailService::sendDefault(
+                $adminEmail,
+                new NewRegistrationRequestMail($registrationRequest),
+                10 // 10 second delay to send last
+            );
 
             \Log::info('Admin notification queued successfully', [
                 'admin_email' => $adminEmail,
                 'registration_id' => $registrationRequest->id,
             ]);
         } catch (\Exception $e) {
-            \Log::error('Failed to send admin notification email', [
+            \Log::error('Failed to queue admin notification email', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'registration_id' => $registrationRequest->id,
