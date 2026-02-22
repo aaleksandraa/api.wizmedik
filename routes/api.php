@@ -78,6 +78,7 @@ Route::get('/doctors/{id}', [DoctorController::class, 'showById'])->where('id', 
 Route::post('/appointments/guest', [AppointmentController::class, 'storeGuest']);
 
 // Public calendar sync route (iCal feed)
+Route::get('/calendar/ical/{token}.ics', [CalendarSyncController::class, 'generateICalFeed']);
 Route::get('/calendar/ical/{token}', [CalendarSyncController::class, 'generateICalFeed']);
 
 // Public lookup routes

@@ -28,14 +28,27 @@ class CalendarSyncController extends Controller
             return response()->json(['message' => 'Doctor profile not found'], 404);
         }
 
-        // First-time setup: create token and enable sync so copied URL works immediately.
-        if (!$doctor->calendar_sync_token) {
+        // If sync is already enabled but token is missing, create token automatically.
+        if ($doctor->calendar_sync_enabled && !$doctor->calendar_sync_token) {
             $doctor->calendar_sync_token = Str::random(64);
+            $doctor->save();
+        }
+
+        // Legacy compatibility: some doctors had token but sync stayed disabled by default.
+        // If no previous sync activity/URLs exist, auto-enable once.
+        if (
+            !$doctor->calendar_sync_enabled
+            && !$doctor->calendar_last_synced
+            && empty($doctor->google_calendar_url)
+            && empty($doctor->outlook_calendar_url)
+        ) {
             $doctor->calendar_sync_enabled = true;
             $doctor->save();
         }
 
-        $icalUrl = $this->buildIcalUrl($doctor, $request);
+        $icalUrl = $doctor->calendar_sync_token
+            ? $this->buildIcalUrl($doctor, $request)
+            : null;
 
         return response()->json([
             'enabled' => (bool) $doctor->calendar_sync_enabled,
@@ -75,21 +88,40 @@ class CalendarSyncController extends Controller
             'outlook_calendar_url' => 'nullable|url',
         ]);
 
-        // If sync is enabled and token does not exist, create one automatically.
-        if (($validated['enabled'] ?? false) && !$doctor->calendar_sync_token) {
-            $doctor->calendar_sync_token = Str::random(64);
+        $enabledWasProvided = array_key_exists('enabled', $validated);
+
+        if ($enabledWasProvided) {
+            if ((bool) $validated['enabled']) {
+                if (!$doctor->calendar_sync_token) {
+                    $doctor->calendar_sync_token = Str::random(64);
+                }
+                $doctor->calendar_sync_enabled = true;
+            } else {
+                // Turning sync off revokes the old URL immediately.
+                $doctor->calendar_sync_enabled = false;
+                $doctor->calendar_sync_token = null;
+                $doctor->calendar_last_synced = null;
+            }
         }
 
-        $doctor->update([
-            'calendar_sync_enabled' => $validated['enabled'] ?? $doctor->calendar_sync_enabled,
-            'google_calendar_url' => $validated['google_calendar_url'] ?? $doctor->google_calendar_url,
-            'outlook_calendar_url' => $validated['outlook_calendar_url'] ?? $doctor->outlook_calendar_url,
-        ]);
+        if (array_key_exists('google_calendar_url', $validated)) {
+            $doctor->google_calendar_url = $validated['google_calendar_url'];
+        }
+
+        if (array_key_exists('outlook_calendar_url', $validated)) {
+            $doctor->outlook_calendar_url = $validated['outlook_calendar_url'];
+        }
+
+        $doctor->save();
+
+        $icalUrl = $doctor->calendar_sync_token ? $this->buildIcalUrl($doctor, $request) : null;
 
         return response()->json([
             'message' => 'Calendar settings updated',
             'settings' => [
                 'enabled' => (bool) $doctor->calendar_sync_enabled,
+                'token' => $doctor->calendar_sync_token,
+                'ical_url' => $icalUrl,
                 'google_calendar_url' => $doctor->google_calendar_url,
                 'outlook_calendar_url' => $doctor->outlook_calendar_url,
             ],
@@ -159,7 +191,8 @@ class CalendarSyncController extends Controller
 
         $appointments = Termin::with(['user:id,ime,prezime'])
             ->where('doktor_id', $doctor->id)
-            ->where('datum_vrijeme', '>=', now()->subDays(30))
+            // Include a wider historical window so already-added appointments are visible after first subscribe.
+            ->where('datum_vrijeme', '>=', now()->subYear())
             ->orderBy('datum_vrijeme')
             ->get();
 
@@ -177,18 +210,18 @@ class CalendarSyncController extends Controller
      */
     private function buildIcalUrl(Doktor $doctor, ?Request $request = null): string
     {
-        $configuredApiUrl = trim((string) config('app.api_url', ''));
-        if ($configuredApiUrl !== '') {
-            return rtrim($configuredApiUrl, '/') . "/api/calendar/ical/{$doctor->calendar_sync_token}";
-        }
-
         $hostUrl = $request ? rtrim($request->getSchemeAndHttpHost(), '/') : '';
         if ($hostUrl !== '') {
-            return "{$hostUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
+            return "{$hostUrl}/api/calendar/ical/{$doctor->calendar_sync_token}.ics";
+        }
+
+        $configuredApiUrl = trim((string) config('app.api_url', ''));
+        if ($configuredApiUrl !== '') {
+            return rtrim($configuredApiUrl, '/') . "/api/calendar/ical/{$doctor->calendar_sync_token}.ics";
         }
 
         $fallbackAppUrl = rtrim((string) config('app.url', ''), '/');
-        return "{$fallbackAppUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
+        return "{$fallbackAppUrl}/api/calendar/ical/{$doctor->calendar_sync_token}.ics";
     }
 
     /**
@@ -388,4 +421,3 @@ class CalendarSyncController extends Controller
         return $folded;
     }
 }
-
