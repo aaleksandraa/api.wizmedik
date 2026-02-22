@@ -37,7 +37,7 @@ class ResetPasswordNotification extends Notification
             'system' => 'Direct Mail (no queue)'
         ]);
 
-        $frontendUrl = env('APP_FRONTEND_URL', 'https://wizmedik.com');
+        $frontendUrl = config('app.frontend_url');
         $url = $frontendUrl . '/reset-password?token=' . $this->token . '&email=' . urlencode($notifiable->email);
 
         return (new MailMessage)
@@ -45,6 +45,7 @@ class ResetPasswordNotification extends Notification
             ->view('emails.reset-lozinke', [
                 'token' => $this->token,
                 'email' => $notifiable->email,
+                'url' => $url,
             ]);
     }
 }

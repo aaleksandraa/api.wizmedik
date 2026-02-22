@@ -17,7 +17,7 @@ class RegistrationRejectedMail extends Mailable
     public function __construct(RegistrationRequest $registrationRequest)
     {
         $this->registrationRequest = $registrationRequest;
-        $this->contactEmail = \App\Models\SiteSetting::get('registration_admin_email', 'info@wizmedik.ba');
+        $this->contactEmail = \App\Models\SiteSetting::get('registration_admin_email', 'info@wizmedik.com');
     }
 
     public function build()

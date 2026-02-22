@@ -25,7 +25,7 @@
 
         <div class="info-box">
             <p>Kliknite na dugme ispod kako biste resetovali svoju lozinku:</p>
-            <a href="{{ env('APP_FRONTEND_URL', 'http://localhost:5173') }}/reset-password?token={{ $token }}&email={{ urlencode($email) }}" class="btn">Resetuj lozinku</a>
+            <a href="{{ $url }}" class="btn">Resetuj lozinku</a>
         </div>
 
         <p>Ovaj link će isteći za 60 minuta.</p>

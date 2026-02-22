@@ -55,7 +55,7 @@
 
         <div class="footer">
             <p>&copy; {{ date('Y') }} wizMedik. Sva prava zadržana.</p>
-            <p>Za pomoć kontaktirajte nas na: info@wizmedik.ba</p>
+            <p>Za pomoć kontaktirajte nas na: info@wizmedik.com</p>
         </div>
     </div>
 </body>
