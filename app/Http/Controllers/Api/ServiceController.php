@@ -15,7 +15,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json([]);
         }
@@ -32,7 +32,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen'], 404);
         }
@@ -60,7 +60,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen'], 404);
         }
@@ -78,7 +78,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen'], 404);
         }

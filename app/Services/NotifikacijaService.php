@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Notifikacija;
-use App\Models\User;
 use App\Mail\TerminZakazan;
 use App\Mail\TerminOtkazan;
 use App\Mail\GostovanjePoziv;
@@ -35,10 +34,11 @@ class NotifikacijaService
                 $terminData
             );
 
-            // Send email to doctor
-            if (!empty($doktor->email)) {
+            // Send email to doctor's account email (users.email), fallback legacy doctor email.
+            $doctorEmail = self::resolveDoctorEmail($doktor);
+            if (!empty($doctorEmail)) {
                 try {
-                    Mail::to($doktor->email)->send(new TerminZakazan($termin, 'doctor'));
+                    Mail::to($doctorEmail)->send(new TerminZakazan($termin, 'doctor'));
                 } catch (\Throwable $e) {
                     Log::error('Failed to send email to doctor: ' . $e->getMessage());
                 }
@@ -117,10 +117,13 @@ class NotifikacijaService
         }
 
         // Send email
-        try {
-            Mail::to($doktor->email)->send(new GostovanjePoziv($gostovanje, $klinika, $doktor));
-        } catch (\Throwable $e) {
-            Log::error('Failed to send gostovanje email: ' . $e->getMessage());
+        $doctorEmail = self::resolveDoctorEmail($doktor);
+        if ($doctorEmail) {
+            try {
+                Mail::to($doctorEmail)->send(new GostovanjePoziv($gostovanje, $klinika, $doktor));
+            } catch (\Throwable $e) {
+                Log::error('Failed to send gostovanje email: ' . $e->getMessage());
+            }
         }
     }
 
@@ -165,10 +168,13 @@ class NotifikacijaService
         }
 
         // Send email to doctor
-        try {
-            Mail::to($doktor->email)->send(new KlinikaZahtjev($zahtjev, $klinika, $doktor, 'clinic_invitation'));
-        } catch (\Throwable $e) {
-            Log::error('Failed to send doctor invitation email: ' . $e->getMessage());
+        $doctorEmail = self::resolveDoctorEmail($doktor);
+        if ($doctorEmail) {
+            try {
+                Mail::to($doctorEmail)->send(new KlinikaZahtjev($zahtjev, $klinika, $doktor, 'clinic_invitation'));
+            } catch (\Throwable $e) {
+                Log::error('Failed to send doctor invitation email: ' . $e->getMessage());
+            }
         }
     }
 
@@ -184,6 +190,30 @@ class NotifikacijaService
             'poruka' => $poruka,
             'data' => $data,
         ]);
+    }
+
+    /**
+     * Resolve doctor notification email from linked user account.
+     */
+    private static function resolveDoctorEmail($doktor): ?string
+    {
+        if (!$doktor) {
+            return null;
+        }
+
+        if ($doktor->relationLoaded('user') && $doktor->user?->email) {
+            return $doktor->user->email;
+        }
+
+        if ($doktor->user_id) {
+            $doktor->loadMissing('user:id,email');
+            if ($doktor->user?->email) {
+                return $doktor->user->email;
+            }
+        }
+
+        // Legacy fallback (pre user_id linkage)
+        return $doktor->email ?: null;
     }
 
     /**
@@ -300,10 +330,11 @@ class NotifikacijaService
                 $terminData
             );
 
-            // Send email to doctor
-            if ($doktor->email) {
+            // Send email to doctor's account email (users.email), fallback legacy doctor email.
+            $doctorEmail = self::resolveDoctorEmail($doktor);
+            if ($doctorEmail) {
                 try {
-                    Mail::to($doktor->email)->send(new TerminOtkazan($termin, 'doctor', $cancelledBy));
+                    Mail::to($doctorEmail)->send(new TerminOtkazan($termin, 'doctor', $cancelledBy));
                 } catch (\Throwable $e) {
                     Log::error('Failed to send cancellation email to doctor: ' . $e->getMessage());
                 }

@@ -39,7 +39,7 @@ class GostovanjeController extends Controller
     public function doctorIndex(Request $request)
     {
         $user = Auth::user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             // Return empty array instead of 404
@@ -146,7 +146,7 @@ class GostovanjeController extends Controller
     public function respond(Request $request, $id)
     {
         $user = Auth::user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             return response()->json(['error' => 'Doktor nije pronađen'], 404);
@@ -174,7 +174,7 @@ class GostovanjeController extends Controller
     {
         $user = Auth::user();
         $klinika = Klinika::where('user_id', $user->id)->first();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         $gostovanje = Gostovanje::where('id', $id)
             ->where(function($q) use ($klinika, $doktor) {
@@ -280,7 +280,7 @@ class GostovanjeController extends Controller
     {
         $user = Auth::user();
         $klinika = Klinika::where('user_id', $user->id)->first();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         $gostovanje = Gostovanje::findOrFail($gostovanjeId);
 
@@ -323,7 +323,7 @@ class GostovanjeController extends Controller
     {
         $user = Auth::user();
         $klinika = Klinika::where('user_id', $user->id)->first();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         $usluga = \App\Models\GostovanjeUsluga::where('id', $uslugaId)
             ->where('gostovanje_id', $gostovanjeId)
@@ -363,7 +363,7 @@ class GostovanjeController extends Controller
     {
         $user = Auth::user();
         $klinika = Klinika::where('user_id', $user->id)->first();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         $usluga = \App\Models\GostovanjeUsluga::where('id', $uslugaId)
             ->where('gostovanje_id', $gostovanjeId)

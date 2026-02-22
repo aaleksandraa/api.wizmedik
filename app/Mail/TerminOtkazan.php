@@ -64,9 +64,10 @@ class TerminOtkazan extends Mailable
                     'name' => $klinika->naziv,
                 ];
             }
-            if ($doktor && $doktor->email) {
+            $doctorEmail = $doktor?->user?->email ?? $doktor?->email;
+            if ($doktor && $doctorEmail) {
                 return [
-                    'email' => $doktor->email,
+                    'email' => $doctorEmail,
                     'name' => "Dr. {$doktor->ime} {$doktor->prezime}",
                 ];
             }

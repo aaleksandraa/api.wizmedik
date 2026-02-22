@@ -30,6 +30,7 @@ class Doktor extends Model
         'google_maps_link',
         'telefon',
         'email',
+        'public_email',
         'opis',
         'youtube_linkovi',
         'ocjena',

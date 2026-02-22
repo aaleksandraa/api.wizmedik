@@ -127,7 +127,7 @@ class BlogController extends Controller
     public function myPosts(Request $request)
     {
         $user = auth()->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             return response()->json([]);
@@ -148,7 +148,7 @@ class BlogController extends Controller
     public function storeDoctor(Request $request)
     {
         $user = auth()->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             return response()->json(['error' => 'Doktor profil nije pronađen'], 404);
@@ -187,7 +187,7 @@ class BlogController extends Controller
     public function updateDoctor(Request $request, $id)
     {
         $user = auth()->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen'], 404);
         }
@@ -219,7 +219,7 @@ class BlogController extends Controller
     public function destroyDoctor($id)
     {
         $user = auth()->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen'], 404);
         }

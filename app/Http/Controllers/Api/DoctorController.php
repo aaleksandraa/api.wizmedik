@@ -8,7 +8,7 @@ use App\Models\Klinika;
 use App\Models\KlinikaDoktorZahtjev;
 use App\Services\NotifikacijaService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class DoctorController extends Controller
 {
@@ -256,13 +256,15 @@ class DoctorController extends Controller
             return response()->json(['message' => 'Nemate dozvolu za pristup.'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)
+        $doktor = Doktor::where('user_id', $user->id)
             ->with(['specijalnostModel', 'klinika', 'usluge', 'specijalnosti'])
             ->first();
 
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen.'], 404);
         }
+
+        $doktor->setAttribute('account_email', $user->email);
 
         return response()->json($doktor);
     }
@@ -278,7 +280,11 @@ class DoctorController extends Controller
             return response()->json(['message' => 'Nemate dozvolu za pristup.'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->firstOrFail();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
+
+        if ($request->has('public_email') && $request->input('public_email') === '') {
+            $request->merge(['public_email' => null]);
+        }
 
         $validated = $request->validate([
             'telefon' => 'sometimes|string|max:20',
@@ -294,6 +300,8 @@ class DoctorController extends Controller
             'longitude' => 'sometimes|numeric',
             'google_maps_link' => 'sometimes|nullable|url',
             'slika_profila' => 'sometimes|string',
+            'public_email' => 'sometimes|nullable|email:rfc|max:255',
+            'account_email' => 'sometimes|required|email:rfc|max:255|unique:users,email,' . $user->id,
             // klinika_id removed - doctors can only join/leave clinics through requests
             'specialty_ids' => 'sometimes|array',
             'specialty_ids.*' => 'exists:specijalnosti,id',
@@ -315,18 +323,30 @@ class DoctorController extends Controller
         }
 
         $specialtyIds = $validated['specialty_ids'] ?? null;
-        unset($validated['specialty_ids']);
+        $accountEmail = $validated['account_email'] ?? null;
+        unset($validated['specialty_ids'], $validated['account_email']);
 
-        $doktor->update($validated);
+        DB::transaction(function () use ($doktor, $validated, $specialtyIds, $accountEmail, $user) {
+            $doktor->update($validated);
 
-        // Sync specialties if provided
-        if ($specialtyIds !== null) {
-            $doktor->specijalnosti()->sync($specialtyIds);
-        }
+            // Sync specialties if provided
+            if ($specialtyIds !== null) {
+                $doktor->specijalnosti()->sync($specialtyIds);
+            }
+
+            // Login email belongs to users table.
+            if ($accountEmail !== null && $accountEmail !== $user->email) {
+                $user->email = $accountEmail;
+                $user->save();
+            }
+        });
+
+        $updatedDoktor = $doktor->fresh()->load('specijalnosti');
+        $updatedDoktor->setAttribute('account_email', $user->fresh()->email);
 
         return response()->json([
             'message' => 'Profil uspješno ažuriran',
-            'doktor' => $doktor->fresh()->load('specijalnosti')
+            'doktor' => $updatedDoktor
         ]);
     }
 
@@ -341,7 +361,7 @@ class DoctorController extends Controller
             return response()->json(['message' => 'Nemate dozvolu za pristup.'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->firstOrFail();
+        $doktor = Doktor::where('user_id', $user->id)->firstOrFail();
 
         $validated = $request->validate([
             'radno_vrijeme' => 'sometimes|array',
@@ -385,8 +405,8 @@ class DoctorController extends Controller
             return response()->json(['message' => 'Nemate dozvolu za pristup.'], 403);
         }
 
-        // Find doctor by email (same as myProfile)
-        $doktor = Doktor::where('email', $user->email)->first();
+        // Find doctor by linked user account (same as myProfile)
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             // Return empty array instead of 404 to avoid breaking the frontend
@@ -412,7 +432,7 @@ class DoctorController extends Controller
             return response()->json(['message' => 'Nemate dozvolu za pristup.'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen.'], 404);
@@ -451,7 +471,7 @@ class DoctorController extends Controller
     public function searchClinics(Request $request)
     {
         $user = $request->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         $search = $request->input('search', '');
 
@@ -481,7 +501,7 @@ class DoctorController extends Controller
             return response()->json(['message' => 'Nemate dozvolu za pristup.'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen.'], 404);
@@ -533,7 +553,7 @@ class DoctorController extends Controller
     public function cancelClinicRequest(Request $request, $id)
     {
         $user = $request->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen.'], 404);
@@ -556,7 +576,7 @@ class DoctorController extends Controller
     public function leaveClinic(Request $request)
     {
         $user = $request->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
 
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen.'], 404);

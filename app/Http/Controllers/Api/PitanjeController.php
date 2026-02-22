@@ -162,7 +162,7 @@ class PitanjeController extends Controller
             return response()->json(['message' => 'Samo doktori mogu odgovarati na pitanja'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen'], 404);
         }
@@ -235,7 +235,7 @@ class PitanjeController extends Controller
             return response()->json(['message' => 'Samo doktori mogu pristupiti notifikacijama'], 403);
         }
 
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['data' => [], 'total' => 0]);
         }
@@ -255,7 +255,7 @@ class PitanjeController extends Controller
     public function oznaciNotifikacijuKaoProcitanu(Request $request, $notifikacijaId)
     {
         $user = $request->user();
-        $doktor = Doktor::where('email', $user->email)->first();
+        $doktor = Doktor::where('user_id', $user->id)->first();
         if (!$doktor) {
             return response()->json(['message' => 'Profil doktora nije pronađen'], 404);
         }
