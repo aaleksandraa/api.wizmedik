@@ -28,8 +28,10 @@ class CalendarSyncController extends Controller
             return response()->json(['message' => 'Doctor profile not found'], 404);
         }
 
+        // First-time setup: create token and enable sync so copied URL works immediately.
         if (!$doctor->calendar_sync_token) {
             $doctor->calendar_sync_token = Str::random(64);
+            $doctor->calendar_sync_enabled = true;
             $doctor->save();
         }
 
@@ -43,9 +45,9 @@ class CalendarSyncController extends Controller
             'outlook_calendar_url' => $doctor->outlook_calendar_url,
             'last_synced' => $doctor->calendar_last_synced,
             'instructions' => [
-                'google' => 'Kopirajte iCal URL i dodajte ga u Google Calendar preko "Dodaj kalendar" > "Sa URL-a"',
-                'apple' => 'Kopirajte iCal URL i dodajte ga u iPhone Calendar preko Settings > Calendar > Accounts > Add Account > Other > Add Subscribed Calendar',
-                'outlook' => 'Kopirajte iCal URL i dodajte ga u Outlook preko "Dodaj kalendar" > "Sa interneta"',
+                'google' => 'Kopirajte iCal URL i dodajte ga u Google Calendar preko "Dodaj kalendar" > "Sa URL-a".',
+                'apple' => 'Kopirajte iCal URL i dodajte ga u Apple Calendar kao subscribed calendar.',
+                'outlook' => 'Kopirajte iCal URL i dodajte ga u Outlook preko "Add calendar" > "Subscribe from web".',
             ],
         ]);
     }
@@ -73,6 +75,11 @@ class CalendarSyncController extends Controller
             'outlook_calendar_url' => 'nullable|url',
         ]);
 
+        // If sync is enabled and token does not exist, create one automatically.
+        if (($validated['enabled'] ?? false) && !$doctor->calendar_sync_token) {
+            $doctor->calendar_sync_token = Str::random(64);
+        }
+
         $doctor->update([
             'calendar_sync_enabled' => $validated['enabled'] ?? $doctor->calendar_sync_enabled,
             'google_calendar_url' => $validated['google_calendar_url'] ?? $doctor->google_calendar_url,
@@ -80,7 +87,7 @@ class CalendarSyncController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Postavke kalendara ažurirane',
+            'message' => 'Calendar settings updated',
             'settings' => [
                 'enabled' => (bool) $doctor->calendar_sync_enabled,
                 'google_calendar_url' => $doctor->google_calendar_url,
@@ -106,14 +113,17 @@ class CalendarSyncController extends Controller
             return response()->json(['message' => 'Doctor profile not found'], 404);
         }
 
+        // Regenerated token should be immediately usable.
         $doctor->calendar_sync_token = Str::random(64);
+        $doctor->calendar_sync_enabled = true;
         $doctor->save();
 
         $icalUrl = $this->buildIcalUrl($doctor, $request);
 
         return response()->json([
-            'message' => 'Token regenerisan',
+            'message' => 'Token regenerated',
             'token' => $doctor->calendar_sync_token,
+            'enabled' => (bool) $doctor->calendar_sync_enabled,
             'ical_url' => $icalUrl,
         ]);
     }
@@ -126,7 +136,8 @@ class CalendarSyncController extends Controller
     {
         // Light validation to avoid unnecessary DB work on malformed tokens.
         if (!preg_match('/^[A-Za-z0-9]{32,128}$/', $token)) {
-            return response('Calendar not found or disabled', 404);
+            return response('Calendar not found or disabled', 404)
+                ->header('Content-Type', 'text/plain; charset=utf-8');
         }
 
         $doctor = Doktor::where('calendar_sync_token', $token)
@@ -134,10 +145,11 @@ class CalendarSyncController extends Controller
             ->first();
 
         if (!$doctor) {
-            return response('Calendar not found or disabled', 404);
+            return response('Calendar not found or disabled', 404)
+                ->header('Content-Type', 'text/plain; charset=utf-8');
         }
 
-        // Best-effort timestamp update; do not break feed if this fails.
+        // Best-effort timestamp update; never fail the feed because of this.
         try {
             $doctor->calendar_last_synced = now();
             $doctor->save();
@@ -155,8 +167,28 @@ class CalendarSyncController extends Controller
 
         return response($ical, 200)
             ->header('Content-Type', 'text/calendar; charset=utf-8')
-            ->header('Content-Disposition', 'attachment; filename="calendar.ics"')
-            ->header('Cache-Control', 'private, max-age=300');
+            ->header('Content-Disposition', 'inline; filename="wizmedik-calendar.ics"')
+            ->header('Cache-Control', 'public, max-age=300')
+            ->header('X-Content-Type-Options', 'nosniff');
+    }
+
+    /**
+     * Build full iCal URL.
+     */
+    private function buildIcalUrl(Doktor $doctor, ?Request $request = null): string
+    {
+        $configuredApiUrl = trim((string) config('app.api_url', ''));
+        if ($configuredApiUrl !== '') {
+            return rtrim($configuredApiUrl, '/') . "/api/calendar/ical/{$doctor->calendar_sync_token}";
+        }
+
+        $hostUrl = $request ? rtrim($request->getSchemeAndHttpHost(), '/') : '';
+        if ($hostUrl !== '') {
+            return "{$hostUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
+        }
+
+        $fallbackAppUrl = rtrim((string) config('app.url', ''), '/');
+        return "{$fallbackAppUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
     }
 
     /**
@@ -171,21 +203,22 @@ class CalendarSyncController extends Controller
         $lines[] = 'CALSCALE:GREGORIAN';
         $lines[] = 'METHOD:PUBLISH';
         $lines[] = 'X-WR-CALNAME:' . $this->escapeString("Dr. {$doctor->ime} {$doctor->prezime} - Termini");
-        $lines[] = 'X-WR-TIMEZONE:Europe/Sarajevo';
         $lines[] = 'X-WR-CALDESC:' . $this->escapeString('Automatski sinhronizovani termini sa WizMedik platforme');
+        $lines[] = 'REFRESH-INTERVAL;VALUE=DURATION:PT5M';
+        $lines[] = 'X-PUBLISHED-TTL:PT5M';
 
         foreach ($appointments as $appointment) {
             try {
                 $lines = array_merge($lines, $this->generateEventLines($appointment, $doctor));
             } catch (\Throwable $e) {
-                // Skip a single broken row instead of breaking the entire calendar feed.
+                // Skip a single broken row instead of failing the entire calendar feed.
                 report($e);
             }
         }
 
         $lines[] = 'END:VCALENDAR';
 
-        return implode("\r\n", $lines) . "\r\n";
+        return implode("\r\n", $this->foldIcalLines($lines)) . "\r\n";
     }
 
     /**
@@ -200,12 +233,13 @@ class CalendarSyncController extends Controller
         $lines[] = "UID:{$uid}";
         $lines[] = 'DTSTAMP:' . Carbon::now('UTC')->format('Ymd\THis\Z');
 
-        $startDateTime = Carbon::parse($appointment->datum_vrijeme)->setTimezone('Europe/Sarajevo');
+        // Emit UTC timestamps for maximum Google/Outlook compatibility.
+        $startDateTimeUtc = Carbon::parse($appointment->datum_vrijeme)->utc();
         $duration = max((int) ($appointment->trajanje_minuti ?? 30), 5);
-        $endDateTime = $startDateTime->copy()->addMinutes($duration);
+        $endDateTimeUtc = $startDateTimeUtc->copy()->addMinutes($duration);
 
-        $lines[] = 'DTSTART;TZID=Europe/Sarajevo:' . $startDateTime->format('Ymd\THis');
-        $lines[] = 'DTEND;TZID=Europe/Sarajevo:' . $endDateTime->format('Ymd\THis');
+        $lines[] = 'DTSTART:' . $startDateTimeUtc->format('Ymd\THis\Z');
+        $lines[] = 'DTEND:' . $endDateTimeUtc->format('Ymd\THis\Z');
 
         $patientName = $this->resolvePatientName($appointment);
         $lines[] = 'SUMMARY:' . $this->escapeString("Termin: {$patientName}");
@@ -248,28 +282,15 @@ class CalendarSyncController extends Controller
         return $lines;
     }
 
-    private function buildIcalUrl(Doktor $doctor, ?Request $request = null): string
-    {
-        $configuredApiUrl = trim((string) config('app.api_url', ''));
-        if ($configuredApiUrl !== '') {
-            return rtrim($configuredApiUrl, '/') . "/api/calendar/ical/{$doctor->calendar_sync_token}";
-        }
-
-        $hostUrl = $request ? rtrim($request->getSchemeAndHttpHost(), '/') : '';
-        if ($hostUrl !== '') {
-            return "{$hostUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
-        }
-
-        $fallbackAppUrl = rtrim((string) config('app.url', ''), '/');
-        return "{$fallbackAppUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
-    }
-
+    /**
+     * Safely read encrypted attributes without failing the whole feed.
+     */
     private function safeReadEncryptedField(Termin $appointment, string $field): ?string
     {
         try {
             $value = $appointment->{$field};
         } catch (\Throwable $e) {
-            // Historical plaintext/corrupt records should not break calendar export.
+            // Historical plaintext/corrupt rows should not break export.
             report($e);
             return null;
         }
@@ -323,10 +344,48 @@ class CalendarSyncController extends Controller
     {
         return match ($status) {
             'zakazan' => 'Zakazan',
-            'potvrden', 'potvrdjen' => 'Potvrđen',
+            'potvrden', 'potvrdjen' => 'Potvrdjen',
             'otkazan' => 'Otkazan',
-            'zavrshen', 'zavrsen', 'završen' => 'Završen',
+            'zavrshen', 'zavrsen', 'završen' => 'Zavrsen',
             default => 'Nepoznat',
         };
     }
+
+    /**
+     * Fold iCal lines to respect RFC line length rules (75 octets).
+     */
+    private function foldIcalLines(array $lines): array
+    {
+        $folded = [];
+
+        foreach ($lines as $line) {
+            if (strlen($line) <= 75) {
+                $folded[] = $line;
+                continue;
+            }
+
+            $remaining = $line;
+            $isFirstChunk = true;
+
+            while ($remaining !== '') {
+                $maxChunkLength = $isFirstChunk ? 75 : 74; // Continuation line starts with one space.
+
+                if (function_exists('mb_strcut')) {
+                    $chunk = mb_strcut($remaining, 0, $maxChunkLength, 'UTF-8');
+                    if ($chunk === '') {
+                        $chunk = substr($remaining, 0, $maxChunkLength);
+                    }
+                } else {
+                    $chunk = substr($remaining, 0, $maxChunkLength);
+                }
+
+                $remaining = (string) substr($remaining, strlen($chunk));
+                $folded[] = $isFirstChunk ? $chunk : " {$chunk}";
+                $isFirstChunk = false;
+            }
+        }
+
+        return $folded;
+    }
 }
+
