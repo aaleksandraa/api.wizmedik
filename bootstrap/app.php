@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -24,50 +25,66 @@ return Application::configure(basePath: dirname(__DIR__))
             'registration.throttle' => \App\Http\Middleware\RegistrationThrottle::class,
         ]);
 
-        // Return JSON for unauthenticated API requests instead of redirecting
+        // Return JSON for unauthenticated API requests instead of redirecting.
         $middleware->redirectGuestsTo(function ($request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 abort(response()->json(['message' => 'Unauthenticated. Please login.'], 401));
             }
+
             return route('login');
         });
 
-        // Enable rate limiting for API routes
+        // Enable rate limiting for API routes.
         $middleware->api(
             prepend: [
                 \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             ]
         );
 
-        // CORS for production
+        // CORS for production.
         $middleware->api(append: [
             \Illuminate\Http\Middleware\HandleCors::class,
             \App\Http\Middleware\SecurityHeadersMiddleware::class,
             \App\Http\Middleware\AuditLogMiddleware::class,
             \App\Http\Middleware\CompressResponse::class,
-            \App\Http\Middleware\SetCacheHeaders::class, // Performance optimization - cache headers
+            \App\Http\Middleware\SetCacheHeaders::class, // Performance optimization - cache headers.
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // Production error handling - hide sensitive details
+        // Production error handling - hide sensitive details only for true server failures.
         $exceptions->render(function (Throwable $e, $request) {
-            if ($request->is('api/*') && config('app.env') === 'production') {
-                // Log the full error
-                \Log::error('API Exception', [
-                    'message' => $e->getMessage(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => $e->getTraceAsString(),
-                    'url' => $request->fullUrl(),
-                    'method' => $request->method(),
-                    'ip' => $request->ip(),
-                ]);
-
-                // Return generic error to user (no stack trace)
-                return response()->json([
-                    'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
-                    'error_id' => \Str::uuid()->toString(),
-                ], 500);
+            if (!$request->is('api/*') || config('app.env') !== 'production') {
+                return null;
             }
+
+            // Preserve framework defaults for expected 4xx API errors.
+            if (
+                $e instanceof \Illuminate\Validation\ValidationException ||
+                $e instanceof \Illuminate\Auth\AuthenticationException ||
+                $e instanceof \Illuminate\Auth\Access\AuthorizationException
+            ) {
+                return null;
+            }
+
+            if ($e instanceof HttpExceptionInterface && $e->getStatusCode() < 500) {
+                return null;
+            }
+
+            // Log full error details for diagnostics.
+            \Log::error('API Exception', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'url' => $request->fullUrl(),
+                'method' => $request->method(),
+                'ip' => $request->ip(),
+            ]);
+
+            // Return generic message to users for 5xx errors.
+            return response()->json([
+                'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
+                'error_id' => \Str::uuid()->toString(),
+            ], 500);
         });
     })->create();

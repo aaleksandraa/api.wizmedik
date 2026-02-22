@@ -105,9 +105,16 @@ class AppointmentController extends Controller
             return response()->json(['error' => $e->getMessage(), 'message' => $e->getMessage()], 409);
         }
 
-        // Send notifications
-        $termin->load(['doktor.klinika', 'user', 'usluga', 'gostovanje.klinika']);
-        NotifikacijaService::terminZakazan($termin);
+        // Send notifications (must not break booking response)
+        try {
+            $termin->load(['doktor.klinika', 'user', 'usluga', 'gostovanje.klinika']);
+            NotifikacijaService::terminZakazan($termin);
+        } catch (\Throwable $notificationError) {
+            Log::error('Appointment notification failed after booking', [
+                'termin_id' => $termin->id,
+                'error' => $notificationError->getMessage(),
+            ]);
+        }
 
         return response()->json($termin->load(['doktor', 'usluga', 'gostovanje.klinika']), 201);
     }
@@ -156,10 +163,10 @@ class AppointmentController extends Controller
                     'status' => $status,
                     'trajanje_minuti' => $trajanje,
                     'cijena' => $cijena,
-                    'guest_ime' => $validated['ime'],
-                    'guest_prezime' => $validated['prezime'],
-                    'guest_telefon' => $validated['telefon'],
-                    'guest_email' => $validated['email'] ?? null,
+                    'guest_ime' => $validated['guest_ime'],
+                    'guest_prezime' => $validated['guest_prezime'],
+                    'guest_telefon' => $validated['guest_telefon'],
+                    'guest_email' => $validated['guest_email'] ?? null,
                     'gostovanje_id' => $validated['gostovanje_id'] ?? null,
                     'klinika_id' => $validated['klinika_id'] ?? null,
                 ]);
@@ -168,9 +175,16 @@ class AppointmentController extends Controller
             return response()->json(['error' => $e->getMessage(), 'message' => $e->getMessage()], 409);
         }
 
-        // Send notifications
-        $termin->load(['doktor.klinika', 'usluga', 'gostovanje.klinika']);
-        NotifikacijaService::terminZakazan($termin);
+        // Send notifications (must not break booking response)
+        try {
+            $termin->load(['doktor.klinika', 'usluga', 'gostovanje.klinika']);
+            NotifikacijaService::terminZakazan($termin);
+        } catch (\Throwable $notificationError) {
+            Log::error('Guest appointment notification failed after booking', [
+                'termin_id' => $termin->id,
+                'error' => $notificationError->getMessage(),
+            ]);
+        }
 
         return response()->json($termin->load(['doktor', 'usluga', 'gostovanje.klinika']), 201);
     }
@@ -241,9 +255,16 @@ class AppointmentController extends Controller
             return response()->json(['error' => $e->getMessage(), 'message' => $e->getMessage()], 409);
         }
 
-        // Send notifications
-        $termin->load(['doktor.klinika', 'usluga']);
-        NotifikacijaService::terminZakazan($termin);
+        // Send notifications (must not break booking response)
+        try {
+            $termin->load(['doktor.klinika', 'usluga']);
+            NotifikacijaService::terminZakazan($termin);
+        } catch (\Throwable $notificationError) {
+            Log::error('Manual appointment notification failed after booking', [
+                'termin_id' => $termin->id,
+                'error' => $notificationError->getMessage(),
+            ]);
+        }
 
         return response()->json($termin->load(['doktor', 'usluga']), 201);
     }

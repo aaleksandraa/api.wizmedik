@@ -36,10 +36,12 @@ class NotifikacijaService
             );
 
             // Send email to doctor
-            try {
-                Mail::to($doktor->email)->send(new TerminZakazan($termin, 'doctor'));
-            } catch (\Exception $e) {
-                Log::error('Failed to send email to doctor: ' . $e->getMessage());
+            if (!empty($doktor->email)) {
+                try {
+                    Mail::to($doktor->email)->send(new TerminZakazan($termin, 'doctor'));
+                } catch (\Throwable $e) {
+                    Log::error('Failed to send email to doctor: ' . $e->getMessage());
+                }
             }
         }
 
@@ -59,7 +61,7 @@ class NotifikacijaService
                 if ($klinika->contact_email) {
                     try {
                         Mail::to($klinika->contact_email)->send(new TerminZakazan($termin, 'clinic'));
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
                         Log::error('Failed to send email to clinic: ' . $e->getMessage());
                     }
                 }
@@ -71,7 +73,7 @@ class NotifikacijaService
             self::createNotifikacija(
                 $termin->user_id,
                 'termin_zakazan',
-                'Termin uspješno zakazan',
+                'Termin uspjeÅ¡no zakazan',
                 self::getTerminPoruka($termin, 'patient'),
                 $terminData
             );
@@ -80,7 +82,7 @@ class NotifikacijaService
             if ($termin->user && $termin->user->email) {
                 try {
                     Mail::to($termin->user->email)->send(new TerminZakazan($termin, 'patient'));
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::error('Failed to send email to patient: ' . $e->getMessage());
                 }
             }
@@ -88,7 +90,7 @@ class NotifikacijaService
             // Send email to guest
             try {
                 Mail::to($termin->guest_email)->send(new TerminZakazan($termin, 'patient'));
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::error('Failed to send email to guest: ' . $e->getMessage());
             }
         }
@@ -117,7 +119,7 @@ class NotifikacijaService
         // Send email
         try {
             Mail::to($doktor->email)->send(new GostovanjePoziv($gostovanje, $klinika, $doktor));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to send gostovanje email: ' . $e->getMessage());
         }
     }
@@ -131,8 +133,8 @@ class NotifikacijaService
             self::createNotifikacija(
                 $klinika->user_id,
                 'doktor_zahtjev',
-                'Novi zahtjev za pridruživanje',
-                "Dr. {$doktor->ime} {$doktor->prezime} ({$doktor->specijalnost}) želi se pridružiti vašoj klinici.",
+                'Novi zahtjev za pridruÅ¾ivanje',
+                "Dr. {$doktor->ime} {$doktor->prezime} ({$doktor->specijalnost}) Å¾eli se pridruÅ¾iti vaÅ¡oj klinici.",
                 ['zahtjev_id' => $zahtjev->id, 'doktor_id' => $doktor->id]
             );
         }
@@ -141,7 +143,7 @@ class NotifikacijaService
         if ($klinika->contact_email) {
             try {
                 Mail::to($klinika->contact_email)->send(new KlinikaZahtjev($zahtjev, $klinika, $doktor, 'doctor_request'));
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::error('Failed to send clinic request email: ' . $e->getMessage());
             }
         }
@@ -156,8 +158,8 @@ class NotifikacijaService
             self::createNotifikacija(
                 $doktor->user_id,
                 'klinika_poziv',
-                'Poziv za pridruživanje klinici',
-                "Klinika {$klinika->naziv} vas poziva da se pridružite njihovom timu.",
+                'Poziv za pridruÅ¾ivanje klinici',
+                "Klinika {$klinika->naziv} vas poziva da se pridruÅ¾ite njihovom timu.",
                 ['zahtjev_id' => $zahtjev->id, 'klinika_id' => $klinika->id]
             );
         }
@@ -165,7 +167,7 @@ class NotifikacijaService
         // Send email to doctor
         try {
             Mail::to($doktor->email)->send(new KlinikaZahtjev($zahtjev, $klinika, $doktor, 'clinic_invitation'));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Failed to send doctor invitation email: ' . $e->getMessage());
         }
     }
@@ -194,7 +196,7 @@ class NotifikacijaService
                 self::createNotifikacija(
                     $doktor->user_id,
                     'novo_pitanje',
-                    'Novo pitanje iz vaše specijalnosti',
+                    'Novo pitanje iz vaÅ¡e specijalnosti',
                     "Korisnik {$pitanje->ime_korisnika} je postavio pitanje: \"{$pitanje->naslov}\"",
                     [
                         'pitanje_id' => $pitanje->id,
@@ -218,8 +220,8 @@ class NotifikacijaService
             self::createNotifikacija(
                 $pitanje->user_id,
                 'odgovor_na_pitanje',
-                'Dobili ste odgovor na vaše pitanje',
-                "{$doktorIme} je odgovorio na vaše pitanje: \"{$pitanje->naslov}\"",
+                'Dobili ste odgovor na vaÅ¡e pitanje',
+                "{$doktorIme} je odgovorio na vaÅ¡e pitanje: \"{$pitanje->naslov}\"",
                 [
                     'pitanje_id' => $pitanje->id,
                     'pitanje_slug' => $pitanje->slug,
@@ -232,7 +234,7 @@ class NotifikacijaService
             if ($pitanje->user && $pitanje->user->email) {
                 try {
                     Mail::to($pitanje->user->email)->send(new OdgovorNaPitanjeMail($pitanje, $odgovor));
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::error('Failed to send answer notification email to user: ' . $e->getMessage());
                 }
             }
@@ -241,7 +243,7 @@ class NotifikacijaService
         elseif ($pitanje->email_korisnika) {
             try {
                 Mail::to($pitanje->email_korisnika)->send(new OdgovorNaPitanjeMail($pitanje, $odgovor));
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Log::error('Failed to send answer notification email to guest: ' . $e->getMessage());
             }
         }
@@ -260,7 +262,7 @@ class NotifikacijaService
         $datum = \Carbon\Carbon::parse($termin->datum_vrijeme)->format('d.m.Y. H:i');
 
         if ($recipientType === 'patient') {
-            return "Vaš termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} je zakazan za {$datum}.";
+            return "VaÅ¡ termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} je zakazan za {$datum}.";
         } elseif ($recipientType === 'doctor') {
             $pacijent = $termin->user
                 ? "{$termin->user->ime} {$termin->user->prezime}"
@@ -302,7 +304,7 @@ class NotifikacijaService
             if ($doktor->email) {
                 try {
                     Mail::to($doktor->email)->send(new TerminOtkazan($termin, 'doctor', $cancelledBy));
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::error('Failed to send cancellation email to doctor: ' . $e->getMessage());
                 }
             }
@@ -324,7 +326,7 @@ class NotifikacijaService
                 if ($klinika->contact_email) {
                     try {
                         Mail::to($klinika->contact_email)->send(new TerminOtkazan($termin, 'clinic', $cancelledBy));
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
                         Log::error('Failed to send cancellation email to clinic: ' . $e->getMessage());
                     }
                 }
@@ -337,7 +339,7 @@ class NotifikacijaService
                 self::createNotifikacija(
                     $termin->user_id,
                     'termin_otkazan',
-                    'Vaš termin je otkazan',
+                    'VaÅ¡ termin je otkazan',
                     self::getTerminOtkazanPoruka($termin, 'patient', $cancelledBy),
                     $terminData
                 );
@@ -346,7 +348,7 @@ class NotifikacijaService
                 if ($termin->user && $termin->user->email) {
                     try {
                         Mail::to($termin->user->email)->send(new TerminOtkazan($termin, 'patient', $cancelledBy));
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
                         Log::error('Failed to send cancellation email to patient: ' . $e->getMessage());
                     }
                 }
@@ -354,7 +356,7 @@ class NotifikacijaService
                 // Send email to guest
                 try {
                     Mail::to($termin->guest_email)->send(new TerminOtkazan($termin, 'patient', $cancelledBy));
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     Log::error('Failed to send cancellation email to guest: ' . $e->getMessage());
                 }
             }
@@ -379,7 +381,7 @@ class NotifikacijaService
         };
 
         if ($recipientType === 'patient') {
-            return "Vaš termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} za {$datum} je otkazan od strane {$cancelledByText}.";
+            return "VaÅ¡ termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} za {$datum} je otkazan od strane {$cancelledByText}.";
         } elseif ($recipientType === 'doctor') {
             return "Termin sa pacijentom {$pacijent} za {$datum} je otkazan od strane {$cancelledByText}.";
         } else {
@@ -387,3 +389,4 @@ class NotifikacijaService
         }
     }
 }
+

@@ -31,7 +31,7 @@ class StoreAppointmentRequest extends FormRequest
             'guest_ime' => ['required_without:user_id', 'string', 'max:100', 'regex:/^[\p{L}\s\-]+$/u'],
             'guest_prezime' => ['required_without:user_id', 'string', 'max:100', 'regex:/^[\p{L}\s\-]+$/u'],
             'guest_telefon' => ['required_without:user_id', 'string', 'regex:/^[\+]?[0-9\s\-\(\)]{9,20}$/'],
-            'guest_email' => ['required_without:user_id', 'email:rfc,dns', 'max:255'],
+            'guest_email' => ['nullable', 'email:rfc,dns', 'max:255'],
 
             'gostovanje_id' => ['nullable', 'integer', 'exists:klinika_doktor_gostovanja,id'],
             'klinika_id' => ['nullable', 'integer', 'exists:klinike,id'],
@@ -52,13 +52,22 @@ class StoreAppointmentRequest extends FormRequest
             'guest_prezime.regex' => 'Prezime može sadržati samo slova, razmake i crtice.',
             'guest_telefon.required_without' => 'Telefon je obavezan.',
             'guest_telefon.regex' => 'Telefon nije u validnom formatu.',
-            'guest_email.required_without' => 'Email je obavezan.',
             'guest_email.email' => 'Email nije validan.',
         ];
     }
 
     protected function prepareForValidation(): void
     {
+        // Backward compatibility for payloads that still use ime/prezime/telefon/email
+        $this->merge([
+            'guest_ime' => $this->input('guest_ime', $this->input('ime')),
+            'guest_prezime' => $this->input('guest_prezime', $this->input('prezime')),
+            'guest_telefon' => $this->input('guest_telefon', $this->input('telefon')),
+            'guest_email' => $this->input('guest_email', $this->input('email')),
+            // Support both napomena and napomene keys
+            'napomene' => $this->input('napomene', $this->input('napomena')),
+        ]);
+
         // Sanitize input
         if ($this->has('razlog')) {
             $this->merge([
