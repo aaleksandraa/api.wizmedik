@@ -230,6 +230,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/calendar-sync', [CalendarSyncController::class, 'getSettings']);
             Route::put('/calendar-sync', [CalendarSyncController::class, 'updateSettings']);
             Route::post('/calendar-sync/regenerate-token', [CalendarSyncController::class, 'regenerateToken']);
+            Route::post('/calendar-sync/sync-now', [CalendarSyncController::class, 'syncNow']);
 
             Route::get('/kategorije', [DoctorDashboardController::class, 'getKategorije']);
             Route::post('/kategorije', [DoctorDashboardController::class, 'createKategorija']);

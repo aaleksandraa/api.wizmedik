@@ -161,6 +161,53 @@ class CalendarSyncController extends Controller
     }
 
     /**
+     * Manual sync action for doctor dashboard testing.
+     * This does not force Google/Outlook to refresh immediately, but validates and regenerates feed now.
+     */
+    public function syncNow(Request $request)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $doctor = Doktor::where('user_id', $user->id)->first();
+
+        if (!$doctor) {
+            return response()->json(['message' => 'Doctor profile not found'], 404);
+        }
+
+        if (!$doctor->calendar_sync_enabled) {
+            return response()->json([
+                'message' => 'Calendar sync is disabled. Enable sync first.',
+            ], 422);
+        }
+
+        if (!$doctor->calendar_sync_token) {
+            $doctor->calendar_sync_token = Str::random(64);
+            $doctor->save();
+        }
+
+        $appointments = $this->getAppointmentsForFeed($doctor);
+        $ical = $this->generateICalContent($doctor, $appointments);
+
+        // Mark manual sync timestamp for dashboard visibility.
+        $doctor->calendar_last_synced = now();
+        $doctor->save();
+
+        return response()->json([
+            'message' => 'Calendar feed regenerated successfully.',
+            'ical_url' => $this->buildIcalUrl($doctor, $request),
+            'last_synced' => $doctor->calendar_last_synced,
+            'events_count' => $appointments->count(),
+            'feed_size_bytes' => strlen($ical),
+            'feed_hash' => substr(sha1($ical), 0, 20),
+            'note' => 'Google and Outlook refresh subscribed calendars periodically (not instantly).',
+        ]);
+    }
+
+    /**
      * Generate iCal feed for doctor's appointments.
      * Public endpoint - no authentication required.
      */
@@ -189,12 +236,7 @@ class CalendarSyncController extends Controller
             report($e);
         }
 
-        $appointments = Termin::with(['user:id,ime,prezime'])
-            ->where('doktor_id', $doctor->id)
-            // Include a wider historical window so already-added appointments are visible after first subscribe.
-            ->where('datum_vrijeme', '>=', now()->subYear())
-            ->orderBy('datum_vrijeme')
-            ->get();
+        $appointments = $this->getAppointmentsForFeed($doctor);
 
         $ical = $this->generateICalContent($doctor, $appointments);
 
@@ -203,6 +245,16 @@ class CalendarSyncController extends Controller
             ->header('Content-Disposition', 'inline; filename="wizmedik-calendar.ics"')
             ->header('Cache-Control', 'public, max-age=300')
             ->header('X-Content-Type-Options', 'nosniff');
+    }
+
+    private function getAppointmentsForFeed(Doktor $doctor)
+    {
+        return Termin::with(['user:id,ime,prezime'])
+            ->where('doktor_id', $doctor->id)
+            // Include a wider historical window so already-added appointments are visible after first subscribe.
+            ->where('datum_vrijeme', '>=', now()->subYear())
+            ->orderBy('datum_vrijeme')
+            ->get();
     }
 
     /**
