@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'api_url' => env('APP_API_URL', env('APP_URL', 'http://localhost')),
+
     'frontend_url' => env('APP_FRONTEND_URL', 'http://localhost:8080'),
 
     /*

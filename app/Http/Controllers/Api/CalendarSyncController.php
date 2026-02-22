@@ -5,14 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Doktor;
 use App\Models\Termin;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 
 class CalendarSyncController extends Controller
 {
     /**
-     * Get calendar sync settings for authenticated doctor
+     * Get calendar sync settings for authenticated doctor.
      */
     public function getSettings(Request $request)
     {
@@ -28,17 +28,15 @@ class CalendarSyncController extends Controller
             return response()->json(['message' => 'Doctor profile not found'], 404);
         }
 
-        // Generate token if doesn't exist
         if (!$doctor->calendar_sync_token) {
             $doctor->calendar_sync_token = Str::random(64);
             $doctor->save();
         }
 
-        $baseUrl = config('app.url');
-        $icalUrl = "{$baseUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
+        $icalUrl = $this->buildIcalUrl($doctor, $request);
 
         return response()->json([
-            'enabled' => $doctor->calendar_sync_enabled,
+            'enabled' => (bool) $doctor->calendar_sync_enabled,
             'token' => $doctor->calendar_sync_token,
             'ical_url' => $icalUrl,
             'google_calendar_url' => $doctor->google_calendar_url,
@@ -47,13 +45,13 @@ class CalendarSyncController extends Controller
             'instructions' => [
                 'google' => 'Kopirajte iCal URL i dodajte ga u Google Calendar preko "Dodaj kalendar" > "Sa URL-a"',
                 'apple' => 'Kopirajte iCal URL i dodajte ga u iPhone Calendar preko Settings > Calendar > Accounts > Add Account > Other > Add Subscribed Calendar',
-                'outlook' => 'Kopirajte iCal URL i dodajte ga u Outlook preko "Dodaj kalendar" > "Sa interneta"'
-            ]
+                'outlook' => 'Kopirajte iCal URL i dodajte ga u Outlook preko "Dodaj kalendar" > "Sa interneta"',
+            ],
         ]);
     }
 
     /**
-     * Update calendar sync settings
+     * Update calendar sync settings.
      */
     public function updateSettings(Request $request)
     {
@@ -84,15 +82,15 @@ class CalendarSyncController extends Controller
         return response()->json([
             'message' => 'Postavke kalendara ažurirane',
             'settings' => [
-                'enabled' => $doctor->calendar_sync_enabled,
+                'enabled' => (bool) $doctor->calendar_sync_enabled,
                 'google_calendar_url' => $doctor->google_calendar_url,
                 'outlook_calendar_url' => $doctor->outlook_calendar_url,
-            ]
+            ],
         ]);
     }
 
     /**
-     * Regenerate calendar sync token
+     * Regenerate calendar sync token.
      */
     public function regenerateToken(Request $request)
     {
@@ -111,8 +109,7 @@ class CalendarSyncController extends Controller
         $doctor->calendar_sync_token = Str::random(64);
         $doctor->save();
 
-        $baseUrl = config('app.url');
-        $icalUrl = "{$baseUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
+        $icalUrl = $this->buildIcalUrl($doctor, $request);
 
         return response()->json([
             'message' => 'Token regenerisan',
@@ -122,11 +119,16 @@ class CalendarSyncController extends Controller
     }
 
     /**
-     * Generate iCal feed for doctor's appointments
-     * Public endpoint - no authentication required
+     * Generate iCal feed for doctor's appointments.
+     * Public endpoint - no authentication required.
      */
-    public function generateICalFeed($token)
+    public function generateICalFeed(string $token)
     {
+        // Light validation to avoid unnecessary DB work on malformed tokens.
+        if (!preg_match('/^[A-Za-z0-9]{32,128}$/', $token)) {
+            return response('Calendar not found or disabled', 404);
+        }
+
         $doctor = Doktor::where('calendar_sync_token', $token)
             ->where('calendar_sync_enabled', true)
             ->first();
@@ -135,29 +137,32 @@ class CalendarSyncController extends Controller
             return response('Calendar not found or disabled', 404);
         }
 
-        // Update last synced timestamp
-        $doctor->calendar_last_synced = now();
-        $doctor->save();
+        // Best-effort timestamp update; do not break feed if this fails.
+        try {
+            $doctor->calendar_last_synced = now();
+            $doctor->save();
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
-        // Get all future appointments
-        $appointments = Termin::where('doktor_id', $doctor->id)
-            ->where('datum', '>=', now()->subDays(30)) // Include past 30 days
-            ->orderBy('datum')
-            ->orderBy('vrijeme')
+        $appointments = Termin::with(['user:id,ime,prezime'])
+            ->where('doktor_id', $doctor->id)
+            ->where('datum_vrijeme', '>=', now()->subDays(30))
+            ->orderBy('datum_vrijeme')
             ->get();
 
-        // Generate iCal content
         $ical = $this->generateICalContent($doctor, $appointments);
 
         return response($ical, 200)
             ->header('Content-Type', 'text/calendar; charset=utf-8')
-            ->header('Content-Disposition', 'attachment; filename="calendar.ics"');
+            ->header('Content-Disposition', 'attachment; filename="calendar.ics"')
+            ->header('Cache-Control', 'private, max-age=300');
     }
 
     /**
-     * Generate iCal format content
+     * Generate iCal format content.
      */
-    private function generateICalContent($doctor, $appointments)
+    private function generateICalContent(Doktor $doctor, $appointments): string
     {
         $lines = [];
         $lines[] = 'BEGIN:VCALENDAR';
@@ -170,78 +175,72 @@ class CalendarSyncController extends Controller
         $lines[] = 'X-WR-CALDESC:' . $this->escapeString('Automatski sinhronizovani termini sa WizMedik platforme');
 
         foreach ($appointments as $appointment) {
-            $lines = array_merge($lines, $this->generateEventLines($appointment, $doctor));
+            try {
+                $lines = array_merge($lines, $this->generateEventLines($appointment, $doctor));
+            } catch (\Throwable $e) {
+                // Skip a single broken row instead of breaking the entire calendar feed.
+                report($e);
+            }
         }
 
         $lines[] = 'END:VCALENDAR';
 
-        return implode("\r\n", $lines);
+        return implode("\r\n", $lines) . "\r\n";
     }
 
     /**
-     * Generate iCal event lines for an appointment
+     * Generate iCal event lines for a single appointment.
      */
-    private function generateEventLines($appointment, $doctor)
+    private function generateEventLines(Termin $appointment, Doktor $doctor): array
     {
         $lines = [];
         $lines[] = 'BEGIN:VEVENT';
 
-        // Unique ID
-        $uid = "appointment-{$appointment->id}@wizmedik.com";
+        $uid = "termin-{$appointment->id}-doktor-{$doctor->id}@wizmedik.com";
         $lines[] = "UID:{$uid}";
+        $lines[] = 'DTSTAMP:' . Carbon::now('UTC')->format('Ymd\THis\Z');
 
-        // Timestamps
-        $lines[] = 'DTSTAMP:' . now()->format('Ymd\THis\Z');
-
-        // Start time
-        $startDateTime = \Carbon\Carbon::parse($appointment->datum . ' ' . $appointment->vrijeme);
-        $lines[] = 'DTSTART:' . $startDateTime->format('Ymd\THis');
-
-        // End time (assume 30 minutes if not specified)
-        $duration = $appointment->trajanje ?? 30;
+        $startDateTime = Carbon::parse($appointment->datum_vrijeme)->setTimezone('Europe/Sarajevo');
+        $duration = max((int) ($appointment->trajanje_minuti ?? 30), 5);
         $endDateTime = $startDateTime->copy()->addMinutes($duration);
-        $lines[] = 'DTEND:' . $endDateTime->format('Ymd\THis');
 
-        // Summary (title)
-        $patientName = $appointment->pacijent
-            ? "{$appointment->pacijent->ime} {$appointment->pacijent->prezime}"
-            : 'Pacijent';
-        $summary = "Termin: {$patientName}";
-        $lines[] = 'SUMMARY:' . $this->escapeString($summary);
+        $lines[] = 'DTSTART;TZID=Europe/Sarajevo:' . $startDateTime->format('Ymd\THis');
+        $lines[] = 'DTEND;TZID=Europe/Sarajevo:' . $endDateTime->format('Ymd\THis');
 
-        // Description
-        $description = "Pacijent: {$patientName}\n";
-        if ($appointment->razlog) {
-            $description .= "Razlog: {$appointment->razlog}\n";
+        $patientName = $this->resolvePatientName($appointment);
+        $lines[] = 'SUMMARY:' . $this->escapeString("Termin: {$patientName}");
+
+        $descriptionLines = ["Pacijent: {$patientName}"];
+
+        $reason = $this->safeReadEncryptedField($appointment, 'razlog');
+        if (!empty($reason)) {
+            $descriptionLines[] = "Razlog: {$reason}";
         }
-        if ($appointment->napomena) {
-            $description .= "Napomena: {$appointment->napomena}\n";
+
+        $notes = $this->safeReadEncryptedField($appointment, 'napomene');
+        if (!empty($notes)) {
+            $descriptionLines[] = "Napomene: {$notes}";
         }
-        $description .= "\nStatus: " . $this->getStatusLabel($appointment->status);
+
+        $descriptionLines[] = 'Status: ' . $this->getStatusLabel((string) $appointment->status);
+        $description = implode("\n", $descriptionLines);
         $lines[] = 'DESCRIPTION:' . $this->escapeString($description);
 
-        // Location
-        if ($doctor->adresa) {
-            $lines[] = 'LOCATION:' . $this->escapeString($doctor->adresa);
+        $location = trim((string) ($doctor->lokacija ?? ''));
+        if (!empty($doctor->grad)) {
+            $location = $location ? "{$location}, {$doctor->grad}" : $doctor->grad;
+        }
+        if (!empty($location)) {
+            $lines[] = 'LOCATION:' . $this->escapeString($location);
         }
 
-        // Status
-        $status = match($appointment->status) {
-            'potvrdjen' => 'CONFIRMED',
-            'otkazan' => 'CANCELLED',
-            'zavrsen' => 'CONFIRMED',
-            default => 'TENTATIVE'
-        };
-        $lines[] = "STATUS:{$status}";
-
-        // Categories
+        $lines[] = 'STATUS:' . $this->getICalStatus((string) $appointment->status);
         $lines[] = 'CATEGORIES:' . $this->escapeString('Medicinski termin,WizMedik');
 
-        // Alarm (reminder 30 minutes before)
         $lines[] = 'BEGIN:VALARM';
         $lines[] = 'TRIGGER:-PT30M';
         $lines[] = 'ACTION:DISPLAY';
-        $lines[] = 'DESCRIPTION:' . $this->escapeString("Podsjetnik: Termin za 30 minuta");
+        $lines[] = 'DESCRIPTION:' . $this->escapeString('Podsjetnik: Termin za 30 minuta');
         $lines[] = 'END:VALARM';
 
         $lines[] = 'END:VEVENT';
@@ -249,26 +248,85 @@ class CalendarSyncController extends Controller
         return $lines;
     }
 
-    /**
-     * Escape special characters for iCal format
-     */
-    private function escapeString($string)
+    private function buildIcalUrl(Doktor $doctor, ?Request $request = null): string
     {
-        $string = str_replace(['\\', ';', ',', "\n", "\r"], ['\\\\', '\\;', '\\,', '\\n', ''], $string);
-        return $string;
+        $configuredApiUrl = trim((string) config('app.api_url', ''));
+        if ($configuredApiUrl !== '') {
+            return rtrim($configuredApiUrl, '/') . "/api/calendar/ical/{$doctor->calendar_sync_token}";
+        }
+
+        $hostUrl = $request ? rtrim($request->getSchemeAndHttpHost(), '/') : '';
+        if ($hostUrl !== '') {
+            return "{$hostUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
+        }
+
+        $fallbackAppUrl = rtrim((string) config('app.url', ''), '/');
+        return "{$fallbackAppUrl}/api/calendar/ical/{$doctor->calendar_sync_token}";
+    }
+
+    private function safeReadEncryptedField(Termin $appointment, string $field): ?string
+    {
+        try {
+            $value = $appointment->{$field};
+        } catch (\Throwable $e) {
+            // Historical plaintext/corrupt records should not break calendar export.
+            report($e);
+            return null;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+        return $normalized === '' ? null : $normalized;
+    }
+
+    private function resolvePatientName(Termin $appointment): string
+    {
+        if ($appointment->user) {
+            $name = trim("{$appointment->user->ime} {$appointment->user->prezime}");
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        $guestName = trim("{$appointment->guest_ime} {$appointment->guest_prezime}");
+        return $guestName !== '' ? $guestName : 'Pacijent';
     }
 
     /**
-     * Get human-readable status label
+     * Escape special characters for iCal format.
      */
-    private function getStatusLabel($status)
+    private function escapeString(string $string): string
     {
-        return match($status) {
-            'na_cekanju' => 'Na čekanju',
-            'potvrdjen' => 'Potvrđen',
+        return str_replace(
+            ['\\', ';', ',', "\n", "\r"],
+            ['\\\\', '\\;', '\\,', '\\n', ''],
+            $string
+        );
+    }
+
+    private function getICalStatus(string $status): string
+    {
+        return match ($status) {
+            'otkazan' => 'CANCELLED',
+            'zakazan', 'potvrden', 'potvrdjen', 'zavrshen', 'zavrsen', 'završen' => 'CONFIRMED',
+            default => 'TENTATIVE',
+        };
+    }
+
+    /**
+     * Get human-readable status label.
+     */
+    private function getStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'zakazan' => 'Zakazan',
+            'potvrden', 'potvrdjen' => 'Potvrđen',
             'otkazan' => 'Otkazan',
-            'zavrsen' => 'Završen',
-            default => 'Nepoznat'
+            'zavrshen', 'zavrsen', 'završen' => 'Završen',
+            default => 'Nepoznat',
         };
     }
 }
