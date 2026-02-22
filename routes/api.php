@@ -70,6 +70,7 @@ Route::get('/doctors/slug/{slug}', [DoctorController::class, 'show']);
 Route::get('/doctors/{id}/available-slots', [DoctorController::class, 'availableSlots'])->where('id', '[0-9]+');
 Route::get('/doctors/{id}/booked-slots', [DoctorController::class, 'bookedSlots'])->where('id', '[0-9]+');
 Route::get('/doctors/{id}/guest-visits', [DoctorController::class, 'publicGuestVisits'])->where('id', '[0-9]+');
+Route::get('/doctors/{id}/services', [DoctorController::class, 'getServices'])->where('id', '[0-9]+');
 // Wildcard route MUST be last - only matches numeric IDs
 Route::get('/doctors/{id}', [DoctorController::class, 'showById'])->where('id', '[0-9]+');
 
