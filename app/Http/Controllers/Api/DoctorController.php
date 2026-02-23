@@ -9,6 +9,7 @@ use App\Models\KlinikaDoktorZahtjev;
 use App\Services\NotifikacijaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class DoctorController extends Controller
 {
@@ -302,6 +303,8 @@ class DoctorController extends Controller
             'slika_profila' => 'sometimes|string',
             'public_email' => 'sometimes|nullable|email:rfc|max:255',
             'account_email' => 'sometimes|required|email:rfc|max:255|unique:users,email,' . $user->id,
+            'current_password' => 'sometimes|required_with:new_password|string|max:255',
+            'new_password' => 'sometimes|string|min:8|max:255|confirmed|different:current_password',
             // klinika_id removed - doctors can only join/leave clinics through requests
             'specialty_ids' => 'sometimes|array',
             'specialty_ids.*' => 'exists:specijalnosti,id',
@@ -324,9 +327,26 @@ class DoctorController extends Controller
 
         $specialtyIds = $validated['specialty_ids'] ?? null;
         $accountEmail = $validated['account_email'] ?? null;
-        unset($validated['specialty_ids'], $validated['account_email']);
+        $newPassword = $validated['new_password'] ?? null;
 
-        DB::transaction(function () use ($doktor, $validated, $specialtyIds, $accountEmail, $user) {
+        if ($newPassword !== null && !Hash::check((string) ($validated['current_password'] ?? ''), (string) $user->password)) {
+            return response()->json([
+                'message' => 'Trenutna lozinka nije ispravna.',
+                'errors' => [
+                    'current_password' => ['Trenutna lozinka nije ispravna.'],
+                ],
+            ], 422);
+        }
+
+        unset(
+            $validated['specialty_ids'],
+            $validated['account_email'],
+            $validated['current_password'],
+            $validated['new_password'],
+            $validated['new_password_confirmation']
+        );
+
+        DB::transaction(function () use ($doktor, $validated, $specialtyIds, $accountEmail, $newPassword, $user) {
             $doktor->update($validated);
 
             // Sync specialties if provided
@@ -334,9 +354,19 @@ class DoctorController extends Controller
                 $doktor->specijalnosti()->sync($specialtyIds);
             }
 
-            // Login email belongs to users table.
+            // Login email and password belong to users table.
+            $shouldSaveUser = false;
             if ($accountEmail !== null && $accountEmail !== $user->email) {
                 $user->email = $accountEmail;
+                $shouldSaveUser = true;
+            }
+
+            if ($newPassword !== null) {
+                $user->password = Hash::make($newPassword);
+                $shouldSaveUser = true;
+            }
+
+            if ($shouldSaveUser) {
                 $user->save();
             }
         });

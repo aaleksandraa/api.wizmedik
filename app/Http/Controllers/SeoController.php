@@ -4,15 +4,18 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SeoController extends Controller
 {
-    /**
-     * Serve index.html with dynamic meta tags
-     */
     public function index(Request $request)
     {
-        $path = $request->path();
+        $normalizedUrl = $this->normalizeListingQueryUrl($request);
+        if ($normalizedUrl) {
+            return redirect($normalizedUrl, 301);
+        }
+
+        $path = trim($request->path(), '/');
         $metaTags = $this->getMetaTagsForPath($path);
 
         // Try multiple paths for index.html
@@ -50,59 +53,291 @@ class SeoController extends Controller
         return response($html)->header('Content-Type', 'text/html');
     }
 
-    /**
-     * Get meta tags based on route
-     */
-    private function getMetaTagsForPath($path)
+    private function getMetaTagsForPath(string $path): array
     {
-        // Doctor profile
-        if (preg_match('/^doktor\/(.+)$/', $path, $matches)) {
+        if ($path === '' || $path === 'index.php') {
+            return $this->getDefaultMeta();
+        }
+
+        if ($path === 'gradovi') {
+            return $this->getCitiesListingMeta();
+        }
+
+        if ($path === 'blog') {
+            return $this->getBlogListingMeta();
+        }
+
+        // Listing routes (critical for SSR SEO fallback)
+        if ($path === 'doktori') {
+            return $this->getDoctorsListingMeta();
+        }
+        if (preg_match('/^doktori\/specijalnost\/([^\/]+)$/', $path, $matches)) {
+            return $this->getDoctorsListingMeta(null, $matches[1]);
+        }
+        if (preg_match('/^doktori\/([^\/]+)\/([^\/]+)$/', $path, $matches)) {
+            return $this->getDoctorsListingMeta($matches[1], $matches[2]);
+        }
+        if (preg_match('/^doktori\/([^\/]+)$/', $path, $matches)) {
+            return $this->getDoctorsListingMeta($matches[1]);
+        }
+
+        if ($path === 'klinike') {
+            return $this->getClinicsListingMeta();
+        }
+        if (preg_match('/^klinike\/specijalnost\/([^\/]+)$/', $path, $matches)) {
+            return $this->getClinicsListingMeta(null, $matches[1]);
+        }
+        if (preg_match('/^klinike\/([^\/]+)$/', $path, $matches)) {
+            return $this->getClinicsListingMeta($matches[1]);
+        }
+
+        if ($path === 'laboratorije') {
+            return $this->getLaboratoriesListingMeta();
+        }
+        if (preg_match('/^laboratorije\/([^\/]+)$/', $path, $matches)) {
+            return $this->getLaboratoriesListingMeta($matches[1]);
+        }
+
+        if ($path === 'banje') {
+            return $this->getSpasListingMeta();
+        }
+        if (preg_match('/^banje\/([^\/]+)$/', $path, $matches)) {
+            return $this->getSpasListingMeta($matches[1]);
+        }
+
+        if ($path === 'domovi-njega') {
+            return $this->getCareHomesListingMeta();
+        }
+        if (preg_match('/^domovi-njega\/([^\/]+)$/', $path, $matches)) {
+            return $this->getCareHomesListingMeta($matches[1]);
+        }
+
+        // Profile routes
+        if (preg_match('/^doktor\/([^\/]+)$/', $path, $matches)) {
             return $this->getDoctorMeta($matches[1]);
         }
-
-        // Clinic profile
-        if (preg_match('/^klinika\/(.+)$/', $path, $matches)) {
+        if (preg_match('/^klinika\/([^\/]+)$/', $path, $matches)) {
             return $this->getClinicMeta($matches[1]);
         }
-
-        // Specialty page
-        if (preg_match('/^specijalnost\/(.+)$/', $path, $matches)) {
-            return $this->getSpecialtyMeta($matches[1]);
-        }
-
-        // City page
-        if (preg_match('/^grad\/(.+)$/', $path, $matches)) {
-            return $this->getCityMeta($matches[1]);
-        }
-
-        // Laboratory profile
-        if (preg_match('/^laboratorija\/(.+)$/', $path, $matches)) {
+        if (preg_match('/^laboratorija\/([^\/]+)$/', $path, $matches)) {
             return $this->getLaboratoryMeta($matches[1]);
         }
-
-        // Spa profile
-        if (preg_match('/^banja\/(.+)$/', $path, $matches)) {
+        if (preg_match('/^banja\/([^\/]+)$/', $path, $matches)) {
             return $this->getSpaMeta($matches[1]);
         }
-
-        // Care home profile
-        if (preg_match('/^dom-njega\/(.+)$/', $path, $matches)) {
+        if (preg_match('/^dom-njega\/([^\/]+)$/', $path, $matches)) {
             return $this->getCareHomeMeta($matches[1]);
         }
 
-        // Blog post
-        if (preg_match('/^blog\/(.+)$/', $path, $matches)) {
+        // Other SEO-enabled pages
+        if (preg_match('/^specijalnost\/([^\/]+)$/', $path, $matches)) {
+            return $this->getSpecialtyMeta($matches[1]);
+        }
+        if (preg_match('/^grad\/([^\/]+)$/', $path, $matches)) {
+            return $this->getCityMeta($matches[1]);
+        }
+        if (preg_match('/^blog\/([^\/]+)$/', $path, $matches)) {
             return $this->getBlogMeta($matches[1]);
         }
 
-        // Default homepage
         return $this->getDefaultMeta();
     }
 
-    /**
-     * Doctor meta tags
-     */
-    private function getDoctorMeta($slug)
+    private function getDoctorsListingMeta(?string $citySlug = null, ?string $specialtySlug = null): array
+    {
+        $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+        $specialty = $specialtySlug ? $this->resolveSpecialtyNameBySlug($specialtySlug) : null;
+
+        $query = DB::table('doktori')
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true);
+        if ($city) {
+            $query->whereRaw('LOWER(grad) = ?', [mb_strtolower($city)]);
+        }
+        if ($specialty) {
+            $query->whereRaw('LOWER(specijalnost) = ?', [mb_strtolower($specialty)]);
+        }
+
+        $count = (clone $query)->count();
+        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
+        $specialtyPart = $specialty ? "{$specialty} " : '';
+
+        $title = "{$specialtyPart}doktori{$locationPart} | wizMedik";
+        $description = "Pronadite {$specialtyPart}doktore{$locationPart}. Dostupno {$count}+ profila sa online zakazivanjem termina i kontakt informacijama.";
+
+        $path = 'doktori';
+        if ($citySlug && $specialtySlug) {
+            $path .= "/{$citySlug}/{$specialtySlug}";
+        } elseif ($specialtySlug) {
+            $path .= "/specijalnost/{$specialtySlug}";
+        } elseif ($citySlug) {
+            $path .= "/{$citySlug}";
+        }
+
+        $url = $this->buildUrl($path);
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getClinicsListingMeta(?string $citySlug = null, ?string $specialtySlug = null): array
+    {
+        $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+        $specialty = $specialtySlug ? $this->resolveSpecialtyNameBySlug($specialtySlug) : null;
+
+        $query = DB::table('klinike')
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true);
+        if ($city) {
+            $query->whereRaw('LOWER(grad) = ?', [mb_strtolower($city)]);
+        }
+        $count = (clone $query)->count();
+
+        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
+        $specialtyPart = $specialty ? " za {$specialty}" : '';
+
+        $title = "Klinike{$specialtyPart}{$locationPart} | wizMedik";
+        $description = "Pregledajte privatne i specijalisticke klinike{$locationPart}{$specialtyPart}. Ukupno {$count}+ klinika sa detaljnim profilima i kontakt podacima.";
+
+        $path = 'klinike';
+        if ($specialtySlug) {
+            $path .= "/specijalnost/{$specialtySlug}";
+        } elseif ($citySlug) {
+            $path .= "/{$citySlug}";
+        }
+
+        $url = $this->buildUrl($path);
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getLaboratoriesListingMeta(?string $citySlug = null): array
+    {
+        $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+
+        $query = DB::table('laboratorije')
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true);
+        if ($city) {
+            $query->whereRaw('LOWER(grad) = ?', [mb_strtolower($city)]);
+        }
+        $count = (clone $query)->count();
+
+        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
+        $title = "Laboratorije{$locationPart} | wizMedik";
+        $description = "Pronadite medicinske laboratorije{$locationPart}. Uporedite analize, cijene, radno vrijeme i kontakt podatke za {$count}+ laboratorija.";
+
+        $path = $citySlug ? "laboratorije/{$citySlug}" : 'laboratorije';
+        $url = $this->buildUrl($path);
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getSpasListingMeta(?string $citySlug = null): array
+    {
+        $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+
+        $query = DB::table('banje')
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true);
+        if ($city) {
+            $query->whereRaw('LOWER(grad) = ?', [mb_strtolower($city)]);
+        }
+        $count = (clone $query)->count();
+
+        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
+        $title = "Banje{$locationPart} | wizMedik";
+        $description = "Pregledajte banje i rehabilitacione centre{$locationPart}. Dostupno {$count}+ profila sa terapijama, smjestajem i kontakt informacijama.";
+
+        $path = $citySlug ? "banje/{$citySlug}" : 'banje';
+        $url = $this->buildUrl($path);
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getCareHomesListingMeta(?string $citySlug = null): array
+    {
+        $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+
+        $query = DB::table('domovi_njega')
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true);
+        if ($city) {
+            $query->whereRaw('LOWER(grad) = ?', [mb_strtolower($city)]);
+        }
+        $count = (clone $query)->count();
+
+        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
+        $title = "Domovi za njegu{$locationPart} | wizMedik";
+        $description = "Uporedite domove za njegu i staracke domove{$locationPart}. Pregled {$count}+ verifikovanih profila sa uslugama i kontakt podacima.";
+
+        $path = $citySlug ? "domovi-njega/{$citySlug}" : 'domovi-njega';
+        $url = $this->buildUrl($path);
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getCitiesListingMeta(): array
+    {
+        $count = DB::table('gradovi')
+            ->where('aktivan', true)
+            ->count();
+
+        $title = 'Gradovi BiH - doktori, klinike, laboratorije, banje i domovi | wizMedik';
+        $description = "Pregledajte {$count}+ gradova u Bosni i Hercegovini i pronadite doktore, klinike, laboratorije, banje i domove za njegu po gradu.";
+        $url = $this->buildUrl('gradovi');
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getBlogListingMeta(): array
+    {
+        $count = DB::table('blog_posts')
+            ->where('status', 'published')
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->count();
+
+        $title = 'Zdravstveni savjeti i blog | wizMedik';
+        $description = "Procitajte {$count}+ strucnih blog postova i zdravstvenih savjeta od doktora na wizMedik platformi.";
+        $url = $this->buildUrl('blog');
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getDoctorMeta(string $slug): array
     {
         $doctor = DB::table('doktori')
             ->where('slug', $slug)
@@ -114,20 +349,17 @@ class SeoController extends Controller
         }
 
         $title = "Dr. {$doctor->ime} {$doctor->prezime} - {$doctor->specijalnost} | wizMedik";
-        $description = "Zakažite pregled kod Dr. {$doctor->ime} {$doctor->prezime}, {$doctor->specijalnost} u {$doctor->grad}. Online zakazivanje termina.";
-        $image = $doctor->slika_profila ?? 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/doktor/{$slug}";
+        $description = "Zakazite pregled kod Dr. {$doctor->ime} {$doctor->prezime}, {$doctor->specijalnost} u {$doctor->grad}. Online zakazivanje termina.";
+        $image = $this->absoluteImage($doctor->slika_profila ?? null);
+        $url = $this->buildUrl("doktor/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'profile')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'profile'),
         ];
     }
 
-    /**
-     * Clinic meta tags
-     */
-    private function getClinicMeta($slug)
+    private function getClinicMeta(string $slug): array
     {
         $clinic = DB::table('klinike')
             ->where('slug', $slug)
@@ -139,20 +371,20 @@ class SeoController extends Controller
         }
 
         $title = "{$clinic->naziv} - Klinika u {$clinic->grad} | wizMedik";
-        $description = $clinic->opis ? substr(strip_tags($clinic->opis), 0, 160) : "Zakažite pregled u {$clinic->naziv}, {$clinic->grad}. Online zakazivanje termina.";
-        $image = 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/klinika/{$slug}";
+        $description = $this->cleanDescription(
+            $clinic->opis ?? null,
+            "Zakazite pregled u {$clinic->naziv}, {$clinic->grad}. Online zakazivanje termina."
+        );
+        $image = $this->defaultImage();
+        $url = $this->buildUrl("klinika/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
         ];
     }
 
-    /**
-     * Specialty meta tags
-     */
-    private function getSpecialtyMeta($slug)
+    private function getSpecialtyMeta(string $slug): array
     {
         $specialty = DB::table('specijalnosti')
             ->where('slug', $slug)
@@ -163,25 +395,23 @@ class SeoController extends Controller
         }
 
         $doctorCount = DB::table('doktori')
-            ->where('specijalnost', $specialty->naziv)
+            ->whereRaw('LOWER(specijalnost) = ?', [mb_strtolower($specialty->naziv)])
             ->whereNull('deleted_at')
             ->count();
 
-        $title = "{$specialty->naziv} - Pronađite doktora | wizMedik";
-        $description = $specialty->seo_opis ?? "Pronađite najboljeg doktora za {$specialty->naziv} u BiH. {$doctorCount}+ doktora dostupno za online zakazivanje.";
-        $image = $specialty->slika_url ?? 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/specijalnost/{$slug}";
+        $title = "{$specialty->naziv} - Pronadite doktora | wizMedik";
+        $description = $specialty->seo_opis
+            ?? "Pronadite najboljeg doktora za {$specialty->naziv} u BiH. Dostupno {$doctorCount}+ doktora za online zakazivanje.";
+        $image = $this->absoluteImage($specialty->slika_url ?? null);
+        $url = $this->buildUrl("specijalnost/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
         ];
     }
 
-    /**
-     * City meta tags
-     */
-    private function getCityMeta($slug)
+    private function getCityMeta(string $slug): array
     {
         $city = DB::table('gradovi')
             ->where('slug', $slug)
@@ -192,25 +422,52 @@ class SeoController extends Controller
         }
 
         $doctorCount = DB::table('doktori')
-            ->where('grad', $city->naziv)
+            ->whereRaw('LOWER(grad) = ?', [mb_strtolower($city->naziv)])
             ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->count();
 
-        $title = "Doktori u {$city->naziv} - Online zakazivanje | wizMedik";
-        $description = "Pronađite i zakažite pregled kod doktora u {$city->naziv}. {$doctorCount}+ doktora dostupno za online zakazivanje termina.";
-        $image = 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/grad/{$slug}";
+        $clinicCount = DB::table('klinike')
+            ->whereRaw('LOWER(grad) = ?', [mb_strtolower($city->naziv)])
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
+            ->count();
+
+        $labCount = DB::table('laboratorije')
+            ->whereRaw('LOWER(grad) = ?', [mb_strtolower($city->naziv)])
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
+            ->count();
+
+        $spaCount = DB::table('banje')
+            ->whereRaw('LOWER(grad) = ?', [mb_strtolower($city->naziv)])
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
+            ->count();
+
+        $careHomeCount = DB::table('domovi_njega')
+            ->whereRaw('LOWER(grad) = ?', [mb_strtolower($city->naziv)])
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
+            ->count();
+
+        $title = "Zdravstvene usluge u {$city->naziv} | wizMedik";
+        $description = "U {$city->naziv} pronadjite {$doctorCount}+ doktora, {$clinicCount}+ klinika, {$labCount}+ laboratorija, {$spaCount}+ banja i {$careHomeCount}+ domova za njegu.";
+        $image = $this->defaultImage();
+        $url = $this->buildUrl("grad/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
         ];
     }
 
-    /**
-     * Laboratory meta tags
-     */
-    private function getLaboratoryMeta($slug)
+    private function getLaboratoryMeta(string $slug): array
     {
         $lab = DB::table('laboratorije')
             ->where('slug', $slug)
@@ -222,20 +479,20 @@ class SeoController extends Controller
         }
 
         $title = "{$lab->naziv} - Laboratorija u {$lab->grad} | wizMedik";
-        $description = $lab->opis ? substr(strip_tags($lab->opis), 0, 160) : "Laboratorijske analize u {$lab->grad}. Provjerite cijene i zakažite termin online.";
-        $image = 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/laboratorija/{$slug}";
+        $description = $this->cleanDescription(
+            $lab->opis ?? null,
+            "Laboratorijske analize u {$lab->grad}. Provjerite cijene i kontakt podatke."
+        );
+        $image = $this->defaultImage();
+        $url = $this->buildUrl("laboratorija/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
         ];
     }
 
-    /**
-     * Spa meta tags
-     */
-    private function getSpaMeta($slug)
+    private function getSpaMeta(string $slug): array
     {
         $spa = DB::table('banje')
             ->where('slug', $slug)
@@ -247,20 +504,20 @@ class SeoController extends Controller
         }
 
         $title = "{$spa->naziv} - Banja u {$spa->grad} | wizMedik";
-        $description = $spa->opis ? substr(strip_tags($spa->opis), 0, 160) : "Banjsko-klimatsko lječilište {$spa->naziv} u {$spa->grad}. Provjerite ponudu i cijene.";
-        $image = 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/banja/{$slug}";
+        $description = $this->cleanDescription(
+            $spa->opis ?? null,
+            "Banjsko lijeciliste {$spa->naziv} u {$spa->grad}. Provjerite ponudu i kontakt."
+        );
+        $image = $this->defaultImage();
+        $url = $this->buildUrl("banja/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
         ];
     }
 
-    /**
-     * Care home meta tags
-     */
-    private function getCareHomeMeta($slug)
+    private function getCareHomeMeta(string $slug): array
     {
         $home = DB::table('domovi_njega')
             ->where('slug', $slug)
@@ -272,24 +529,26 @@ class SeoController extends Controller
         }
 
         $title = "{$home->naziv} - Dom njege u {$home->grad} | wizMedik";
-        $description = $home->opis ? substr(strip_tags($home->opis), 0, 160) : "Dom za njegu starih i nemoćnih osoba {$home->naziv} u {$home->grad}. Provjerite usluge i cijene.";
-        $image = 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/dom-njega/{$slug}";
+        $description = $this->cleanDescription(
+            $home->opis ?? null,
+            "Dom za njegu starih i nemocnih osoba {$home->naziv} u {$home->grad}."
+        );
+        $image = $this->defaultImage();
+        $url = $this->buildUrl("dom-njega/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
         ];
     }
 
-    /**
-     * Blog meta tags
-     */
-    private function getBlogMeta($slug)
+    private function getBlogMeta(string $slug): array
     {
-        $post = DB::table('blog_postovi')
+        $post = DB::table('blog_posts')
             ->where('slug', $slug)
             ->where('status', 'published')
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
             ->first();
 
         if (!$post) {
@@ -297,45 +556,57 @@ class SeoController extends Controller
         }
 
         $title = "{$post->naslov} | wizMedik Blog";
-        $description = $post->kratak_opis ?? substr(strip_tags($post->sadrzaj), 0, 160);
-        $image = $post->slika_url ?? 'https://wizmedik.com/og-image.jpg';
-        $url = "https://wizmedik.com/blog/{$slug}";
+        $description = $this->cleanDescription(
+            $post->excerpt ?? strip_tags($post->sadrzaj ?? ''),
+            'Strucni zdravstveni savjeti na wizMedik blogu.'
+        );
+        $image = $this->absoluteImage($post->thumbnail ?? null);
+        $url = $this->buildUrl("blog/{$slug}");
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'article')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'article'),
         ];
     }
 
-    /**
-     * Default homepage meta tags
-     */
-    private function getDefaultMeta()
+    private function getDefaultMeta(): array
     {
-        $title = "wizMedik - Pronađite doktore u Bosni i Hercegovini | Online zakazivanje";
-        $description = "Vodeća platforma za pronalaženje doktora i online zakazivanje termina u BiH. 500+ doktora, 50+ specijalnosti u Sarajevu, Banja Luci, Tuzli i drugim gradovima.";
-        $image = 'https://wizmedik.com/og-image.jpg';
-        $url = 'https://wizmedik.com/';
+        $title = 'wizMedik - Pronadite doktore, klinike, laboratorije, banje i domove njege';
+        $description = 'Vodeca platforma za pronalazenje zdravstvenih usluga i online zakazivanje termina u Bosni i Hercegovini.';
+        $image = $this->defaultImage();
+        $url = $this->buildUrl('/');
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website')
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
         ];
     }
 
-    /**
-     * Build meta tags HTML
-     */
-    private function buildMetaTags($title, $description, $image, $url, $type = 'website')
-    {
+    private function buildMetaTags(
+        string $title,
+        string $description,
+        string $image,
+        string $url,
+        string $type = 'website',
+        ?array $structuredData = null
+    ): string {
         $escapedTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $escapedDescription = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
         $escapedImage = htmlspecialchars($image, ENT_QUOTES, 'UTF-8');
         $escapedUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
 
+        $jsonLd = '';
+        if ($structuredData) {
+            $encoded = json_encode($structuredData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($encoded !== false) {
+                $jsonLd = "\n    <script type=\"application/ld+json\">{$encoded}</script>";
+            }
+        }
+
         return <<<HTML
     <!-- SEO Meta Tags -->
     <meta name="description" content="{$escapedDescription}">
+    <meta name="robots" content="index, follow">
     <link rel="canonical" href="{$escapedUrl}">
 
     <!-- Open Graph / Facebook -->
@@ -354,7 +625,162 @@ class SeoController extends Controller
     <meta name="twitter:url" content="{$escapedUrl}">
     <meta name="twitter:title" content="{$escapedTitle}">
     <meta name="twitter:description" content="{$escapedDescription}">
-    <meta name="twitter:image" content="{$escapedImage}">
+    <meta name="twitter:image" content="{$escapedImage}">{$jsonLd}
 HTML;
+    }
+
+    private function buildCollectionSchema(string $title, string $description, string $url, int $count): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'CollectionPage',
+            'name' => $title,
+            'description' => $description,
+            'url' => $url,
+            'mainEntity' => [
+                '@type' => 'ItemList',
+                'numberOfItems' => $count,
+            ],
+        ];
+    }
+
+    private function getBaseUrl(): string
+    {
+        return rtrim(config('app.frontend_url', 'https://wizmedik.com'), '/');
+    }
+
+    private function buildUrl(string $path): string
+    {
+        if ($path === '/' || $path === '') {
+            return $this->getBaseUrl() . '/';
+        }
+
+        return $this->getBaseUrl() . '/' . ltrim($path, '/');
+    }
+
+    private function defaultImage(): string
+    {
+        return $this->buildUrl('/wizmedik-logo.png');
+    }
+
+    private function absoluteImage(?string $image): string
+    {
+        if (!$image) {
+            return $this->defaultImage();
+        }
+
+        if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://')) {
+            return $image;
+        }
+
+        return $this->buildUrl($image);
+    }
+
+    private function cleanDescription(?string $description, string $fallback): string
+    {
+        $clean = trim(strip_tags((string) $description));
+        if ($clean === '') {
+            return $fallback;
+        }
+
+        return mb_substr($clean, 0, 160);
+    }
+
+    private function decodeSegment(string $value): string
+    {
+        $decoded = urldecode(str_replace('+', ' ', $value));
+        $decoded = trim(str_replace('-', ' ', $decoded));
+
+        return mb_convert_case($decoded, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    private function resolveSpecialtyNameBySlug(string $slug): string
+    {
+        $specialty = DB::table('specijalnosti')
+            ->where('slug', $slug)
+            ->first();
+
+        if ($specialty && !empty($specialty->naziv)) {
+            return $specialty->naziv;
+        }
+
+        return $this->decodeSegment($slug);
+    }
+
+    private function resolveCityNameBySlug(string $slug): string
+    {
+        $city = DB::table('gradovi')
+            ->where('slug', $slug)
+            ->first();
+
+        if ($city && !empty($city->naziv)) {
+            return $city->naziv;
+        }
+
+        return $this->decodeSegment($slug);
+    }
+
+    private function normalizeListingQueryUrl(Request $request): ?string
+    {
+        $path = trim($request->path(), '/');
+        $query = $request->query();
+
+        if (!in_array($path, ['doktori', 'klinike', 'laboratorije', 'banje', 'domovi-njega'], true)) {
+            return null;
+        }
+
+        $city = $request->query('grad');
+        $specialty = $request->query('specijalnost');
+        $search = $request->query('pretraga');
+
+        if ($path === 'doktori') {
+            if (!empty($search)) {
+                return null;
+            }
+
+            $citySlug = $city ? $this->queryValueToSlug($city) : null;
+            $specialtySlug = $specialty ? $this->queryValueToSlug($specialty) : null;
+
+            if ($citySlug && $specialtySlug) {
+                return $this->buildUrl("doktori/{$citySlug}/{$specialtySlug}");
+            }
+            if ($citySlug) {
+                return $this->buildUrl("doktori/{$citySlug}");
+            }
+            if ($specialtySlug) {
+                return $this->buildUrl("doktori/specijalnost/{$specialtySlug}");
+            }
+            return null;
+        }
+
+        if ($path === 'klinike') {
+            $citySlug = $city ? $this->queryValueToSlug($city) : null;
+            $specialtySlug = $specialty ? $this->queryValueToSlug($specialty) : null;
+
+            if ($specialtySlug && count($query) === 1) {
+                return $this->buildUrl("klinike/specijalnost/{$specialtySlug}");
+            }
+            if ($citySlug && count($query) === 1) {
+                return $this->buildUrl("klinike/{$citySlug}");
+            }
+            return null;
+        }
+
+        if (in_array($path, ['laboratorije', 'banje', 'domovi-njega'], true)) {
+            $citySlug = $city ? $this->queryValueToSlug($city) : null;
+            if ($citySlug && count($query) === 1) {
+                return $this->buildUrl("{$path}/{$citySlug}");
+            }
+        }
+
+        return null;
+    }
+
+    private function queryValueToSlug(string $value): string
+    {
+        $decoded = urldecode(str_replace('+', ' ', $value));
+        $slug = Str::slug($decoded);
+
+        return $slug !== '' ? $slug : rawurlencode(trim($decoded));
     }
 }

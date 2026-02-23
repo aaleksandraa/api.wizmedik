@@ -92,9 +92,10 @@ class HomepageController extends Controller
             // Try to get specialties
             try {
                 $specialties = DB::table('specijalnosti')
-                    ->whereNull('parent_id')
+                    ->where('aktivan', true)
+                    ->whereNotNull('slug')
                     ->select('id', 'naziv', 'slug')
-                    ->limit(8)
+                    ->orderBy('naziv', 'asc')
                     ->get();
 
                 $response['specialties'] = $specialties->toArray();

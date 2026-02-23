@@ -460,9 +460,9 @@ class RegistrationController extends Controller
      */
     private function createRegistrationRequest(string $type, $request): RegistrationRequest
     {
-        // For spa and care_home, use account_email for login, otherwise use email
-        $accountEmail = in_array($type, ['spa', 'care_home'])
-            ? $request->account_email
+        // For profiles with separate login/public email, prefer account_email for login if provided
+        $accountEmail = in_array($type, ['spa', 'care_home', 'laboratory'])
+            ? ($request->account_email ?: $request->email)
             : $request->email;
 
         $data = [
@@ -498,21 +498,18 @@ class RegistrationController extends Controller
         } elseif ($type === 'laboratory') {
             $data['naziv'] = $request->naziv;
             $data['ime'] = $request->ime; // Contact person
-            // Use account_email if provided, otherwise use public email
-            if ($request->account_email) {
-                $data['email'] = $request->account_email;
-                // Store public email in message
-                $data['message'] = json_encode([
-                    'public_email' => $request->email,
-                    'message' => $request->message,
-                ]);
-            }
+            // Always keep public email in payload metadata
+            $data['message'] = json_encode([
+                'public_email' => $request->email,
+                'message' => $request->message,
+            ]);
         } elseif ($type === 'spa') {
             $data['naziv'] = $request->naziv;
             $data['ime'] = $request->kontakt_ime . ' ' . ($request->kontakt_prezime ?? ''); // Contact person
             // Store additional spa data in message as JSON (including public email)
             $data['message'] = json_encode([
                 'public_email' => $request->email, // Public email for profile display
+                'regija' => $request->regija,
                 'vrste' => $request->vrste,
                 'medicinski_nadzor' => $request->medicinski_nadzor,
                 'ima_smjestaj' => $request->ima_smjestaj,

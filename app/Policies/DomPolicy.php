@@ -39,7 +39,7 @@ class DomPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole(['admin', 'care_home_manager']);
+        return $user->hasRole(['admin', 'dom_manager', 'care_home_manager', 'care_home']);
     }
 
     /**
@@ -48,7 +48,7 @@ class DomPolicy
     public function update(User $user, Dom $dom): bool
     {
         return $user->hasRole('admin') ||
-               ($user->hasRole('care_home_manager') && $user->id === $dom->user_id);
+               (($user->hasRole('dom_manager') || $user->hasRole('care_home_manager') || $user->hasRole('care_home')) && $user->id === $dom->user_id);
     }
 
     /**
@@ -57,7 +57,7 @@ class DomPolicy
     public function delete(User $user, Dom $dom): bool
     {
         return $user->hasRole('admin') ||
-               ($user->hasRole('care_home_manager') && $user->id === $dom->user_id);
+               (($user->hasRole('dom_manager') || $user->hasRole('care_home_manager') || $user->hasRole('care_home')) && $user->id === $dom->user_id);
     }
 
     /**
@@ -98,7 +98,7 @@ class DomPolicy
     public function manageInquiries(User $user, Dom $dom): bool
     {
         return $user->hasRole('admin') ||
-               ($user->hasRole('care_home_manager') && $user->id === $dom->user_id);
+               (($user->hasRole('dom_manager') || $user->hasRole('care_home_manager') || $user->hasRole('care_home')) && $user->id === $dom->user_id);
     }
 
     /**
@@ -107,7 +107,7 @@ class DomPolicy
     public function manageReviews(User $user, Dom $dom): bool
     {
         return $user->hasRole('admin') ||
-               ($user->hasRole('care_home_manager') && $user->id === $dom->user_id);
+               (($user->hasRole('dom_manager') || $user->hasRole('care_home_manager') || $user->hasRole('care_home')) && $user->id === $dom->user_id);
     }
 
     /**
@@ -116,6 +116,6 @@ class DomPolicy
     public function viewStatistics(User $user, Dom $dom): bool
     {
         return $user->hasRole('admin') ||
-               ($user->hasRole('care_home_manager') && $user->id === $dom->user_id);
+               (($user->hasRole('dom_manager') || $user->hasRole('care_home_manager') || $user->hasRole('care_home')) && $user->id === $dom->user_id);
     }
 }

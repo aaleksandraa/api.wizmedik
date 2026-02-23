@@ -45,6 +45,8 @@ class UpdateLaboratorijaRequest extends FormRequest
             // Images
             'featured_slika' => ['nullable', 'string', 'max:500'],
             'profilna_slika' => ['nullable', 'string', 'max:500'],
+            'galerija' => ['nullable', 'array', 'max:50'],
+            'galerija.*' => ['string', 'max:1000'],
 
             // Features
             'online_rezultati' => ['nullable', 'boolean'],

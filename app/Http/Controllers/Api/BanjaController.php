@@ -187,6 +187,61 @@ class BanjaController extends Controller
     }
 
     /**
+     * Get packages for a specific banja
+     */
+    public function getPaketi(int $id): JsonResponse
+    {
+        try {
+            $banja = Banja::aktivan()->findOrFail($id);
+            $paketi = $banja->paketi()->aktivan()->ordered()->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $paketi
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching banja packages: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri dohvatanju paketa'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get approved reviews for a specific banja
+     */
+    public function getRecenzije(Request $request, int $id): JsonResponse
+    {
+        try {
+            $banja = Banja::aktivan()->findOrFail($id);
+
+            $query = $banja->odobreneRecenzije()->with('user');
+            $perPage = min((int) $request->get('per_page', 10), 50);
+            $recenzije = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $recenzije->items(),
+                'pagination' => [
+                    'current_page' => $recenzije->currentPage(),
+                    'last_page' => $recenzije->lastPage(),
+                    'per_page' => $recenzije->perPage(),
+                    'total' => $recenzije->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching banja reviews: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri dohvatanju recenzija'
+            ], 500);
+        }
+    }
+
+    /**
      * Send inquiry to banja
      */
     public function posaljiUpit(BanjaUpitRequest $request, int $id): JsonResponse

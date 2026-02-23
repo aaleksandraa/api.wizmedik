@@ -312,6 +312,25 @@ class AdminRegistrationController extends Controller
      */
     private function createUserAndProfile(RegistrationRequest $registrationRequest): array
     {
+        $decodedMessage = null;
+        if (is_string($registrationRequest->message) && $registrationRequest->message !== '') {
+            $parsed = json_decode($registrationRequest->message, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
+                $decodedMessage = $parsed;
+            }
+        }
+
+        $messageData = $decodedMessage ?? [];
+        $textMessage = is_string($messageData['message'] ?? null)
+            ? trim($messageData['message'])
+            : (($decodedMessage === null && is_string($registrationRequest->message))
+                ? trim($registrationRequest->message)
+                : '');
+
+        $publicEmail = is_string($messageData['public_email'] ?? null) && trim($messageData['public_email']) !== ''
+            ? trim($messageData['public_email'])
+            : $registrationRequest->email;
+
         // Determine role based on type
         $roleMapping = [
             'doctor' => 'doctor',
@@ -378,16 +397,17 @@ class AdminRegistrationController extends Controller
                 'user_id' => $user->id,
                 'naziv' => $registrationRequest->naziv,
                 'slug' => Str::slug($registrationRequest->naziv . '-' . $user->id),
-                'email' => $registrationRequest->email,
+                'email' => $publicEmail,
                 'telefon' => $registrationRequest->telefon,
                 'adresa' => $registrationRequest->adresa,
                 'grad' => $registrationRequest->grad,
-                'opis' => '',
-                'ocjena' => 0,
-                'broj_ocjena' => 0,
+                'opis' => $textMessage,
+                'website' => $messageData['website'] ?? null,
+                'prosjecna_ocjena' => 0,
+                'broj_recenzija' => 0,
                 'broj_pregleda' => 0,
-                'verified' => true,
-                'active' => true,
+                'verifikovan' => true,
+                'aktivan' => true,
             ]);
 
             return ['user' => $user, 'laboratory' => $laboratory];
@@ -397,12 +417,15 @@ class AdminRegistrationController extends Controller
                 'user_id' => $user->id,
                 'naziv' => $registrationRequest->naziv,
                 'slug' => Str::slug($registrationRequest->naziv . '-' . $user->id),
-                'email' => $registrationRequest->email,
+                'email' => $publicEmail,
                 'telefon' => $registrationRequest->telefon,
                 'adresa' => $registrationRequest->adresa,
                 'grad' => $registrationRequest->grad,
-                'regija' => $registrationRequest->regija ?? '',
-                'opis' => '',
+                'regija' => $messageData['regija'] ?? '',
+                'opis' => $messageData['opis'] ?? '',
+                'website' => $messageData['website'] ?? null,
+                'medicinski_nadzor' => (bool) ($messageData['medicinski_nadzor'] ?? false),
+                'ima_smjestaj' => (bool) ($messageData['ima_smjestaj'] ?? false),
                 'prosjecna_ocjena' => 0,
                 'broj_recenzija' => 0,
                 'broj_pregleda' => 0,
@@ -410,24 +433,63 @@ class AdminRegistrationController extends Controller
                 'aktivan' => true,
             ]);
 
+            $vrsteIds = collect($messageData['vrste'] ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            if (!empty($vrsteIds)) {
+                $spa->vrste()->sync($vrsteIds);
+            }
+
             return ['user' => $user, 'spa' => $spa];
         } elseif ($registrationRequest->type === 'care_home') {
+            $tipDomaId = isset($messageData['tip_doma_id']) && is_numeric($messageData['tip_doma_id'])
+                ? (int) $messageData['tip_doma_id']
+                : \App\Models\TipDoma::query()->value('id');
+            $nivoNjegeId = isset($messageData['nivo_njege_id']) && is_numeric($messageData['nivo_njege_id'])
+                ? (int) $messageData['nivo_njege_id']
+                : \App\Models\NivoNjege::query()->value('id');
+
+            if (!$tipDomaId || !$nivoNjegeId) {
+                throw new \RuntimeException('Nedostaju obavezni tip doma ili nivo njege za kreiranje profila doma.');
+            }
+
             // Create care home profile
             $careHome = \App\Models\Dom::create([
                 'user_id' => $user->id,
                 'naziv' => $registrationRequest->naziv,
                 'slug' => Str::slug($registrationRequest->naziv . '-' . $user->id),
-                'email' => $registrationRequest->email,
+                'email' => $publicEmail,
                 'telefon' => $registrationRequest->telefon,
                 'adresa' => $registrationRequest->adresa,
                 'grad' => $registrationRequest->grad,
-                'opis' => '',
+                'website' => $messageData['website'] ?? null,
+                'opis' => $messageData['opis'] ?? '',
+                'tip_doma_id' => $tipDomaId,
+                'nivo_njege_id' => $nivoNjegeId,
+                'nurses_availability' => $messageData['nurses_availability'] ?? 'shifts',
+                'doctor_availability' => $messageData['doctor_availability'] ?? 'on_call',
+                'has_physiotherapist' => (bool) ($messageData['has_physiotherapist'] ?? false),
+                'has_physiatrist' => (bool) ($messageData['has_physiatrist'] ?? false),
+                'emergency_protocol' => (bool) ($messageData['emergency_protocol'] ?? false),
                 'prosjecna_ocjena' => 0,
                 'broj_recenzija' => 0,
                 'broj_pregleda' => 0,
                 'verifikovan' => true,
                 'aktivan' => true,
             ]);
+
+            $programIds = collect($messageData['programi_njege'] ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            if (!empty($programIds)) {
+                $careHome->programiNjege()->sync($programIds);
+            }
 
             return ['user' => $user, 'care_home' => $careHome];
         } else {

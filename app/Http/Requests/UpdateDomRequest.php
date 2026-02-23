@@ -12,10 +12,26 @@ class UpdateDomRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $dom = $this->route('dom');
+        $user = $this->user();
+        if (!$user) {
+            return false;
+        }
 
-        return $this->user()->hasRole('admin') ||
-               ($this->user()->hasRole('care_home_manager') && $this->user()->id === $dom->user_id);
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        $dom = $this->route('dom');
+        if (!$dom) {
+            $dom = \App\Models\Dom::where('user_id', $user->id)->first();
+        }
+
+        if (!$dom) {
+            return false;
+        }
+
+        return ($user->hasRole('dom_manager') || $user->hasRole('care_home_manager') || $user->hasRole('care_home'))
+            && $user->id === $dom->user_id;
     }
 
     /**
@@ -23,34 +39,35 @@ class UpdateDomRequest extends FormRequest
      */
     public function rules(): array
     {
-        $domId = $this->route('dom')->id;
+        $domId = $this->route('dom')?->id
+            ?? \App\Models\Dom::where('user_id', $this->user()->id)->value('id');
 
         return [
-            'naziv' => 'required|string|max:255|unique:domovi_njega,naziv,' . $domId,
+            'naziv' => 'sometimes|required|string|max:255|unique:domovi_njega,naziv,' . $domId,
             'slug' => 'nullable|string|max:255|unique:domovi_njega,slug,' . $domId . '|regex:/^[a-z0-9-]+$/',
-            'grad' => 'required|string|max:100',
+            'grad' => 'sometimes|required|string|max:100',
             'regija' => 'nullable|string|max:100',
-            'adresa' => 'required|string|max:500',
+            'adresa' => 'sometimes|required|string|max:500',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'google_maps_link' => 'nullable|string|max:500',
             'telefon' => 'nullable|string|max:50|regex:/^[\d\s\+\-\(\)]+$/',
             'email' => 'nullable|email|max:255',
             'website' => 'nullable|url|max:255',
-            'opis' => 'required|string|max:1000',
+            'opis' => 'sometimes|required|string|max:1000',
             'detaljni_opis' => 'nullable|string|max:10000',
 
             // Tip i nivo
-            'tip_doma_id' => 'required|exists:tipovi_domova,id',
-            'nivo_njege_id' => 'required|exists:nivoi_njege,id',
+            'tip_doma_id' => 'sometimes|required|exists:tipovi_domova,id',
+            'nivo_njege_id' => 'sometimes|required|exists:nivoi_njege,id',
 
             // Admission
             'accepts_tags' => 'nullable|array',
             'not_accepts_text' => 'nullable|string|max:1000',
 
             // Osoblje
-            'nurses_availability' => 'required|in:24_7,shifts,on_demand',
-            'doctor_availability' => 'required|in:permanent,periodic,on_call',
+            'nurses_availability' => 'sometimes|required|in:24_7,shifts,on_demand',
+            'doctor_availability' => 'sometimes|required|in:permanent,periodic,on_call',
             'has_physiotherapist' => 'boolean',
             'has_physiatrist' => 'boolean',
 
@@ -62,7 +79,7 @@ class UpdateDomRequest extends FormRequest
             'visiting_rules' => 'nullable|string|max:2000',
 
             // Cijene
-            'pricing_mode' => 'required|in:public,on_request',
+            'pricing_mode' => 'sometimes|required|in:public,on_request',
             'price_from' => 'nullable|numeric|min:0',
             'price_includes' => 'nullable|string|max:1000',
             'extra_charges' => 'nullable|string|max:1000',
@@ -75,9 +92,9 @@ class UpdateDomRequest extends FormRequest
             'aktivan' => Rule::when($this->user()->hasRole('admin'), 'boolean'),
 
             // Taxonomies
-            'programi_njege' => 'required|array|min:1',
+            'programi_njege' => 'sometimes|array|min:1',
             'programi_njege.*' => 'exists:programi_njege,id',
-            'medicinske_usluge' => 'required|array|min:1',
+            'medicinske_usluge' => 'sometimes|array|min:1',
             'medicinske_usluge.*' => 'exists:medicinske_usluge,id',
             'smjestaj_uslovi' => 'nullable|array',
             'smjestaj_uslovi.*' => 'exists:smjestaj_uslovi,id',
@@ -167,6 +184,60 @@ class UpdateDomRequest extends FormRequest
         if (!$this->slug && $this->naziv) {
             $this->merge([
                 'slug' => \Str::slug($this->naziv)
+            ]);
+        }
+
+        // Normalize relation payloads from dashboard (array of objects -> array of IDs)
+        $normalizeIds = function ($value): array {
+            if (!is_array($value)) {
+                return [];
+            }
+
+            return collect($value)
+                ->map(function ($item) {
+                    if (is_array($item) && isset($item['id'])) {
+                        return (int) $item['id'];
+                    }
+                    if (is_object($item) && isset($item->id)) {
+                        return (int) $item->id;
+                    }
+                    if (is_numeric($item)) {
+                        return (int) $item;
+                    }
+                    return null;
+                })
+                ->filter(fn ($id) => is_int($id) && $id > 0)
+                ->values()
+                ->all();
+        };
+
+        if ($this->has('programi_njege')) {
+            $this->merge([
+                'programi_njege' => $normalizeIds($this->input('programi_njege'))
+            ]);
+        }
+
+        if ($this->has('smjestaj_uslovi')) {
+            $this->merge([
+                'smjestaj_uslovi' => $normalizeIds($this->input('smjestaj_uslovi'))
+            ]);
+        }
+
+        if ($this->has('medicinske_usluge')) {
+            $this->merge([
+                'medicinske_usluge' => $normalizeIds($this->input('medicinske_usluge'))
+            ]);
+        } elseif ($this->has('medicinsk_usluge')) {
+            // Backward compatibility with serialized relation name from Eloquent.
+            $this->merge([
+                'medicinske_usluge' => $normalizeIds($this->input('medicinsk_usluge'))
+            ]);
+        }
+
+        // Auto-add https:// to website if missing protocol
+        if ($this->website && !preg_match('/^https?:\/\//i', $this->website)) {
+            $this->merge([
+                'website' => 'https://' . $this->website
             ]);
         }
 

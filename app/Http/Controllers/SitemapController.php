@@ -2,22 +2,126 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\DB;
 use App\Models\BlogPost;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SitemapController extends Controller
 {
-    /**
-     * Get the base URL for the frontend
-     */
     private function getBaseUrl(): string
     {
-        return config('app.frontend_url', 'https://wizmedik.com');
+        return rtrim(config('app.frontend_url', 'https://wizmedik.com'), '/');
     }
 
-    /**
-     * Main sitemap index
-     */
+    private function xmlEscape(?string $value): string
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    private function xmlDate($value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('c');
+        }
+
+        if (empty($value)) {
+            return now()->format('c');
+        }
+
+        return date('c', strtotime((string) $value));
+    }
+
+    private function appendUrl(
+        string &$xml,
+        string $loc,
+        $lastmod,
+        string $changefreq,
+        string $priority
+    ): void {
+        $xml .= '<url>';
+        $xml .= '<loc>' . $this->xmlEscape($loc) . '</loc>';
+        $xml .= '<lastmod>' . $this->xmlDate($lastmod) . '</lastmod>';
+        $xml .= '<changefreq>' . $changefreq . '</changefreq>';
+        $xml .= '<priority>' . $priority . '</priority>';
+        $xml .= '</url>';
+    }
+
+    private function citySlugMap(): array
+    {
+        $map = [];
+
+        $cities = DB::table('gradovi')
+            ->select('naziv', 'slug')
+            ->whereNotNull('naziv')
+            ->whereNotNull('slug')
+            ->get();
+
+        foreach ($cities as $city) {
+            $key = mb_strtolower(trim((string) $city->naziv));
+            if ($key !== '') {
+                $map[$key] = (string) $city->slug;
+            }
+        }
+
+        return $map;
+    }
+
+    private function specialtySlugMap(): array
+    {
+        $map = [];
+
+        $specialties = DB::table('specijalnosti')
+            ->select('naziv', 'slug')
+            ->whereNotNull('naziv')
+            ->whereNotNull('slug')
+            ->get();
+
+        foreach ($specialties as $specialty) {
+            $key = mb_strtolower(trim((string) $specialty->naziv));
+            if ($key !== '') {
+                $map[$key] = (string) $specialty->slug;
+            }
+        }
+
+        return $map;
+    }
+
+    private function resolveCitySlug(string $cityName, array $citySlugMap): string
+    {
+        $key = mb_strtolower(trim($cityName));
+        if (isset($citySlugMap[$key]) && $citySlugMap[$key] !== '') {
+            return $citySlugMap[$key];
+        }
+
+        $slug = Str::slug($cityName);
+        return $slug !== '' ? $slug : rawurlencode($cityName);
+    }
+
+    private function resolveSpecialtySlug(string $specialtyName, array $specialtySlugMap): string
+    {
+        $key = mb_strtolower(trim($specialtyName));
+        if (isset($specialtySlugMap[$key]) && $specialtySlugMap[$key] !== '') {
+            return $specialtySlugMap[$key];
+        }
+
+        $slug = Str::slug($specialtyName);
+        return $slug !== '' ? $slug : rawurlencode($specialtyName);
+    }
+
+    private function cityRowsForTable(string $table): Collection
+    {
+        return DB::table($table)
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
+            ->whereNotNull('grad')
+            ->where('grad', '!=', '')
+            ->selectRaw('grad, MAX(updated_at) AS updated_at')
+            ->groupBy('grad')
+            ->get();
+    }
+
     public function index()
     {
         $baseUrl = $this->getBaseUrl();
@@ -34,13 +138,14 @@ class SitemapController extends Controller
             'sitemap-laboratories.xml',
             'sitemap-spas.xml',
             'sitemap-care-homes.xml',
-            'sitemap-blog.xml'
+            'sitemap-doctor-city-specialties.xml',
+            'sitemap-blog.xml',
         ];
 
         foreach ($sitemaps as $sitemap) {
             $xml .= '<sitemap>';
-            $xml .= '<loc>' . $baseUrl . '/' . $sitemap . '</loc>';
-            $xml .= '<lastmod>' . now()->format('c') . '</lastmod>'; // ISO 8601 format
+            $xml .= '<loc>' . $this->xmlEscape($baseUrl . '/' . $sitemap) . '</loc>';
+            $xml .= '<lastmod>' . now()->format('c') . '</lastmod>';
             $xml .= '</sitemap>';
         }
 
@@ -49,9 +154,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Static pages sitemap
-     */
     public function pages()
     {
         $baseUrl = $this->getBaseUrl();
@@ -67,24 +169,30 @@ class SitemapController extends Controller
             ['url' => '/gradovi', 'priority' => '0.8', 'changefreq' => 'weekly'],
             ['url' => '/laboratorije', 'priority' => '0.8', 'changefreq' => 'daily'],
             ['url' => '/banje', 'priority' => '0.8', 'changefreq' => 'weekly'],
+            ['url' => '/banje/indikacije-terapije', 'priority' => '0.7', 'changefreq' => 'weekly'],
             ['url' => '/domovi-njega', 'priority' => '0.8', 'changefreq' => 'weekly'],
+            ['url' => '/domovi-njega/vodic', 'priority' => '0.7', 'changefreq' => 'weekly'],
             ['url' => '/blog', 'priority' => '0.7', 'changefreq' => 'daily'],
             ['url' => '/pitanja', 'priority' => '0.7', 'changefreq' => 'daily'],
-            ['url' => '/o-nama', 'priority' => '0.6', 'changefreq' => 'monthly'],
-            ['url' => '/kontakt', 'priority' => '0.6', 'changefreq' => 'monthly'],
+            ['url' => '/about', 'priority' => '0.6', 'changefreq' => 'monthly'],
+            ['url' => '/contact', 'priority' => '0.6', 'changefreq' => 'monthly'],
+            ['url' => '/faq', 'priority' => '0.6', 'changefreq' => 'monthly'],
+            ['url' => '/kalkulatori', 'priority' => '0.6', 'changefreq' => 'monthly'],
+            ['url' => '/mkb10', 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['url' => '/uslovi-koristenja', 'priority' => '0.5', 'changefreq' => 'yearly'],
             ['url' => '/politika-privatnosti', 'priority' => '0.5', 'changefreq' => 'yearly'],
         ];
 
-        $lastmod = now()->format('c'); // ISO 8601 format
+        $lastmod = now()->format('c');
 
         foreach ($pages as $page) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . $page['url'] . '</loc>';
-            $xml .= '<lastmod>' . $lastmod . '</lastmod>';
-            $xml .= '<changefreq>' . $page['changefreq'] . '</changefreq>';
-            $xml .= '<priority>' . $page['priority'] . '</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . $page['url'],
+                $lastmod,
+                $page['changefreq'],
+                $page['priority']
+            );
         }
 
         $xml .= '</urlset>';
@@ -92,9 +200,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Doctors sitemap
-     */
     public function doctors()
     {
         $baseUrl = $this->getBaseUrl();
@@ -110,12 +215,13 @@ class SitemapController extends Controller
             ->get();
 
         foreach ($doctors as $doctor) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/doktor/' . htmlspecialchars($doctor->slug) . '</loc>';
-            $xml .= '<lastmod>' . date('c', strtotime($doctor->updated_at)) . '</lastmod>'; // ISO 8601 format
-            $xml .= '<changefreq>weekly</changefreq>';
-            $xml .= '<priority>0.8</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/doktor/' . $doctor->slug,
+                $doctor->updated_at,
+                'weekly',
+                '0.8'
+            );
         }
 
         $xml .= '</urlset>';
@@ -123,9 +229,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Clinics sitemap
-     */
     public function clinics()
     {
         $baseUrl = $this->getBaseUrl();
@@ -141,12 +244,13 @@ class SitemapController extends Controller
             ->get();
 
         foreach ($clinics as $clinic) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/klinika/' . htmlspecialchars($clinic->slug) . '</loc>';
-            $xml .= '<lastmod>' . date('c', strtotime($clinic->updated_at)) . '</lastmod>'; // ISO 8601 format
-            $xml .= '<changefreq>weekly</changefreq>';
-            $xml .= '<priority>0.8</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/klinika/' . $clinic->slug,
+                $clinic->updated_at,
+                'weekly',
+                '0.8'
+            );
         }
 
         $xml .= '</urlset>';
@@ -154,9 +258,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Specialties sitemap
-     */
     public function specialties()
     {
         $baseUrl = $this->getBaseUrl();
@@ -166,15 +267,34 @@ class SitemapController extends Controller
 
         $specialties = DB::table('specijalnosti')
             ->select('slug', 'updated_at')
+            ->where('aktivan', true)
+            ->whereNotNull('slug')
             ->get();
 
         foreach ($specialties as $specialty) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/specijalnost/' . htmlspecialchars($specialty->slug) . '</loc>';
-            $xml .= '<lastmod>' . date('c', strtotime($specialty->updated_at)) . '</lastmod>'; // ISO 8601 format
-            $xml .= '<changefreq>monthly</changefreq>';
-            $xml .= '<priority>0.7</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/specijalnost/' . $specialty->slug,
+                $specialty->updated_at,
+                'monthly',
+                '0.7'
+            );
+
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/doktori/specijalnost/' . $specialty->slug,
+                $specialty->updated_at,
+                'weekly',
+                '0.85'
+            );
+
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/klinike/specijalnost/' . $specialty->slug,
+                $specialty->updated_at,
+                'weekly',
+                '0.8'
+            );
         }
 
         $xml .= '</urlset>';
@@ -182,9 +302,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Cities sitemap
-     */
     public function cities()
     {
         $baseUrl = $this->getBaseUrl();
@@ -194,15 +311,52 @@ class SitemapController extends Controller
 
         $cities = DB::table('gradovi')
             ->select('slug', 'updated_at')
+            ->where('aktivan', true)
+            ->whereNotNull('slug')
             ->get();
 
         foreach ($cities as $city) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/grad/' . htmlspecialchars($city->slug) . '</loc>';
-            $xml .= '<lastmod>' . date('c', strtotime($city->updated_at)) . '</lastmod>'; // ISO 8601 format
-            $xml .= '<changefreq>monthly</changefreq>';
-            $xml .= '<priority>0.7</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/grad/' . $city->slug,
+                $city->updated_at,
+                'weekly',
+                '0.8'
+            );
+        }
+
+        $citySlugMap = $this->citySlugMap();
+        $added = [];
+
+        $cityVerticalRoutes = [
+            ['prefix' => 'doktori', 'rows' => $this->cityRowsForTable('doktori')],
+            ['prefix' => 'klinike', 'rows' => $this->cityRowsForTable('klinike')],
+            ['prefix' => 'laboratorije', 'rows' => $this->cityRowsForTable('laboratorije')],
+            ['prefix' => 'banje', 'rows' => $this->cityRowsForTable('banje')],
+            ['prefix' => 'domovi-njega', 'rows' => $this->cityRowsForTable('domovi_njega')],
+        ];
+
+        foreach ($cityVerticalRoutes as $route) {
+            foreach ($route['rows'] as $row) {
+                $citySlug = $this->resolveCitySlug((string) $row->grad, $citySlugMap);
+                if ($citySlug === '') {
+                    continue;
+                }
+
+                $path = $route['prefix'] . '/' . $citySlug;
+                if (isset($added[$path])) {
+                    continue;
+                }
+                $added[$path] = true;
+
+                $this->appendUrl(
+                    $xml,
+                    $baseUrl . '/' . $path,
+                    $row->updated_at,
+                    'weekly',
+                    '0.8'
+                );
+            }
         }
 
         $xml .= '</urlset>';
@@ -210,9 +364,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Laboratories sitemap
-     */
     public function laboratories()
     {
         $baseUrl = $this->getBaseUrl();
@@ -227,12 +378,13 @@ class SitemapController extends Controller
             ->get();
 
         foreach ($laboratories as $lab) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/laboratorija/' . htmlspecialchars($lab->slug) . '</loc>';
-            $xml .= '<lastmod>' . date('c', strtotime($lab->updated_at)) . '</lastmod>'; // ISO 8601 format
-            $xml .= '<changefreq>weekly</changefreq>';
-            $xml .= '<priority>0.7</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/laboratorija/' . $lab->slug,
+                $lab->updated_at,
+                'weekly',
+                '0.7'
+            );
         }
 
         $xml .= '</urlset>';
@@ -240,9 +392,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Spas sitemap
-     */
     public function spas()
     {
         $baseUrl = $this->getBaseUrl();
@@ -257,12 +406,13 @@ class SitemapController extends Controller
             ->get();
 
         foreach ($spas as $spa) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/banja/' . htmlspecialchars($spa->slug) . '</loc>';
-            $xml .= '<lastmod>' . date('c', strtotime($spa->updated_at)) . '</lastmod>'; // ISO 8601 format
-            $xml .= '<changefreq>monthly</changefreq>';
-            $xml .= '<priority>0.7</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/banja/' . $spa->slug,
+                $spa->updated_at,
+                'monthly',
+                '0.7'
+            );
         }
 
         $xml .= '</urlset>';
@@ -270,9 +420,6 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Care homes sitemap
-     */
     public function careHomes()
     {
         $baseUrl = $this->getBaseUrl();
@@ -287,12 +434,13 @@ class SitemapController extends Controller
             ->get();
 
         foreach ($homes as $home) {
-            $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/dom-njega/' . htmlspecialchars($home->slug) . '</loc>';
-            $xml .= '<lastmod>' . date('c', strtotime($home->updated_at)) . '</lastmod>'; // ISO 8601 format
-            $xml .= '<changefreq>monthly</changefreq>';
-            $xml .= '<priority>0.7</priority>';
-            $xml .= '</url>';
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/dom-njega/' . $home->slug,
+                $home->updated_at,
+                'monthly',
+                '0.7'
+            );
         }
 
         $xml .= '</urlset>';
@@ -300,9 +448,57 @@ class SitemapController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    /**
-     * Blog sitemap
-     */
+    public function doctorCitySpecialties()
+    {
+        $baseUrl = $this->getBaseUrl();
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+        $citySlugMap = $this->citySlugMap();
+        $specialtySlugMap = $this->specialtySlugMap();
+        $seen = [];
+
+        $pairs = DB::table('doktori')
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
+            ->whereNotNull('grad')
+            ->where('grad', '!=', '')
+            ->whereNotNull('specijalnost')
+            ->where('specijalnost', '!=', '')
+            ->selectRaw('grad, specijalnost, MAX(updated_at) AS updated_at')
+            ->groupBy('grad', 'specijalnost')
+            ->get();
+
+        foreach ($pairs as $pair) {
+            $citySlug = $this->resolveCitySlug((string) $pair->grad, $citySlugMap);
+            $specialtySlug = $this->resolveSpecialtySlug((string) $pair->specijalnost, $specialtySlugMap);
+
+            if ($citySlug === '' || $specialtySlug === '') {
+                continue;
+            }
+
+            $path = '/doktori/' . $citySlug . '/' . $specialtySlug;
+            if (isset($seen[$path])) {
+                continue;
+            }
+            $seen[$path] = true;
+
+            $this->appendUrl(
+                $xml,
+                $baseUrl . $path,
+                $pair->updated_at,
+                'weekly',
+                '0.88'
+            );
+        }
+
+        $xml .= '</urlset>';
+
+        return response($xml, 200)->header('Content-Type', 'application/xml');
+    }
+
     public function blog()
     {
         $baseUrl = $this->getBaseUrl();
@@ -319,28 +515,24 @@ class SitemapController extends Controller
 
         foreach ($posts as $post) {
             $xml .= '<url>';
-            $xml .= '<loc>' . $baseUrl . '/blog/' . htmlspecialchars($post->slug) . '</loc>';
+            $xml .= '<loc>' . $this->xmlEscape($baseUrl . '/blog/' . $post->slug) . '</loc>';
 
-            // Use ISO 8601 format (W3C Datetime) - required by sitemap standard
-            $lastmod = $post->updated_at->format('c'); // ISO 8601 format with timezone
-            $xml .= '<lastmod>' . $lastmod . '</lastmod>';
+            $xml .= '<lastmod>' . $this->xmlDate($post->updated_at ?? $post->published_at) . '</lastmod>';
 
             $xml .= '<changefreq>monthly</changefreq>';
             $xml .= '<priority>0.6</priority>';
 
-            // Add image information if thumbnail exists (helps with Google Images indexing)
             if ($post->thumbnail) {
                 $imageUrl = $post->thumbnail;
-                // Convert relative URLs to absolute
                 if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
                     $imageUrl = config('app.url') . '/storage/' . ltrim($imageUrl, '/');
                 }
 
                 $xml .= '<image:image>';
-                $xml .= '<image:loc>' . htmlspecialchars($imageUrl) . '</image:loc>';
-                $xml .= '<image:title>' . htmlspecialchars($post->naslov) . '</image:title>';
+                $xml .= '<image:loc>' . $this->xmlEscape($imageUrl) . '</image:loc>';
+                $xml .= '<image:title>' . $this->xmlEscape($post->naslov) . '</image:title>';
                 if ($post->excerpt) {
-                    $xml .= '<image:caption>' . htmlspecialchars(strip_tags($post->excerpt)) . '</image:caption>';
+                    $xml .= '<image:caption>' . $this->xmlEscape(strip_tags($post->excerpt)) . '</image:caption>';
                 }
                 $xml .= '</image:image>';
             }

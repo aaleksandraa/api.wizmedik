@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
@@ -55,7 +56,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'telefon' => $user->telefon,
                 'grad' => $user->grad,
-                'role' => $user->getRoleNames()->first(),
+                'role' => $this->resolvePrimaryRole($user),
             ],
             'token' => $token,
         ], 201);
@@ -161,7 +162,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'telefon' => $user->telefon,
                 'grad' => $user->grad,
-                'role' => $user->getRoleNames()->first(),
+                'role' => $this->resolvePrimaryRole($user),
             ],
             'token' => $token,
         ]);
@@ -197,10 +198,45 @@ class AuthController extends Controller
                 'datum_rodjenja' => $user->datum_rodjenja,
                 'adresa' => $user->adresa,
                 'grad' => $user->grad,
-                'role' => $user->getRoleNames()->first(),
+                'role' => $this->resolvePrimaryRole($user),
                 'permissions' => $user->getAllPermissions()->pluck('name'),
             ],
         ]);
+    }
+
+    /**
+     * Ensure user has a valid Spatie role and return primary role name.
+     * Handles legacy values stored in users.role.
+     */
+    private function resolvePrimaryRole(User $user): string
+    {
+        $currentRole = $user->getRoleNames()->first();
+        if ($currentRole) {
+            return $currentRole;
+        }
+
+        $legacyRole = (string) ($user->role ?? '');
+        $mappedRole = match ($legacyRole) {
+            'spa' => 'spa_manager',
+            'care_home', 'care_home_manager' => 'dom_manager',
+            default => $legacyRole !== '' ? $legacyRole : 'patient',
+        };
+
+        if ($mappedRole !== '' && Role::where('name', $mappedRole)->exists()) {
+            try {
+                $user->assignRole($mappedRole);
+                return $mappedRole;
+            } catch (\Throwable $e) {
+                Log::warning('Failed to auto-assign legacy role', [
+                    'user_id' => $user->id,
+                    'legacy_role' => $legacyRole,
+                    'mapped_role' => $mappedRole,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $mappedRole;
     }
 
     /**

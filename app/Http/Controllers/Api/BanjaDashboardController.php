@@ -383,7 +383,7 @@ class BanjaDashboardController extends Controller
             $banja = Banja::where('user_id', auth()->id())->findOrFail($banjaId);
             $customTerapija = $banja->customTerapije()->findOrFail($terapijaId);
 
-            $request->validate([
+            $validated = $request->validate([
                 'naziv' => 'required|string|max:200',
                 'opis' => 'nullable|string|max:1000',
                 'cijena' => 'nullable|numeric|min:0',
@@ -391,7 +391,7 @@ class BanjaDashboardController extends Controller
                 'redoslijed' => 'nullable|integer|min:0'
             ]);
 
-            $customTerapija->update($request->validated());
+            $customTerapija->update($validated);
 
             return response()->json([
                 'success' => true,

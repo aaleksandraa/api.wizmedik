@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Banja;
 use App\Models\BanjaPaket;
 use App\Models\BanjaCustomTerapija;
+use App\Models\BanjaUpit;
+use App\Models\BanjaRecenzija;
 use App\Models\VrstaBanje;
 use App\Models\Indikacija;
 use App\Models\Terapija;
@@ -392,6 +394,181 @@ class SpaDashboardController extends Controller
         } catch (\Exception $e) {
             \Log::error('Gallery delete error: ' . $e->getMessage());
             return response()->json(['message' => 'Greška'], 500);
+        }
+    }
+
+    /**
+     * Toggle active status for manager's spa.
+     */
+    public function toggleActive(): JsonResponse
+    {
+        try {
+            $banja = Banja::where('user_id', auth()->id())->firstOrFail();
+            $newStatus = !$banja->aktivan;
+
+            $banja->update(['aktivan' => $newStatus]);
+            $banja->logAudit(
+                $newStatus ? 'activate' : 'deactivate',
+                ['aktivan' => !$newStatus],
+                ['aktivan' => $newStatus]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => $newStatus ? 'Banja je aktivirana' : 'Banja je deaktivirana',
+                'data' => [
+                    'aktivan' => $banja->aktivan,
+                    'verifikovan' => $banja->verifikovan,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Spa toggle active error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri promjeni statusa banje'
+            ], 500);
+        }
+    }
+
+    /**
+     * List inquiries for manager's spa.
+     */
+    public function upiti(Request $request): JsonResponse
+    {
+        try {
+            $banja = Banja::where('user_id', auth()->id())->firstOrFail();
+
+            $query = BanjaUpit::where('banja_id', $banja->id)
+                ->with('user')
+                ->latest();
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('tip')) {
+                $query->where('tip', $request->tip);
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('ime', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('poruka', 'like', "%{$search}%");
+                });
+            }
+
+            $perPage = min((int) $request->get('per_page', 20), 100);
+            $upiti = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $upiti->items(),
+                'pagination' => [
+                    'current_page' => $upiti->currentPage(),
+                    'last_page' => $upiti->lastPage(),
+                    'per_page' => $upiti->perPage(),
+                    'total' => $upiti->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Spa inquiries error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri dohvatanju upita'
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark inquiry as read.
+     */
+    public function oznaciUpitProcitan(int $id): JsonResponse
+    {
+        return $this->azurirajStatusUpita($id, 'procitan');
+    }
+
+    /**
+     * Mark inquiry as answered.
+     */
+    public function oznaciUpitOdgovoren(int $id): JsonResponse
+    {
+        return $this->azurirajStatusUpita($id, 'odgovoren');
+    }
+
+    /**
+     * Close inquiry.
+     */
+    public function zatvoriUpit(int $id): JsonResponse
+    {
+        return $this->azurirajStatusUpita($id, 'zatvoren');
+    }
+
+    /**
+     * List reviews for manager's spa.
+     */
+    public function recenzije(Request $request): JsonResponse
+    {
+        try {
+            $banja = Banja::where('user_id', auth()->id())->firstOrFail();
+
+            $query = BanjaRecenzija::where('banja_id', $banja->id)
+                ->with('user')
+                ->latest();
+
+            if ($request->filled('odobreno')) {
+                $query->where('odobreno', $request->boolean('odobreno'));
+            }
+
+            if ($request->filled('ocjena')) {
+                $query->where('ocjena', (int) $request->ocjena);
+            }
+
+            $perPage = min((int) $request->get('per_page', 20), 100);
+            $recenzije = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $recenzije->items(),
+                'pagination' => [
+                    'current_page' => $recenzije->currentPage(),
+                    'last_page' => $recenzije->lastPage(),
+                    'per_page' => $recenzije->perPage(),
+                    'total' => $recenzije->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Spa reviews error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri dohvatanju recenzija'
+            ], 500);
+        }
+    }
+
+    /**
+     * Internal helper for inquiry status update.
+     */
+    private function azurirajStatusUpita(int $upitId, string $status): JsonResponse
+    {
+        try {
+            $banja = Banja::where('user_id', auth()->id())->firstOrFail();
+            $upit = BanjaUpit::where('banja_id', $banja->id)->findOrFail($upitId);
+
+            $upit->update(['status' => $status]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Status upita je aÅ¾uriran',
+                'data' => $upit
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Spa inquiry status update error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri aÅ¾uriranju statusa upita'
+            ], 500);
         }
     }
 

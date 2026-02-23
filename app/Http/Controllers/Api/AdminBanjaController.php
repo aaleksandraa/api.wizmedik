@@ -363,6 +363,193 @@ class AdminBanjaController extends Controller
     }
 
     /**
+     * Get audit log for a specific banja
+     */
+    public function auditLog(int $id, Request $request): JsonResponse
+    {
+        try {
+            $banja = Banja::findOrFail($id);
+
+            $query = $banja->auditLog()
+                ->with('user')
+                ->latest();
+
+            if ($request->filled('akcija')) {
+                $query->where('akcija', $request->akcija);
+            }
+
+            $perPage = min((int) $request->get('per_page', 20), 100);
+            $logs = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $logs->items(),
+                'pagination' => [
+                    'current_page' => $logs->currentPage(),
+                    'last_page' => $logs->lastPage(),
+                    'per_page' => $logs->perPage(),
+                    'total' => $logs->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Admin error fetching banja audit log: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri dohvatanju audit loga'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all banja reviews for admin moderation
+     */
+    public function recenzije(Request $request): JsonResponse
+    {
+        try {
+            $query = BanjaRecenzija::with([
+                'banja:id,naziv,slug',
+                'user:id,name,email'
+            ])->latest();
+
+            if ($request->filled('banja_id')) {
+                $query->where('banja_id', (int) $request->banja_id);
+            }
+
+            if ($request->filled('odobreno')) {
+                $query->where('odobreno', $request->boolean('odobreno'));
+            }
+
+            if ($request->filled('ocjena')) {
+                $query->where('ocjena', (int) $request->ocjena);
+            }
+
+            $perPage = min((int) $request->get('per_page', 20), 100);
+            $recenzije = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $recenzije->items(),
+                'pagination' => [
+                    'current_page' => $recenzije->currentPage(),
+                    'last_page' => $recenzije->lastPage(),
+                    'per_page' => $recenzije->perPage(),
+                    'total' => $recenzije->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Admin error fetching banja reviews: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri dohvatanju recenzija'
+            ], 500);
+        }
+    }
+
+    /**
+     * Approve a banja review
+     */
+    public function odobriRecenziju(int $id): JsonResponse
+    {
+        try {
+            $recenzija = BanjaRecenzija::findOrFail($id);
+            $recenzija->approve();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Recenzija je odobrena',
+                'data' => $recenzija
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Admin error approving banja review: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri odobravanju recenzije'
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete/reject a banja review
+     */
+    public function obrisiRecenziju(int $id): JsonResponse
+    {
+        try {
+            $recenzija = BanjaRecenzija::findOrFail($id);
+            $recenzija->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Recenzija je obrisana'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Admin error deleting banja review: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri brisanju recenzije'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all banja inquiries for admin
+     */
+    public function upiti(Request $request): JsonResponse
+    {
+        try {
+            $query = BanjaUpit::with([
+                'banja:id,naziv,slug',
+                'user:id,name,email'
+            ])->latest();
+
+            if ($request->filled('banja_id')) {
+                $query->where('banja_id', (int) $request->banja_id);
+            }
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+
+            if ($request->filled('tip')) {
+                $query->where('tip', $request->tip);
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('ime', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('poruka', 'like', "%{$search}%");
+                });
+            }
+
+            $perPage = min((int) $request->get('per_page', 20), 100);
+            $upiti = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $upiti->items(),
+                'pagination' => [
+                    'current_page' => $upiti->currentPage(),
+                    'last_page' => $upiti->lastPage(),
+                    'per_page' => $upiti->perPage(),
+                    'total' => $upiti->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Admin error fetching banja inquiries: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'GreÅ¡ka pri dohvatanju upita'
+            ], 500);
+        }
+    }
+
+    /**
      * Get taxonomies for forms
      */
     public function taxonomies(): JsonResponse

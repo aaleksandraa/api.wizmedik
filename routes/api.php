@@ -60,8 +60,12 @@ Route::get('/verify-email/{token}', [RegistrationController::class, 'verifyEmail
 Route::get('/register/verify/{token}', [RegistrationController::class, 'verifyEmail']); // Alias for email link
 Route::post('/verify-email-code', [RegistrationController::class, 'verifyEmailWithCode'])
     ->middleware('throttle:10,60');
+Route::post('/register/verify-code', [RegistrationController::class, 'verifyEmailWithCode']); // Alias
 Route::post('/resend-verification', [RegistrationController::class, 'resendVerification'])
     ->middleware('throttle:3,60');
+Route::post('/register/resend-verification', [RegistrationController::class, 'resendVerification'])
+    ->middleware('throttle:3,60'); // Alias
+Route::get('/register/settings', [RegistrationController::class, 'getSettings']);
 
 // Public doctor routes
 Route::get('/doctors', [DoctorController::class, 'index']);
@@ -147,8 +151,11 @@ Route::post('/domovi-njega/{id}/recenzija', [\App\Http\Controllers\Api\DomContro
 
 // Public banje (spas) routes with rate limiting
 Route::get('/banje', [\App\Http\Controllers\Api\BanjaController::class, 'index']);
+Route::get('/banje/search', [\App\Http\Controllers\Api\BanjaController::class, 'index']); // Alias
 Route::get('/banje/filter-options', [\App\Http\Controllers\Api\BanjaController::class, 'filterOptions']);
 Route::get('/banje/grad/{grad}', [\App\Http\Controllers\Api\BanjaController::class, 'poGradu']);
+Route::get('/banje/{id}/paketi', [\App\Http\Controllers\Api\BanjaController::class, 'getPaketi'])->where('id', '[0-9]+');
+Route::get('/banje/{id}/recenzije', [\App\Http\Controllers\Api\BanjaController::class, 'getRecenzije'])->where('id', '[0-9]+');
 Route::get('/banje/{slug}', [\App\Http\Controllers\Api\BanjaController::class, 'show']);
 Route::post('/banje/{id}/upit', [\App\Http\Controllers\Api\BanjaController::class, 'posaljiUpit'])
     ->middleware('throttle:5,60'); // 5 inquiries per 60 minutes
@@ -250,8 +257,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:clinic')->prefix('clinic')->group(function () {
         Route::get('/profile', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getProfile']);
         Route::put('/profile', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'updateProfile']);
+        Route::put('/change-password', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'changePassword']);
         Route::get('/appointments', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getAppointments']);
         Route::get('/doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getDoctors']);
+        Route::post('/doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'addDoctor']);
+        Route::put('/doctors/{id}', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'updateDoctor']);
         Route::put('/appointments/{id}/status', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'updateAppointmentStatus']);
         Route::get('/statistics', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getStatistics']);
 
@@ -269,7 +279,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/guest-doctors/{id}', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'updateGuestDoctor']);
         Route::delete('/guest-doctors/{id}', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'cancelGuestDoctor']);
         Route::get('/search-doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'searchDoctors']);
-        Route::get('/search-existing-doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'searchDoctors']); // Alias
+        Route::get('/search-existing-doctors', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'searchExistingDoctors']); // Alias
 
         // Calendar and appointments
         Route::get('/calendar-data', [\App\Http\Controllers\Api\ClinicDashboardController::class, 'getCalendarData']);
@@ -327,6 +337,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:laboratory')->prefix('laboratorija')->group(function () {
         Route::get('/profile', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'getProfile']);
         Route::put('/profile', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updateProfile']);
+        Route::put('/change-password', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'changePassword']);
         Route::post('/change-password', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'changePassword']);
         Route::get('/statistics', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'getStatistics']);
 
@@ -335,6 +346,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/analize', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'createAnaliza']);
         Route::put('/analize/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updateAnaliza']);
         Route::delete('/analize/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'deleteAnaliza']);
+        Route::put('/analize/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderAnalize']);
         Route::post('/analize/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderAnalize']);
 
         // Packages management
@@ -342,6 +354,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/paketi', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'createPaket']);
         Route::put('/paketi/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updatePaket']);
         Route::delete('/paketi/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'deletePaket']);
+        Route::put('/paketi/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderPaketi']);
         Route::post('/paketi/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderPaketi']);
 
         // Gallery management
@@ -352,11 +365,45 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/radno-vrijeme', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updateRadnoVrijeme']);
     });
 
+    // Laboratory Dashboard aliases (compatibility with existing frontend /laboratory/* paths)
+    Route::middleware('role:laboratory')->prefix('laboratory')->group(function () {
+        Route::get('/profile', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'getProfile']);
+        Route::put('/profile', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updateProfile']);
+        Route::put('/change-password', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'changePassword']);
+        Route::post('/change-password', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'changePassword']);
+        Route::get('/statistics', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'getStatistics']);
+
+        Route::get('/analize', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'getAnalize']);
+        Route::post('/analize', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'createAnaliza']);
+        Route::put('/analize/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updateAnaliza']);
+        Route::delete('/analize/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'deleteAnaliza']);
+        Route::put('/analize/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderAnalize']);
+        Route::post('/analize/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderAnalize']);
+
+        Route::get('/paketi', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'getPaketi']);
+        Route::post('/paketi', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'createPaket']);
+        Route::put('/paketi/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updatePaket']);
+        Route::delete('/paketi/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'deletePaket']);
+        Route::put('/paketi/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderPaketi']);
+        Route::post('/paketi/reorder', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'reorderPaketi']);
+
+        Route::post('/galerija', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'uploadGalleryImage']);
+        Route::post('/galerija/upload', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'uploadGalleryImage']);
+        Route::delete('/galerija/{id}', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'deleteGalleryImage']);
+        Route::put('/radno-vrijeme', [\App\Http\Controllers\Api\LaboratorijaDashboardController::class, 'updateRadnoVrijeme']);
+    });
+
     // Spa Dashboard (spa manager only)
-    Route::middleware('role:spa')->prefix('spa')->group(function () {
+    Route::middleware('role:spa_manager|spa')->prefix('spa')->group(function () {
         Route::get('/profile', [\App\Http\Controllers\Api\SpaDashboardController::class, 'profile']);
         Route::put('/profile', [\App\Http\Controllers\Api\SpaDashboardController::class, 'updateProfile']);
         Route::get('/statistics', [\App\Http\Controllers\Api\SpaDashboardController::class, 'statistics']);
+        Route::post('/toggle-active', [\App\Http\Controllers\Api\SpaDashboardController::class, 'toggleActive']);
+        Route::get('/upiti', [\App\Http\Controllers\Api\SpaDashboardController::class, 'upiti']);
+        Route::put('/upiti/{id}/procitan', [\App\Http\Controllers\Api\SpaDashboardController::class, 'oznaciUpitProcitan']);
+        Route::put('/upiti/{id}/odgovoren', [\App\Http\Controllers\Api\SpaDashboardController::class, 'oznaciUpitOdgovoren']);
+        Route::put('/upiti/{id}/zatvori', [\App\Http\Controllers\Api\SpaDashboardController::class, 'zatvoriUpit']);
+        Route::get('/recenzije', [\App\Http\Controllers\Api\SpaDashboardController::class, 'recenzije']);
 
         // Packages management
         Route::get('/paketi', [\App\Http\Controllers\Api\SpaDashboardController::class, 'paketi']);
@@ -371,21 +418,42 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/custom-terapije/{id}', [\App\Http\Controllers\Api\SpaDashboardController::class, 'updateCustomTerapija']);
         Route::delete('/custom-terapije/{id}', [\App\Http\Controllers\Api\SpaDashboardController::class, 'deleteCustomTerapija']);
         Route::post('/custom-terapije/reorder', [\App\Http\Controllers\Api\SpaDashboardController::class, 'reorderTerapije']);
+        Route::post('/reorder-terapije', [\App\Http\Controllers\Api\SpaDashboardController::class, 'reorderTerapije']); // Alias
 
         // Available options
         Route::get('/available-vrste', [\App\Http\Controllers\Api\SpaDashboardController::class, 'availableVrste']);
         Route::get('/available-indikacije', [\App\Http\Controllers\Api\SpaDashboardController::class, 'availableIndikacije']);
         Route::get('/available-terapije', [\App\Http\Controllers\Api\SpaDashboardController::class, 'availableTerapije']);
+        Route::get('/vrste/available', [\App\Http\Controllers\Api\SpaDashboardController::class, 'availableVrste']); // Alias
+        Route::get('/indikacije/available', [\App\Http\Controllers\Api\SpaDashboardController::class, 'availableIndikacije']); // Alias
+        Route::get('/terapije/available', [\App\Http\Controllers\Api\SpaDashboardController::class, 'availableTerapije']); // Alias
 
         // Images management
         Route::post('/upload-featured', [\App\Http\Controllers\Api\SpaDashboardController::class, 'uploadFeaturedImage']);
         Route::post('/upload-gallery', [\App\Http\Controllers\Api\SpaDashboardController::class, 'uploadGalleryImage']);
         Route::delete('/gallery-image', [\App\Http\Controllers\Api\SpaDashboardController::class, 'deleteGalleryImage']);
         Route::post('/set-featured', [\App\Http\Controllers\Api\SpaDashboardController::class, 'setFeaturedImage']);
+        Route::post('/featured-image', [\App\Http\Controllers\Api\SpaDashboardController::class, 'uploadFeaturedImage']); // Alias
+        Route::post('/galerija', [\App\Http\Controllers\Api\SpaDashboardController::class, 'uploadGalleryImage']); // Alias
+        Route::delete('/galerija', [\App\Http\Controllers\Api\SpaDashboardController::class, 'deleteGalleryImage']); // Alias
+        Route::post('/reorder-paketi', [\App\Http\Controllers\Api\SpaDashboardController::class, 'reorderPaketi']); // Alias
+    });
+
+    // Spa Dashboard legacy aliases (/banja/*)
+    Route::middleware('role:spa_manager|spa')->prefix('banja')->group(function () {
+        Route::get('/moja', [\App\Http\Controllers\Api\SpaDashboardController::class, 'profile']);
+        Route::put('/moja', [\App\Http\Controllers\Api\SpaDashboardController::class, 'updateProfile']);
+        Route::get('/statistika', [\App\Http\Controllers\Api\SpaDashboardController::class, 'statistics']);
+        Route::post('/toggle-active', [\App\Http\Controllers\Api\SpaDashboardController::class, 'toggleActive']);
+        Route::get('/upiti', [\App\Http\Controllers\Api\SpaDashboardController::class, 'upiti']);
+        Route::put('/upiti/{id}/procitan', [\App\Http\Controllers\Api\SpaDashboardController::class, 'oznaciUpitProcitan']);
+        Route::put('/upiti/{id}/odgovoren', [\App\Http\Controllers\Api\SpaDashboardController::class, 'oznaciUpitOdgovoren']);
+        Route::put('/upiti/{id}/zatvori', [\App\Http\Controllers\Api\SpaDashboardController::class, 'zatvoriUpit']);
+        Route::get('/recenzije', [\App\Http\Controllers\Api\SpaDashboardController::class, 'recenzije']);
     });
 
     // Care Home Dashboard (care home manager only)
-    Route::middleware('role:care_home')->prefix('dom')->group(function () {
+    Route::middleware('role:dom_manager|care_home|care_home_manager')->prefix('dom')->group(function () {
         Route::get('/profile', [\App\Http\Controllers\Api\DomDashboardController::class, 'mojDom']);
         Route::put('/profile', [\App\Http\Controllers\Api\DomDashboardController::class, 'azurirajDom']);
         Route::get('/statistics', [\App\Http\Controllers\Api\DomDashboardController::class, 'statistike']);
@@ -399,6 +467,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/recenzije', [\App\Http\Controllers\Api\DomDashboardController::class, 'recenzije']);
 
         // Images management
+        Route::post('/upload-slike', [\App\Http\Controllers\Api\DomDashboardController::class, 'uploadSlike']);
+    });
+
+    // Care Home dashboard aliases (compatibility with existing frontend /dom-dashboard/* paths)
+    Route::middleware('role:dom_manager|care_home|care_home_manager')->prefix('dom-dashboard')->group(function () {
+        Route::get('/moj-dom', [\App\Http\Controllers\Api\DomDashboardController::class, 'mojDom']);
+        Route::put('/moj-dom', [\App\Http\Controllers\Api\DomDashboardController::class, 'azurirajDom']);
+        Route::get('/statistike', [\App\Http\Controllers\Api\DomDashboardController::class, 'statistike']);
+        Route::get('/aktivnost', [\App\Http\Controllers\Api\DomDashboardController::class, 'aktivnost']);
+        Route::get('/upiti', [\App\Http\Controllers\Api\DomDashboardController::class, 'upiti']);
+        Route::put('/upiti/{id}', [\App\Http\Controllers\Api\DomDashboardController::class, 'azurirajUpit']);
+        Route::patch('/upiti/{id}', [\App\Http\Controllers\Api\DomDashboardController::class, 'azurirajUpit']);
+        Route::get('/recenzije', [\App\Http\Controllers\Api\DomDashboardController::class, 'recenzije']);
         Route::post('/upload-slike', [\App\Http\Controllers\Api\DomDashboardController::class, 'uploadSlike']);
     });
 
@@ -546,9 +627,33 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/laboratories/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateLaboratory']);
     Route::delete('/laboratories/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteLaboratory']);
 
+    // Spa management (canonical /admin/spas)
+    Route::get('/spas/statistika/dashboard', [\App\Http\Controllers\Api\AdminBanjaController::class, 'statistics']);
+    Route::get('/spas/recenzije', [\App\Http\Controllers\Api\AdminBanjaController::class, 'recenzije']);
+    Route::post('/spas/recenzije/{id}/odobri', [\App\Http\Controllers\Api\AdminBanjaController::class, 'odobriRecenziju']);
+    Route::delete('/spas/recenzije/{id}', [\App\Http\Controllers\Api\AdminBanjaController::class, 'obrisiRecenziju']);
+    Route::get('/spas/upiti', [\App\Http\Controllers\Api\AdminBanjaController::class, 'upiti']);
+    Route::get('/spas/audit-log/{id}', [\App\Http\Controllers\Api\AdminBanjaController::class, 'auditLog']);
+    Route::post('/spas/{id}/verify', [\App\Http\Controllers\Api\AdminBanjaController::class, 'verify']);
+    Route::post('/spas/{id}/toggle-active', [\App\Http\Controllers\Api\AdminBanjaController::class, 'toggleStatus']);
+    Route::post('/spas', [\App\Http\Controllers\Api\AdminBanjaController::class, 'store']);
     Route::get('/spas', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getSpas']);
     Route::put('/spas/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateSpa']);
     Route::delete('/spas/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteSpa']);
+
+    // Legacy spa admin aliases (/admin/banje/*)
+    Route::get('/banje/statistika/dashboard', [\App\Http\Controllers\Api\AdminBanjaController::class, 'statistics']);
+    Route::get('/banje/recenzije', [\App\Http\Controllers\Api\AdminBanjaController::class, 'recenzije']);
+    Route::post('/banje/recenzije/{id}/odobri', [\App\Http\Controllers\Api\AdminBanjaController::class, 'odobriRecenziju']);
+    Route::delete('/banje/recenzije/{id}', [\App\Http\Controllers\Api\AdminBanjaController::class, 'obrisiRecenziju']);
+    Route::get('/banje/upiti', [\App\Http\Controllers\Api\AdminBanjaController::class, 'upiti']);
+    Route::get('/banje/audit-log/{id}', [\App\Http\Controllers\Api\AdminBanjaController::class, 'auditLog']);
+    Route::post('/banje/{id}/verify', [\App\Http\Controllers\Api\AdminBanjaController::class, 'verify']);
+    Route::post('/banje/{id}/toggle-active', [\App\Http\Controllers\Api\AdminBanjaController::class, 'toggleStatus']);
+    Route::post('/banje', [\App\Http\Controllers\Api\AdminBanjaController::class, 'store']);
+    Route::get('/banje', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getSpas']);
+    Route::put('/banje/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateSpa']);
+    Route::delete('/banje/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteSpa']);
 
     Route::get('/care-homes', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getCareHomes']);
     Route::put('/care-homes/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateCareHome']);
