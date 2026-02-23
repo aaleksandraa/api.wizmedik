@@ -666,6 +666,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // Medical Calendar - Admin routes
     Route::get('/medical-calendar', [MedicalCalendarController::class, 'adminIndex']);
     Route::post('/medical-calendar', [MedicalCalendarController::class, 'store']);
+    Route::post('/medical-calendar/import-xml', [MedicalCalendarController::class, 'importXml']);
+    Route::get('/medical-calendar/export-xml', [MedicalCalendarController::class, 'exportXml']);
+    Route::post('/medical-calendar/bulk-delete', [MedicalCalendarController::class, 'bulkDestroy']);
     Route::put('/medical-calendar/{id}', [MedicalCalendarController::class, 'update']);
     Route::delete('/medical-calendar/{id}', [MedicalCalendarController::class, 'destroy']);
 });

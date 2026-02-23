@@ -175,6 +175,7 @@ class SitemapController extends Controller
             ['url' => '/domovi-njega/vodic', 'priority' => '0.7', 'changefreq' => 'weekly'],
             ['url' => '/blog', 'priority' => '0.7', 'changefreq' => 'daily'],
             ['url' => '/pitanja', 'priority' => '0.7', 'changefreq' => 'daily'],
+            ['url' => '/medicinski-kalendar', 'priority' => '0.75', 'changefreq' => 'weekly'],
             ['url' => '/about', 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['url' => '/contact', 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['url' => '/faq', 'priority' => '0.6', 'changefreq' => 'monthly'],

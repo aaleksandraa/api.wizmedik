@@ -240,10 +240,20 @@ class CalendarSyncController extends Controller
 
         $ical = $this->generateICalContent($doctor, $appointments);
 
+        $lastModifiedSource = $appointments->max('updated_at')
+            ?? $appointments->max('created_at')
+            ?? $doctor->updated_at
+            ?? now();
+
+        $lastModified = Carbon::parse($lastModifiedSource)->utc()->toRfc7231String();
+        $etag = '"' . sha1($ical) . '"';
+
         return response($ical, 200)
             ->header('Content-Type', 'text/calendar; charset=utf-8')
             ->header('Content-Disposition', 'inline; filename="wizmedik-calendar.ics"')
-            ->header('Cache-Control', 'public, max-age=300')
+            ->header('Cache-Control', 'public, max-age=300, must-revalidate')
+            ->header('ETag', $etag)
+            ->header('Last-Modified', $lastModified)
             ->header('X-Content-Type-Options', 'nosniff');
     }
 
@@ -262,18 +272,21 @@ class CalendarSyncController extends Controller
      */
     private function buildIcalUrl(Doktor $doctor, ?Request $request = null): string
     {
-        $hostUrl = $request ? rtrim($request->getSchemeAndHttpHost(), '/') : '';
-        if ($hostUrl !== '') {
-            return "{$hostUrl}/api/calendar/ical/{$doctor->calendar_sync_token}.ics";
-        }
+        $token = (string) $doctor->calendar_sync_token;
+        $configuredApiUrl = $this->normalizeApiBaseUrl((string) config('app.api_url', ''));
 
-        $configuredApiUrl = trim((string) config('app.api_url', ''));
+        // Prefer canonical API URL from config to avoid proxy/front-host mismatches.
         if ($configuredApiUrl !== '') {
-            return rtrim($configuredApiUrl, '/') . "/api/calendar/ical/{$doctor->calendar_sync_token}.ics";
+            return "{$configuredApiUrl}/api/calendar/ical/{$token}.ics";
         }
 
-        $fallbackAppUrl = rtrim((string) config('app.url', ''), '/');
-        return "{$fallbackAppUrl}/api/calendar/ical/{$doctor->calendar_sync_token}.ics";
+        $hostUrl = $request ? $this->normalizeApiBaseUrl($request->getSchemeAndHttpHost()) : '';
+        if ($hostUrl !== '') {
+            return "{$hostUrl}/api/calendar/ical/{$token}.ics";
+        }
+
+        $fallbackAppUrl = $this->normalizeApiBaseUrl((string) config('app.url', ''));
+        return "{$fallbackAppUrl}/api/calendar/ical/{$token}.ics";
     }
 
     /**
@@ -281,12 +294,17 @@ class CalendarSyncController extends Controller
      */
     private function generateICalContent(Doktor $doctor, $appointments): string
     {
+        $timezone = (string) config('app.timezone', 'UTC');
+
         $lines = [];
         $lines[] = 'BEGIN:VCALENDAR';
         $lines[] = 'VERSION:2.0';
         $lines[] = 'PRODID:-//WizMedik//Calendar Sync//EN';
         $lines[] = 'CALSCALE:GREGORIAN';
         $lines[] = 'METHOD:PUBLISH';
+        $lines[] = 'X-WR-TIMEZONE:' . $this->escapeString($timezone);
+        $lines[] = 'X-WR-RELCALID:wizmedik-doctor-' . $doctor->id;
+        $lines[] = 'NAME:' . $this->escapeString("Dr. {$doctor->ime} {$doctor->prezime} - Termini");
         $lines[] = 'X-WR-CALNAME:' . $this->escapeString("Dr. {$doctor->ime} {$doctor->prezime} - Termini");
         $lines[] = 'X-WR-CALDESC:' . $this->escapeString('Automatski sinhronizovani termini sa WizMedik platforme');
         $lines[] = 'REFRESH-INTERVAL;VALUE=DURATION:PT5M';
@@ -317,6 +335,10 @@ class CalendarSyncController extends Controller
         $uid = "termin-{$appointment->id}-doktor-{$doctor->id}@wizmedik.com";
         $lines[] = "UID:{$uid}";
         $lines[] = 'DTSTAMP:' . Carbon::now('UTC')->format('Ymd\THis\Z');
+        $lines[] = 'LAST-MODIFIED:' . Carbon::parse($appointment->updated_at ?? $appointment->created_at ?? now())
+            ->utc()
+            ->format('Ymd\THis\Z');
+        $lines[] = 'SEQUENCE:0';
 
         // Emit UTC timestamps for maximum Google/Outlook compatibility.
         $startDateTimeUtc = Carbon::parse($appointment->datum_vrijeme)->utc();
@@ -354,6 +376,7 @@ class CalendarSyncController extends Controller
         }
 
         $lines[] = 'STATUS:' . $this->getICalStatus((string) $appointment->status);
+        $lines[] = 'TRANSP:OPAQUE';
         $lines[] = 'CATEGORIES:' . $this->escapeString('Medicinski termin,WizMedik');
 
         $lines[] = 'BEGIN:VALARM';
@@ -471,5 +494,23 @@ class CalendarSyncController extends Controller
         }
 
         return $folded;
+    }
+
+    private function normalizeApiBaseUrl(string $url): string
+    {
+        $normalized = rtrim(trim($url), '/');
+        if ($normalized === '') {
+            return '';
+        }
+
+        if (str_ends_with(strtolower($normalized), '/api')) {
+            $normalized = substr($normalized, 0, -4);
+        }
+
+        if (app()->environment('production') && str_starts_with($normalized, 'http://')) {
+            $normalized = 'https://' . substr($normalized, 7);
+        }
+
+        return $normalized;
     }
 }

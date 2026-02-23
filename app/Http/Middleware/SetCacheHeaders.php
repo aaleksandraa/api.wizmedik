@@ -58,6 +58,18 @@ class SetCacheHeaders
             }
         }
 
+        // iCal subscription feed - keep it cacheable for calendar clients.
+        if (str_starts_with($path, 'api/calendar/ical/')) {
+            if ($response->getStatusCode() === 200) {
+                $response->headers->set('Cache-Control', 'public, max-age=300, must-revalidate');
+                $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 300) . ' GMT');
+            } else {
+                $response->headers->set('Cache-Control', 'no-cache, private');
+            }
+
+            return $response;
+        }
+
         // Profile pages - 10 minutes cache
         $profileEndpoints = [
             'api/doktor/',

@@ -67,6 +67,10 @@ class SeoController extends Controller
             return $this->getBlogListingMeta();
         }
 
+        if ($path === 'medicinski-kalendar') {
+            return $this->getMedicalCalendarMeta();
+        }
+
         if ($path === 'pitanja') {
             return $this->getQuestionsListingMeta();
         }
@@ -370,6 +374,33 @@ class SeoController extends Controller
         $description = "Procitajte {$count}+ javnih medicinskih pitanja i odgovora verifikovanih doktora na wizMedik platformi.";
         $url = $this->buildUrl('pitanja');
         $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getMedicalCalendarMeta(): array
+    {
+        $year = (int) now()->format('Y');
+
+        $countForCurrentYear = DB::table('medical_calendar')
+            ->where('is_active', true)
+            ->whereYear('date', $year)
+            ->count();
+
+        // Keep a stable 2026 fallback if current year has not been populated yet.
+        $targetYear = $countForCurrentYear > 0 ? $year : 2026;
+        $eventsCount = DB::table('medical_calendar')
+            ->where('is_active', true)
+            ->whereYear('date', $targetYear)
+            ->count();
+
+        $title = "Medicinski kalendar {$targetYear} - Kalendar zdravlja {$targetYear} | wizMedik";
+        $description = "Kompletan kalendar zdravlja {$targetYear} sa svjetskim danima zdravlja, kampanjama i edukativnim datumima. Dostupno {$eventsCount}+ zdravstvenih datuma.";
+        $url = $this->buildUrl('medicinski-kalendar');
+        $schema = $this->buildCollectionSchema($title, $description, $url, $eventsCount);
 
         return [
             'title' => "<title>{$title}</title>",
