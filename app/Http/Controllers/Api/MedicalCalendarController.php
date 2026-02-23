@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\MedicalCalendar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Throwable;
 
 class MedicalCalendarController extends Controller
 {
@@ -147,6 +150,13 @@ class MedicalCalendarController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if (!$this->isMedicalCalendarSchemaReady()) {
+            return response()->json([
+                'message' => 'Medical calendar tabela nije uskladjena sa kodom. Pokrenite migracije na serveru pa pokusajte ponovo.',
+                'hint' => 'php artisan migrate --force',
+            ], 500);
+        }
+
         $file = $request->file('xml_file');
         $xmlContent = @file_get_contents($file->getRealPath());
 
@@ -156,8 +166,29 @@ class MedicalCalendarController extends Controller
             ], 422);
         }
 
-        libxml_use_internal_errors(true);
-        $xml = simplexml_load_string($xmlContent);
+        if (!function_exists('simplexml_load_string')) {
+            Log::error('Medical calendar XML import failed: SimpleXML extension is missing.');
+            return response()->json([
+                'message' => 'Server nema omogucen XML parser (SimpleXML). Kontaktirajte hosting podrsku da aktivira php-xml/SimpleXML.',
+                'code' => 'XML_PARSER_UNAVAILABLE',
+            ], 500);
+        }
+
+        try {
+            libxml_use_internal_errors(true);
+            $xml = simplexml_load_string($xmlContent, 'SimpleXMLElement', LIBXML_NOCDATA);
+        } catch (Throwable $e) {
+            Log::error('Medical calendar XML parse exception.', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'message' => 'Greska pri obradi XML fajla na serveru.',
+                'code' => 'XML_PARSE_EXCEPTION',
+            ], 500);
+        }
 
         if ($xml === false) {
             $errors = collect(libxml_get_errors())
@@ -268,11 +299,32 @@ class MedicalCalendarController extends Controller
             }
 
             DB::commit();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             DB::rollBack();
 
+            Log::error('Medical calendar XML import database error.', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            $dbMessage = strtolower($e->getMessage());
+            if (str_contains($dbMessage, 'unknown column') || str_contains($dbMessage, 'doesn\'t exist')) {
+                return response()->json([
+                    'message' => 'Baza nije uskladjena sa medical calendar modulom. Pokrenite migracije na serveru.',
+                    'hint' => 'php artisan migrate --force',
+                ], 500);
+            }
+
+            if (str_contains($dbMessage, 'data truncated for column') && str_contains($dbMessage, 'type')) {
+                return response()->json([
+                    'message' => 'Kolona "type" u bazi nema podrsku za sve tipove dogadjaja. Potrebna je migracija sheme.',
+                    'hint' => 'php artisan migrate --force',
+                ], 500);
+            }
+
             return response()->json([
-                'message' => 'Greška pri unosu XML podataka.',
+                'message' => 'Greska pri unosu XML podataka.',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -345,5 +397,32 @@ class MedicalCalendarController extends Controller
     private function xmlEscape(?string $value): string
     {
         return htmlspecialchars((string) $value, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    private function isMedicalCalendarSchemaReady(): bool
+    {
+        if (!Schema::hasTable('medical_calendar')) {
+            return false;
+        }
+
+        $requiredColumns = [
+            'date',
+            'title',
+            'description',
+            'type',
+            'end_date',
+            'category',
+            'color',
+            'is_active',
+            'sort_order',
+        ];
+
+        foreach ($requiredColumns as $column) {
+            if (!Schema::hasColumn('medical_calendar', $column)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

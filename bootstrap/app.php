@@ -70,8 +70,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
+            $errorId = \Str::uuid()->toString();
+
             // Log full error details for diagnostics.
             \Log::error('API Exception', [
+                'error_id' => $errorId,
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -84,7 +87,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // Return generic message to users for 5xx errors.
             return response()->json([
                 'message' => 'Došlo je do greške na serveru. Molimo pokušajte ponovo.',
-                'error_id' => \Str::uuid()->toString(),
+                'error_id' => $errorId,
             ], 500);
         });
     })->create();

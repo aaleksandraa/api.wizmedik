@@ -1,0 +1,954 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<medical_calendar>
+  <event>
+    <date>2026-01-01</date>
+    <title>Cervical Cancer Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti o raku grlića materice (HPV, PAPA test, skrining).</description>
+    <type>month</type>
+    <category>zdravlje-zena</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>0</sort_order>
+  </event>
+  <event>
+    <date>2026-01-04</date>
+    <title>World Braille Day</title>
+    <description>[INICIJATIVA] Svjetski dan Brailleovog pisma (pristupačnost).</description>
+    <type>day</type>
+    <category>rehabilitacija-invaliditet</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>1</sort_order>
+  </event>
+  <event>
+    <date>2026-01-25</date>
+    <title>World Leprosy Day</title>
+    <description>[ZVANIČNO] WHO (Other): Svjetski dan lepre (zadnja nedjelja januara).</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>2</sort_order>
+  </event>
+  <event>
+    <date>2026-01-30</date>
+    <title>World Neglected Tropical Diseases Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan zanemarenih tropskih bolesti (NTD).</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>3</sort_order>
+  </event>
+  <event>
+    <date>2026-02-01</date>
+    <title>Cancer Prevention Month</title>
+    <description>[INICIJATIVA] Mjesec prevencije raka (skriningi, stil života).</description>
+    <type>month</type>
+    <category>onkologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>4</sort_order>
+  </event>
+  <event>
+    <date>2026-02-01</date>
+    <title>Heart Health Month</title>
+    <description>[INICIJATIVA] Mjesec zdravlja srca (prevencija, pritisak, holesterol).</description>
+    <type>month</type>
+    <category>kardiologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>5</sort_order>
+  </event>
+  <event>
+    <date>2026-02-04</date>
+    <title>World Cancer Day</title>
+    <description>[INICIJATIVA] Svjetski dan borbe protiv raka.</description>
+    <type>day</type>
+    <category>onkologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>6</sort_order>
+  </event>
+  <event>
+    <date>2026-02-06</date>
+    <title>International Day of Zero Tolerance for FGM</title>
+    <description>[ZVANIČNO] UN: Nulta tolerancija na FGM.</description>
+    <type>day</type>
+    <category>zdravlje-zena</category>
+    <color>#ec4899</color>
+    <is_active>1</is_active>
+    <sort_order>7</sort_order>
+  </event>
+  <event>
+    <date>2026-02-09</date>
+    <title>International Epilepsy Day</title>
+    <description>[INICIJATIVA] Međunarodni dan epilepsije (drugi ponedjeljak februara).</description>
+    <type>day</type>
+    <category>neurologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>8</sort_order>
+  </event>
+  <event>
+    <date>2026-02-11</date>
+    <title>World Day of the Sick</title>
+    <description>[INICIJATIVA] Svjetski dan bolesnika (humanizacija njege).</description>
+    <type>day</type>
+    <category>opste-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>9</sort_order>
+  </event>
+  <event>
+    <date>2026-02-15</date>
+    <title>International Childhood Cancer Day</title>
+    <description>[INICIJATIVA] Međunarodni dan djece oboljele od raka.</description>
+    <type>day</type>
+    <category>pedijatrija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>10</sort_order>
+  </event>
+  <event>
+    <date>2026-02-28</date>
+    <title>Rare Disease Day (rule-based)</title>
+    <description>[INICIJATIVA] Dan rijetkih bolesti (zadnji dan februara).</description>
+    <type>day</type>
+    <category>neurologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>11</sort_order>
+  </event>
+  <event>
+    <date>2026-03-01</date>
+    <title>Colorectal Cancer Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti o raku debelog crijeva (skrining).</description>
+    <type>month</type>
+    <category>onkologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>12</sort_order>
+  </event>
+  <event>
+    <date>2026-03-01</date>
+    <title>TB Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti o tuberkulozi.</description>
+    <type>month</type>
+    <category>zarazne-bolesti</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>13</sort_order>
+  </event>
+  <event>
+    <date>2026-03-01</date>
+    <title>Zero Discrimination Day</title>
+    <description>[INICIJATIVA] Jednaka prava i pristup zdravstvenoj zaštiti.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>14</sort_order>
+  </event>
+  <event>
+    <date>2026-03-04</date>
+    <title>World Obesity Day</title>
+    <description>[INICIJATIVA] Svjetski dan gojaznosti.</description>
+    <type>day</type>
+    <category>endokrinologija-metabolizam</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>15</sort_order>
+  </event>
+  <event>
+    <date>2026-03-08</date>
+    <title>International Women’s Day</title>
+    <description>[INICIJATIVA] Međunarodni dan žena (zdravlje žena).</description>
+    <type>day</type>
+    <category>zdravlje-zena</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>16</sort_order>
+  </event>
+  <event>
+    <date>2026-03-12</date>
+    <title>World Kidney Day</title>
+    <description>[INICIJATIVA] Svjetski dan bubrega (drugi četvrtak marta).</description>
+    <type>day</type>
+    <category>nefrologija-urologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>17</sort_order>
+  </event>
+  <event>
+    <date>2026-03-20</date>
+    <title>World Oral Health Day</title>
+    <description>[INICIJATIVA] Svjetski dan oralnog zdravlja.</description>
+    <type>day</type>
+    <category>stomatologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>18</sort_order>
+  </event>
+  <event>
+    <date>2026-03-21</date>
+    <title>World Down Syndrome Day</title>
+    <description>[INICIJATIVA] Svjetski dan Down sindroma.</description>
+    <type>day</type>
+    <category>rehabilitacija-invaliditet</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>19</sort_order>
+  </event>
+  <event>
+    <date>2026-03-22</date>
+    <title>World Water Day</title>
+    <description>[ZVANIČNO] UN: Svjetski dan voda (sanitacija i zdravlje).</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>20</sort_order>
+  </event>
+  <event>
+    <date>2026-03-24</date>
+    <title>World TB Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan tuberkuloze.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>21</sort_order>
+  </event>
+  <event>
+    <date>2026-03-26</date>
+    <title>Purple Day (Epilepsy Awareness)</title>
+    <description>[INICIJATIVA] Dan svjesnosti o epilepsiji (Purple Day).</description>
+    <type>day</type>
+    <category>neurologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>22</sort_order>
+  </event>
+  <event>
+    <date>2026-04-01</date>
+    <title>Autism Acceptance Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti/prihvatanja autizma.</description>
+    <type>month</type>
+    <category>neurologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>23</sort_order>
+  </event>
+  <event>
+    <date>2026-04-07</date>
+    <title>World Health Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan zdravlja.</description>
+    <type>day</type>
+    <category>opste-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>24</sort_order>
+  </event>
+  <event>
+    <date>2026-04-11</date>
+    <title>World Parkinson’s Day</title>
+    <description>[INICIJATIVA] Svjetski dan Parkinsonove bolesti.</description>
+    <type>day</type>
+    <category>neurologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>25</sort_order>
+  </event>
+  <event>
+    <date>2026-04-14</date>
+    <title>World Chagas Disease Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan Chagasove bolesti.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>26</sort_order>
+  </event>
+  <event>
+    <date>2026-04-17</date>
+    <title>World Haemophilia Day</title>
+    <description>[INICIJATIVA] Svjetski dan hemofilije.</description>
+    <type>day</type>
+    <category>hematologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>27</sort_order>
+  </event>
+  <event>
+    <date>2026-04-23</date>
+    <title>World Laboratory Day</title>
+    <description>[INICIJATIVA] Svjetski dan laboratorijske medicine.</description>
+    <type>day</type>
+    <category>zdravstveni-radnici</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>28</sort_order>
+  </event>
+  <event>
+    <date>2026-04-24</date>
+    <title>World Immunization Week</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetska sedmica imunizacije (24–30 april).</description>
+    <type>week</type>
+    <category>prevencija</category>
+    <color>#06b6d4</color>
+    <is_active>1</is_active>
+    <sort_order>29</sort_order>
+  </event>
+  <event>
+    <date>2026-04-24</date>
+    <title>World Meningitis Day</title>
+    <description>[INICIJATIVA] Svjetski dan meningitisa.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>30</sort_order>
+  </event>
+  <event>
+    <date>2026-04-25</date>
+    <title>World Malaria Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan malarije.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>31</sort_order>
+  </event>
+  <event>
+    <date>2026-05-01</date>
+    <title>Mental Health Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec mentalnog zdravlja.</description>
+    <type>month</type>
+    <category>mentalno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>32</sort_order>
+  </event>
+  <event>
+    <date>2026-05-01</date>
+    <title>Skin Cancer Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti o raku kože i UV prevenciji.</description>
+    <type>month</type>
+    <category>dermatologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>33</sort_order>
+  </event>
+  <event>
+    <date>2026-05-05</date>
+    <title>International Day of the Midwife</title>
+    <description>[INICIJATIVA] Međunarodni dan babica.</description>
+    <type>day</type>
+    <category>zdravlje-zena</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>34</sort_order>
+  </event>
+  <event>
+    <date>2026-05-05</date>
+    <title>World Asthma Day</title>
+    <description>[INICIJATIVA] Svjetski dan astme (prvi utorak maja).</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>35</sort_order>
+  </event>
+  <event>
+    <date>2026-05-05</date>
+    <title>World Hand Hygiene Day</title>
+    <description>[ZVANIČNO] WHO (Other): Svjetski dan higijene ruku.</description>
+    <type>day</type>
+    <category>prevencija</category>
+    <color>#06b6d4</color>
+    <is_active>1</is_active>
+    <sort_order>36</sort_order>
+  </event>
+  <event>
+    <date>2026-05-12</date>
+    <title>International Nurses Day</title>
+    <description>[INICIJATIVA] Međunarodni dan medicinskih sestara.</description>
+    <type>day</type>
+    <category>zdravstveni-radnici</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>37</sort_order>
+  </event>
+  <event>
+    <date>2026-05-17</date>
+    <title>World Hypertension Day</title>
+    <description>[INICIJATIVA] Svjetski dan hipertenzije.</description>
+    <type>day</type>
+    <category>kardiologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>38</sort_order>
+  </event>
+  <event>
+    <date>2026-05-19</date>
+    <title>World IBD Day</title>
+    <description>[INICIJATIVA] Svjetski dan upalnih bolesti crijeva (IBD).</description>
+    <type>day</type>
+    <category>gastroenterologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>39</sort_order>
+  </event>
+  <event>
+    <date>2026-05-25</date>
+    <title>World Thyroid Day</title>
+    <description>[INICIJATIVA] Svjetski dan štitne žlijezde.</description>
+    <type>day</type>
+    <category>endokrinologija-metabolizam</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>40</sort_order>
+  </event>
+  <event>
+    <date>2026-05-28</date>
+    <title>International Day of Action for Women’s Health</title>
+    <description>[INICIJATIVA] Dan akcije za zdravlje žena.</description>
+    <type>day</type>
+    <category>zdravlje-zena</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>41</sort_order>
+  </event>
+  <event>
+    <date>2026-05-29</date>
+    <title>World Digestive Health Day</title>
+    <description>[INICIJATIVA] Svjetski dan digestivnog zdravlja.</description>
+    <type>day</type>
+    <category>gastroenterologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>42</sort_order>
+  </event>
+  <event>
+    <date>2026-05-31</date>
+    <title>World No Tobacco Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan bez duvana.</description>
+    <type>day</type>
+    <category>prevencija</category>
+    <color>#06b6d4</color>
+    <is_active>1</is_active>
+    <sort_order>43</sort_order>
+  </event>
+  <event>
+    <date>2026-06-01</date>
+    <title>Men’s Health Month</title>
+    <description>[INICIJATIVA] Mjesec muškog zdravlja (prevencija, skrining).</description>
+    <type>month</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>44</sort_order>
+  </event>
+  <event>
+    <date>2026-06-07</date>
+    <title>World Food Safety Day</title>
+    <description>[ZVANIČNO] WHO/FAO: Svjetski dan bezbjednosti hrane.</description>
+    <type>day</type>
+    <category>ishrana</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>45</sort_order>
+  </event>
+  <event>
+    <date>2026-06-14</date>
+    <title>World Blood Donor Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan davalaca krvi.</description>
+    <type>day</type>
+    <category>hematologija</category>
+    <color>#dc2626</color>
+    <is_active>1</is_active>
+    <sort_order>46</sort_order>
+  </event>
+  <event>
+    <date>2026-06-19</date>
+    <title>World Sickle Cell Day</title>
+    <description>[INICIJATIVA] Svjetski dan srpaste anemije.</description>
+    <type>day</type>
+    <category>hematologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>47</sort_order>
+  </event>
+  <event>
+    <date>2026-06-20</date>
+    <title>World Refugee Day</title>
+    <description>[ZVANIČNO] UN: Svjetski dan izbjeglica (zdravstvena zaštita i podrška).</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>48</sort_order>
+  </event>
+  <event>
+    <date>2026-06-21</date>
+    <title>International Yoga Day</title>
+    <description>[INICIJATIVA] Joga i mentalno/fizičko zdravlje.</description>
+    <type>day</type>
+    <category>prevencija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>49</sort_order>
+  </event>
+  <event>
+    <date>2026-06-26</date>
+    <title>International Day against Drug Abuse and Illicit Trafficking</title>
+    <description>[ZVANIČNO] UN: Dan borbe protiv zloupotrebe droga.</description>
+    <type>day</type>
+    <category>ovisnosti</category>
+    <color>#dc2626</color>
+    <is_active>1</is_active>
+    <sort_order>50</sort_order>
+  </event>
+  <event>
+    <date>2026-07-11</date>
+    <title>World Population Day</title>
+    <description>[INICIJATIVA] Svjetski dan populacije.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>51</sort_order>
+  </event>
+  <event>
+    <date>2026-07-24</date>
+    <title>International Self-Care Day</title>
+    <description>[INICIJATIVA] Međunarodni dan brige o sebi (24/7).</description>
+    <type>day</type>
+    <category>prevencija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>52</sort_order>
+  </event>
+  <event>
+    <date>2026-07-25</date>
+    <title>World Drowning Prevention Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan prevencije utapanja.</description>
+    <type>day</type>
+    <category>prevencija</category>
+    <color>#06b6d4</color>
+    <is_active>1</is_active>
+    <sort_order>53</sort_order>
+  </event>
+  <event>
+    <date>2026-07-28</date>
+    <title>World Hepatitis Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan hepatitisa.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>54</sort_order>
+  </event>
+  <event>
+    <date>2026-08-01</date>
+    <title>World Breastfeeding Week</title>
+    <description>[ZVANIČNO] WHO (Other): Svjetska sedmica dojenja (01–07 avgust).</description>
+    <type>week</type>
+    <category>zdravlje-zena</category>
+    <color>#ec4899</color>
+    <is_active>1</is_active>
+    <sort_order>55</sort_order>
+  </event>
+  <event>
+    <date>2026-08-20</date>
+    <title>World Mosquito Day</title>
+    <description>[INICIJATIVA] Svjetski dan komarca (bolesti koje prenose komarci).</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>56</sort_order>
+  </event>
+  <event>
+    <date>2026-09-01</date>
+    <title>Childhood Cancer Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti o dječijem raku.</description>
+    <type>month</type>
+    <category>pedijatrija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>57</sort_order>
+  </event>
+  <event>
+    <date>2026-09-08</date>
+    <title>World Physiotherapy Day</title>
+    <description>[INICIJATIVA] Svjetski dan fizioterapije.</description>
+    <type>day</type>
+    <category>zdravstveni-radnici</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>58</sort_order>
+  </event>
+  <event>
+    <date>2026-09-10</date>
+    <title>World Suicide Prevention Day</title>
+    <description>[ZVANIČNO] WHO (Other): Svjetski dan prevencije samoubistva.</description>
+    <type>day</type>
+    <category>mentalno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>59</sort_order>
+  </event>
+  <event>
+    <date>2026-09-13</date>
+    <title>World Sepsis Day</title>
+    <description>[INICIJATIVA] Svjetski dan sepse.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>60</sort_order>
+  </event>
+  <event>
+    <date>2026-09-17</date>
+    <title>World Patient Safety Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan bezbjednosti pacijenata.</description>
+    <type>day</type>
+    <category>sigurnost-pacijenata</category>
+    <color>#06b6d4</color>
+    <is_active>1</is_active>
+    <sort_order>61</sort_order>
+  </event>
+  <event>
+    <date>2026-09-21</date>
+    <title>World Alzheimer’s Day</title>
+    <description>[INICIJATIVA] Svjetski dan Alchajmerove bolesti.</description>
+    <type>day</type>
+    <category>neurologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>62</sort_order>
+  </event>
+  <event>
+    <date>2026-09-25</date>
+    <title>World Pharmacists Day</title>
+    <description>[INICIJATIVA] Svjetski dan farmaceuta.</description>
+    <type>day</type>
+    <category>zdravstveni-radnici</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>63</sort_order>
+  </event>
+  <event>
+    <date>2026-09-26</date>
+    <title>World Contraception Day</title>
+    <description>[INICIJATIVA] Svjetski dan kontracepcije.</description>
+    <type>day</type>
+    <category>reproduktivno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>64</sort_order>
+  </event>
+  <event>
+    <date>2026-09-28</date>
+    <title>World Rabies Day</title>
+    <description>[ZVANIČNO] WHO (Other): Svjetski dan bjesnoće.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>65</sort_order>
+  </event>
+  <event>
+    <date>2026-09-29</date>
+    <title>World Heart Day</title>
+    <description>[INICIJATIVA] Svjetski dan srca.</description>
+    <type>day</type>
+    <category>kardiologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>66</sort_order>
+  </event>
+  <event>
+    <date>2026-10-01</date>
+    <title>Breast Cancer Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti o raku dojke (skrining).</description>
+    <type>month</type>
+    <category>onkologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>67</sort_order>
+  </event>
+  <event>
+    <date>2026-10-01</date>
+    <title>International Day of Older Persons</title>
+    <description>[ZVANIČNO] UN: Međunarodni dan starijih osoba.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>68</sort_order>
+  </event>
+  <event>
+    <date>2026-10-08</date>
+    <title>World Sight Day</title>
+    <description>[INICIJATIVA] Svjetski dan vida (drugi četvrtak oktobra).</description>
+    <type>day</type>
+    <category>oftalmologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>69</sort_order>
+  </event>
+  <event>
+    <date>2026-10-10</date>
+    <title>World Mental Health Day</title>
+    <description>[ZVANIČNO] WHO (Other): Svjetski dan mentalnog zdravlja.</description>
+    <type>day</type>
+    <category>mentalno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>70</sort_order>
+  </event>
+  <event>
+    <date>2026-10-12</date>
+    <title>World Arthritis Day</title>
+    <description>[INICIJATIVA] Svjetski dan artritisa.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>71</sort_order>
+  </event>
+  <event>
+    <date>2026-10-13</date>
+    <title>World Thrombosis Day</title>
+    <description>[INICIJATIVA] Svjetski dan tromboze.</description>
+    <type>day</type>
+    <category>hematologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>72</sort_order>
+  </event>
+  <event>
+    <date>2026-10-15</date>
+    <title>Global Handwashing Day</title>
+    <description>[INICIJATIVA] Globalni dan pranja ruku.</description>
+    <type>day</type>
+    <category>prevencija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>73</sort_order>
+  </event>
+  <event>
+    <date>2026-10-16</date>
+    <title>World Anaesthesia Day</title>
+    <description>[INICIJATIVA] Svjetski dan anestezije.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>74</sort_order>
+  </event>
+  <event>
+    <date>2026-10-16</date>
+    <title>World Food Day</title>
+    <description>[INICIJATIVA] Svjetski dan hrane.</description>
+    <type>day</type>
+    <category>ishrana</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>75</sort_order>
+  </event>
+  <event>
+    <date>2026-10-20</date>
+    <title>International Lead Poisoning Prevention Week of Action</title>
+    <description>[ZVANIČNO] WHO (Other): Sedmica prevencije trovanja olovom (20–26 oktobar).</description>
+    <type>week</type>
+    <category>javno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>76</sort_order>
+  </event>
+  <event>
+    <date>2026-10-20</date>
+    <title>World Osteoporosis Day</title>
+    <description>[INICIJATIVA] Svjetski dan osteoporoze.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>77</sort_order>
+  </event>
+  <event>
+    <date>2026-10-24</date>
+    <title>World Polio Day</title>
+    <description>[INICIJATIVA] Svjetski dan polija.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>78</sort_order>
+  </event>
+  <event>
+    <date>2026-10-29</date>
+    <title>World Stroke Day</title>
+    <description>[INICIJATIVA] Svjetski dan moždanog udara.</description>
+    <type>day</type>
+    <category>neurologija</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>79</sort_order>
+  </event>
+  <event>
+    <date>2026-11-01</date>
+    <title>Diabetes Awareness Month</title>
+    <description>[INICIJATIVA] Mjesec svjesnosti o dijabetesu.</description>
+    <type>month</type>
+    <category>endokrinologija-metabolizam</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>80</sort_order>
+  </event>
+  <event>
+    <date>2026-11-01</date>
+    <title>Movember</title>
+    <description>[INICIJATIVA] Movember – muško zdravlje (prostata, testisi, mentalno zdravlje).</description>
+    <type>month</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>81</sort_order>
+  </event>
+  <event>
+    <date>2026-11-08</date>
+    <title>World Radiography Day / International Day of Radiology</title>
+    <description>[INICIJATIVA] Dan radiologije/radiografije.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>82</sort_order>
+  </event>
+  <event>
+    <date>2026-11-12</date>
+    <title>World Pneumonia Day</title>
+    <description>[INICIJATIVA] Svjetski dan pneumonije.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>83</sort_order>
+  </event>
+  <event>
+    <date>2026-11-14</date>
+    <title>World Diabetes Day</title>
+    <description>[ZVANIČNO] WHO (Other): Svjetski dan dijabetesa.</description>
+    <type>day</type>
+    <category>endokrinologija-metabolizam</category>
+    <color>#0891b2</color>
+    <is_active>1</is_active>
+    <sort_order>84</sort_order>
+  </event>
+  <event>
+    <date>2026-11-15</date>
+    <title>World Prematurity Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan prevremeno rođenih beba.</description>
+    <type>day</type>
+    <category>pedijatrija</category>
+    <color>#fbbf24</color>
+    <is_active>1</is_active>
+    <sort_order>85</sort_order>
+  </event>
+  <event>
+    <date>2026-11-17</date>
+    <title>World Cervical Cancer Elimination Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan eliminacije raka grlića materice (HPV, PAPA, skrining).</description>
+    <type>day</type>
+    <category>zdravlje-zena</category>
+    <color>#ec4899</color>
+    <is_active>1</is_active>
+    <sort_order>86</sort_order>
+  </event>
+  <event>
+    <date>2026-11-18</date>
+    <title>European Antibiotic Awareness Day (EAAD)</title>
+    <description>[ZVANIČNO] ECDC: Evropski dan svjesnosti o antibioticima (18. novembar).</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>87</sort_order>
+  </event>
+  <event>
+    <date>2026-11-18</date>
+    <title>World AMR Awareness Week</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetska sedmica antimikrobne rezistencije (18–24 novembar).</description>
+    <type>week</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>88</sort_order>
+  </event>
+  <event>
+    <date>2026-11-18</date>
+    <title>World COPD Day</title>
+    <description>[INICIJATIVA] Svjetski dan HOBP/COPD (treća srijeda novembra).</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#94a3b8</color>
+    <is_active>1</is_active>
+    <sort_order>89</sort_order>
+  </event>
+  <event>
+    <date>2026-11-19</date>
+    <title>World Toilet Day</title>
+    <description>[ZVANIČNO] UN: Svjetski dan toaleta (sanitacija).</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>90</sort_order>
+  </event>
+  <event>
+    <date>2026-11-25</date>
+    <end_date>2026-12-10</end_date>
+    <title>16 Days of Activism against Gender-Based Violence</title>
+    <description>[ZVANIČNO] UN/WHO: 16 dana aktivizma protiv rodno zasnovanog nasilja (25 nov – 10 dec).</description>
+    <type>campaign</type>
+    <category>zdravlje-zena</category>
+    <color>#ec4899</color>
+    <is_active>1</is_active>
+    <sort_order>91</sort_order>
+  </event>
+  <event>
+    <date>2026-12-01</date>
+    <title>World AIDS Day</title>
+    <description>[ZVANIČNO] WHO kampanja: Svjetski dan AIDS-a.</description>
+    <type>day</type>
+    <category>zarazne-bolesti</category>
+    <color>#f59e0b</color>
+    <is_active>1</is_active>
+    <sort_order>92</sort_order>
+  </event>
+  <event>
+    <date>2026-12-03</date>
+    <title>International Day of Persons with Disabilities</title>
+    <description>[ZVANIČNO] UN: Međunarodni dan osoba sa invaliditetom.</description>
+    <type>day</type>
+    <category>rehabilitacija-invaliditet</category>
+    <color>#0891b2</color>
+    <is_active>1</is_active>
+    <sort_order>93</sort_order>
+  </event>
+  <event>
+    <date>2026-12-12</date>
+    <title>Universal Health Coverage Day</title>
+    <description>[ZVANIČNO] Global: Dan univerzalnog zdravstvenog pokrića.</description>
+    <type>day</type>
+    <category>javno-zdravlje</category>
+    <color>#10b981</color>
+    <is_active>1</is_active>
+    <sort_order>94</sort_order>
+  </event>
+</medical_calendar>
