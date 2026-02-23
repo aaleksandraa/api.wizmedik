@@ -17,6 +17,7 @@ Route::get('/sitemap-spas.xml', [SitemapController::class, 'spas']);
 Route::get('/sitemap-care-homes.xml', [SitemapController::class, 'careHomes']);
 Route::get('/sitemap-doctor-city-specialties.xml', [SitemapController::class, 'doctorCitySpecialties']);
 Route::get('/sitemap-blog.xml', [SitemapController::class, 'blog']);
+Route::get('/sitemap-pitanja.xml', [SitemapController::class, 'questions']);
 
 // Serve storage files
 Route::get('/storage/{folder}/{filename}', function ($folder, $filename) {

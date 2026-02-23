@@ -67,6 +67,23 @@ class SeoController extends Controller
             return $this->getBlogListingMeta();
         }
 
+        if ($path === 'pitanja') {
+            return $this->getQuestionsListingMeta();
+        }
+        if ($path === 'doktori/lista') {
+            return $this->getNoindexMeta(
+                'Kompaktna lista doktora | wizMedik',
+                'Pomocna stranica za pregled doktora.',
+                'doktori/lista'
+            );
+        }
+        if ($path === 'banje/indikacije-terapije') {
+            return $this->getSpaGuideMeta();
+        }
+        if ($path === 'domovi-njega/vodic') {
+            return $this->getCareHomesGuideMeta();
+        }
+
         // Listing routes (critical for SSR SEO fallback)
         if ($path === 'doktori') {
             return $this->getDoctorsListingMeta();
@@ -138,6 +155,12 @@ class SeoController extends Controller
         }
         if (preg_match('/^blog\/([^\/]+)$/', $path, $matches)) {
             return $this->getBlogMeta($matches[1]);
+        }
+        if (preg_match('/^pitanja\/([^\/]+)$/', $path, $matches)) {
+            return $this->getQuestionMeta($matches[1]);
+        }
+        if ($path === 'postavi-pitanje') {
+            return $this->getAskQuestionMeta();
         }
 
         return $this->getDefaultMeta();
@@ -337,11 +360,54 @@ class SeoController extends Controller
         ];
     }
 
+    private function getQuestionsListingMeta(): array
+    {
+        $count = DB::table('pitanja')
+            ->where('je_javno', true)
+            ->count();
+
+        $title = 'Medicinska pitanja i odgovori | wizMedik';
+        $description = "Procitajte {$count}+ javnih medicinskih pitanja i odgovora verifikovanih doktora na wizMedik platformi.";
+        $url = $this->buildUrl('pitanja');
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getSpaGuideMeta(): array
+    {
+        $title = 'Indikacije i terapije u banjama | wizMedik';
+        $description = 'Vodic kroz indikacije i terapije dostupne u banjama u Bosni i Hercegovini.';
+        $url = $this->buildUrl('banje/indikacije-terapije');
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'article'),
+        ];
+    }
+
+    private function getCareHomesGuideMeta(): array
+    {
+        $title = 'Vodic za domove njege | wizMedik';
+        $description = 'Detaljan vodic kroz tipove domova njege, nivoe njege i usluge.';
+        $url = $this->buildUrl('domovi-njega/vodic');
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'article'),
+        ];
+    }
+
     private function getDoctorMeta(string $slug): array
     {
         $doctor = DB::table('doktori')
             ->where('slug', $slug)
             ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->first();
 
         if (!$doctor) {
@@ -364,6 +430,8 @@ class SeoController extends Controller
         $clinic = DB::table('klinike')
             ->where('slug', $slug)
             ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->first();
 
         if (!$clinic) {
@@ -397,6 +465,8 @@ class SeoController extends Controller
         $doctorCount = DB::table('doktori')
             ->whereRaw('LOWER(specijalnost) = ?', [mb_strtolower($specialty->naziv)])
             ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->count();
 
         $title = "{$specialty->naziv} - Pronadite doktora | wizMedik";
@@ -472,6 +542,8 @@ class SeoController extends Controller
         $lab = DB::table('laboratorije')
             ->where('slug', $slug)
             ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->first();
 
         if (!$lab) {
@@ -497,6 +569,8 @@ class SeoController extends Controller
         $spa = DB::table('banje')
             ->where('slug', $slug)
             ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->first();
 
         if (!$spa) {
@@ -522,6 +596,8 @@ class SeoController extends Controller
         $home = DB::table('domovi_njega')
             ->where('slug', $slug)
             ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->first();
 
         if (!$home) {
@@ -569,6 +645,102 @@ class SeoController extends Controller
         ];
     }
 
+    private function getQuestionMeta(string $slug): array
+    {
+        $question = DB::table('pitanja')
+            ->leftJoin('specijalnosti', 'specijalnosti.id', '=', 'pitanja.specijalnost_id')
+            ->select(
+                'pitanja.id',
+                'pitanja.slug',
+                'pitanja.naslov',
+                'pitanja.sadrzaj',
+                'pitanja.updated_at',
+                'pitanja.created_at',
+                'pitanja.je_javno',
+                'specijalnosti.naziv as specijalnost_naziv'
+            )
+            ->where('pitanja.slug', $slug)
+            ->where('pitanja.je_javno', true)
+            ->first();
+
+        if (!$question) {
+            return $this->getNoindexMeta(
+                'Pitanje nije pronadjeno | wizMedik',
+                'Trazeno pitanje nije dostupno.',
+                "pitanja/{$slug}"
+            );
+        }
+
+        $url = $this->buildUrl("pitanja/{$slug}");
+        $title = "{$question->naslov} | Medicinska pitanja | wizMedik";
+        $description = $this->cleanDescription(
+            $question->sadrzaj ?? null,
+            'Javno medicinsko pitanje i odgovori doktora na wizMedik platformi.'
+        );
+
+        $answers = DB::table('odgovori_na_pitanja')
+            ->select('sadrzaj', 'je_prihvacen', 'updated_at', 'created_at')
+            ->where('pitanje_id', $question->id)
+            ->orderByDesc('je_prihvacen')
+            ->orderByDesc('broj_lajkova')
+            ->orderBy('created_at')
+            ->limit(5)
+            ->get();
+
+        $acceptedAnswer = $answers->firstWhere('je_prihvacen', true);
+        $suggestedAnswers = $answers->map(function ($answer) {
+            return [
+                '@type' => 'Answer',
+                'text' => trim(strip_tags((string) $answer->sadrzaj)),
+                'dateCreated' => $this->toIsoDate($answer->created_at),
+                'dateModified' => $this->toIsoDate($answer->updated_at ?? $answer->created_at),
+            ];
+        })->values()->all();
+
+        $mainEntity = [
+            '@type' => 'Question',
+            'name' => $question->naslov,
+            'text' => trim(strip_tags((string) $question->sadrzaj)),
+            'dateCreated' => $this->toIsoDate($question->created_at),
+            'dateModified' => $this->toIsoDate($question->updated_at ?? $question->created_at),
+            'url' => $url,
+            'about' => $question->specijalnost_naziv,
+            'suggestedAnswer' => $suggestedAnswers,
+        ];
+
+        if ($acceptedAnswer) {
+            $mainEntity['acceptedAnswer'] = [
+                '@type' => 'Answer',
+                'text' => trim(strip_tags((string) $acceptedAnswer->sadrzaj)),
+                'dateCreated' => $this->toIsoDate($acceptedAnswer->created_at),
+                'dateModified' => $this->toIsoDate($acceptedAnswer->updated_at ?? $acceptedAnswer->created_at),
+            ];
+        }
+
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'QAPage',
+            'mainEntity' => $mainEntity,
+        ];
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'article', $schema),
+        ];
+    }
+
+    private function getAskQuestionMeta(): array
+    {
+        $title = 'Postavi medicinsko pitanje | wizMedik';
+        $description = 'Postavite medicinsko pitanje i dobijte odgovor verifikovanih doktora.';
+        $url = $this->buildUrl('postavi-pitanje');
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', null, 'noindex, follow'),
+        ];
+    }
+
     private function getDefaultMeta(): array
     {
         $title = 'wizMedik - Pronadite doktore, klinike, laboratorije, banje i domove njege';
@@ -582,18 +754,30 @@ class SeoController extends Controller
         ];
     }
 
+    private function getNoindexMeta(string $title, string $description, string $path): array
+    {
+        $url = $this->buildUrl($path);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', null, 'noindex, nofollow'),
+        ];
+    }
+
     private function buildMetaTags(
         string $title,
         string $description,
         string $image,
         string $url,
         string $type = 'website',
-        ?array $structuredData = null
+        ?array $structuredData = null,
+        string $robots = 'index, follow'
     ): string {
         $escapedTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $escapedDescription = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
         $escapedImage = htmlspecialchars($image, ENT_QUOTES, 'UTF-8');
         $escapedUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        $escapedRobots = htmlspecialchars($robots, ENT_QUOTES, 'UTF-8');
 
         $jsonLd = '';
         if ($structuredData) {
@@ -606,7 +790,7 @@ class SeoController extends Controller
         return <<<HTML
     <!-- SEO Meta Tags -->
     <meta name="description" content="{$escapedDescription}">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="{$escapedRobots}">
     <link rel="canonical" href="{$escapedUrl}">
 
     <!-- Open Graph / Facebook -->
@@ -684,6 +868,19 @@ HTML;
         }
 
         return mb_substr($clean, 0, 160);
+    }
+
+    private function toIsoDate($value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('c');
+        }
+
+        if (empty($value)) {
+            return now()->format('c');
+        }
+
+        return date('c', strtotime((string) $value));
     }
 
     private function decodeSegment(string $value): string

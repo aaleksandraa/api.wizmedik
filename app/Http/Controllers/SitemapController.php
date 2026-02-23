@@ -140,6 +140,7 @@ class SitemapController extends Controller
             'sitemap-care-homes.xml',
             'sitemap-doctor-city-specialties.xml',
             'sitemap-blog.xml',
+            'sitemap-pitanja.xml',
         ];
 
         foreach ($sitemaps as $sitemap) {
@@ -374,6 +375,7 @@ class SitemapController extends Controller
         $laboratories = DB::table('laboratorije')
             ->whereNull('deleted_at')
             ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->select('slug', 'updated_at')
             ->get();
 
@@ -402,6 +404,7 @@ class SitemapController extends Controller
         $spas = DB::table('banje')
             ->whereNull('deleted_at')
             ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->select('slug', 'updated_at')
             ->get();
 
@@ -430,6 +433,7 @@ class SitemapController extends Controller
         $homes = DB::table('domovi_njega')
             ->whereNull('deleted_at')
             ->where('aktivan', true)
+            ->where('verifikovan', true)
             ->select('slug', 'updated_at')
             ->get();
 
@@ -538,6 +542,34 @@ class SitemapController extends Controller
             }
 
             $xml .= '</url>';
+        }
+
+        $xml .= '</urlset>';
+
+        return response($xml, 200)->header('Content-Type', 'application/xml');
+    }
+
+    public function questions()
+    {
+        $baseUrl = $this->getBaseUrl();
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+        $questions = DB::table('pitanja')
+            ->where('je_javno', true)
+            ->select('slug', 'updated_at', 'created_at', 'je_odgovoreno')
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        foreach ($questions as $question) {
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/pitanja/' . $question->slug,
+                $question->updated_at ?? $question->created_at,
+                'weekly',
+                $question->je_odgovoreno ? '0.7' : '0.6'
+            );
         }
 
         $xml .= '</urlset>';

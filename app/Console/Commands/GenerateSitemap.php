@@ -63,6 +63,7 @@ class GenerateSitemap extends Command
             'sitemap-specialties.xml' => 'specialties',
             'sitemap-cities.xml' => 'cities',
             'sitemap-blog.xml' => 'blog',
+            'sitemap-pitanja.xml' => 'questions',
         ];
 
         $successCount = 0;
