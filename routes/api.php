@@ -332,6 +332,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/blog/posts/{id}', [\App\Http\Controllers\Api\BlogController::class, 'updateDoctor']);
     Route::delete('/blog/posts/{id}', [\App\Http\Controllers\Api\BlogController::class, 'destroyDoctor']);
     Route::get('/blog/can-write', [\App\Http\Controllers\Api\BlogController::class, 'canDoctorsWrite']);
+    // Backward-compatible alias used by some frontend versions
+    Route::get('/blog/can-doctors-write', [\App\Http\Controllers\Api\BlogController::class, 'canDoctorsWrite']);
 
     // Laboratory Dashboard (laboratory manager only)
     Route::middleware('role:laboratory')->prefix('laboratorija')->group(function () {
