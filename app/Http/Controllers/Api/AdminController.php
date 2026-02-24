@@ -226,15 +226,27 @@ class AdminController extends Controller
     {
         $validated = $request->validate([
             'naziv' => 'required|string',
+            'u_gradu' => 'nullable|string',
+            'slug' => 'nullable|string',
             'opis' => 'required|string',
             'detaljni_opis' => 'required|string',
             'populacija' => 'nullable|string',
-            'hitna_pomoc' => 'string',
+            'broj_bolnica' => 'nullable|integer|min:0',
+            'hitna_pomoc' => 'nullable|string',
             'kljucne_tacke' => 'nullable|array',
+            'kljucne_tacke.*' => 'nullable',
             'aktivan' => 'boolean',
         ]);
 
+        if (array_key_exists('kljucne_tacke', $validated)) {
+            $validated['kljucne_tacke'] = $this->normalizeCityKeyPoints($validated['kljucne_tacke'] ?? []);
+        }
+
         $grad = Grad::create($validated);
+
+        // Invalidate city cache after create
+        $this->invalidateCityCache($grad->slug);
+
         return response()->json(['message' => 'City created', 'grad' => $grad], 201);
     }
 
@@ -247,7 +259,25 @@ class AdminController extends Controller
             'request_data' => $request->all(),
         ]);
 
-        $grad->update($request->all());
+        $validated = $request->validate([
+            'naziv' => 'sometimes|string',
+            'u_gradu' => 'nullable|string',
+            'slug' => 'nullable|string',
+            'opis' => 'sometimes|string',
+            'detaljni_opis' => 'sometimes|string',
+            'populacija' => 'nullable|string',
+            'broj_bolnica' => 'nullable|integer|min:0',
+            'hitna_pomoc' => 'nullable|string',
+            'kljucne_tacke' => 'nullable|array',
+            'kljucne_tacke.*' => 'nullable',
+            'aktivan' => 'sometimes|boolean',
+        ]);
+
+        if ($request->has('kljucne_tacke')) {
+            $validated['kljucne_tacke'] = $this->normalizeCityKeyPoints($validated['kljucne_tacke'] ?? []);
+        }
+
+        $grad->update($validated);
 
         // Invalidate city cache
         $this->invalidateCityCache($grad->slug);
@@ -282,6 +312,45 @@ class AdminController extends Controller
                 \Illuminate\Support\Facades\Cache::forget("city_{$slug}_v2");
             }
         }
+    }
+
+    /**
+     * Normalize city key points to a consistent shape:
+     * [
+     *   ['naziv' => '...', 'url' => '...']
+     * ]
+     */
+    private function normalizeCityKeyPoints(array $keyPoints): array
+    {
+        return collect($keyPoints)
+            ->map(function ($item) {
+                if (is_string($item)) {
+                    $naziv = trim($item);
+                    return $naziv !== '' ? ['naziv' => $naziv] : null;
+                }
+
+                if (!is_array($item)) {
+                    return null;
+                }
+
+                $naziv = trim((string) ($item['naziv'] ?? $item['name'] ?? ''));
+                $url = trim((string) ($item['url'] ?? $item['link'] ?? ''));
+
+                if ($naziv === '') {
+                    return null;
+                }
+
+                return array_filter(
+                    [
+                        'naziv' => $naziv,
+                        'url' => $url !== '' ? $url : null,
+                    ],
+                    fn($value) => $value !== null
+                );
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     // Specialties Management
