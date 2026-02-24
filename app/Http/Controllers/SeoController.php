@@ -446,7 +446,7 @@ class SeoController extends Controller
         }
 
         $title = "Dr. {$doctor->ime} {$doctor->prezime} - {$doctor->specijalnost} | wizMedik";
-        $description = "Zakazite pregled kod Dr. {$doctor->ime} {$doctor->prezime}, {$doctor->specijalnost} u {$doctor->grad}. Online zakazivanje termina.";
+        $description = "Zakažite pregled kod Dr. {$doctor->ime} {$doctor->prezime}, {$doctor->specijalnost} u {$doctor->grad}. Online zakazivanje termina.";
         $image = $this->absoluteImage($doctor->slika_profila ?? null);
         $url = $this->buildUrl("doktor/{$slug}");
 
@@ -472,7 +472,7 @@ class SeoController extends Controller
         $title = "{$clinic->naziv} - Klinika u {$clinic->grad} | wizMedik";
         $description = $this->cleanDescription(
             $clinic->opis ?? null,
-            "Zakazite pregled u {$clinic->naziv}, {$clinic->grad}. Online zakazivanje termina."
+            "Zakažite pregled u {$clinic->naziv}, {$clinic->grad}. Online zakazivanje termina."
         );
         $image = $this->defaultImage();
         $url = $this->buildUrl("klinika/{$slug}");
@@ -558,7 +558,7 @@ class SeoController extends Controller
             ->count();
 
         $title = "Zdravstvene usluge u {$city->naziv} | wizMedik";
-        $description = "U {$city->naziv} pronadjite {$doctorCount}+ doktora, {$clinicCount}+ klinika, {$labCount}+ laboratorija, {$spaCount}+ banja i {$careHomeCount}+ domova za njegu.";
+        $description = "U {$city->naziv} pronađite {$doctorCount}+ doktora, {$clinicCount}+ klinika, {$labCount}+ laboratorija, {$spaCount}+ banja i {$careHomeCount}+ domova za njegu.";
         $image = $this->defaultImage();
         $url = $this->buildUrl("grad/{$slug}");
 
