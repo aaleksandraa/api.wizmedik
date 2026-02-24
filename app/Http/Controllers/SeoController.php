@@ -685,6 +685,7 @@ class SeoController extends Controller
                 'pitanja.slug',
                 'pitanja.naslov',
                 'pitanja.sadrzaj',
+                'pitanja.ime_korisnika',
                 'pitanja.updated_at',
                 'pitanja.created_at',
                 'pitanja.je_javno',
@@ -710,21 +711,44 @@ class SeoController extends Controller
         );
 
         $answers = DB::table('odgovori_na_pitanja')
-            ->select('sadrzaj', 'je_prihvacen', 'updated_at', 'created_at')
+            ->leftJoin('doktori', 'doktori.id', '=', 'odgovori_na_pitanja.doktor_id')
+            ->leftJoin('users', 'users.id', '=', 'doktori.user_id')
+            ->select(
+                'odgovori_na_pitanja.id',
+                'odgovori_na_pitanja.sadrzaj',
+                'odgovori_na_pitanja.je_prihvacen',
+                'odgovori_na_pitanja.updated_at',
+                'odgovori_na_pitanja.created_at',
+                'doktori.slug as doktor_slug',
+                'users.ime as doktor_ime',
+                'users.prezime as doktor_prezime'
+            )
             ->where('pitanje_id', $question->id)
-            ->orderByDesc('je_prihvacen')
-            ->orderByDesc('broj_lajkova')
-            ->orderBy('created_at')
+            ->orderByDesc('odgovori_na_pitanja.je_prihvacen')
+            ->orderByDesc('odgovori_na_pitanja.broj_lajkova')
+            ->orderBy('odgovori_na_pitanja.created_at')
             ->limit(5)
             ->get();
 
         $acceptedAnswer = $answers->firstWhere('je_prihvacen', true);
-        $suggestedAnswers = $answers->map(function ($answer) {
+        $suggestedAnswers = $answers->map(function ($answer) use ($question) {
+            $answerUrl = $this->buildUrl("pitanja/{$question->slug}#odgovor-{$answer->id}");
+            $doctorName = trim((string) ($answer->doktor_ime ?? '') . ' ' . (string) ($answer->doktor_prezime ?? ''));
+            $doctorUrl = $answer->doktor_slug
+                ? $this->buildUrl("doktor/{$answer->doktor_slug}")
+                : $this->buildUrl('doktori');
+
             return [
                 '@type' => 'Answer',
                 'text' => trim(strip_tags((string) $answer->sadrzaj)),
                 'dateCreated' => $this->toIsoDate($answer->created_at),
                 'dateModified' => $this->toIsoDate($answer->updated_at ?? $answer->created_at),
+                'url' => $answerUrl,
+                'author' => [
+                    '@type' => 'Person',
+                    'name' => $doctorName !== '' ? $doctorName : 'Doktor wizMedik',
+                    'url' => $doctorUrl,
+                ],
             ];
         })->values()->all();
 
@@ -736,15 +760,31 @@ class SeoController extends Controller
             'dateModified' => $this->toIsoDate($question->updated_at ?? $question->created_at),
             'url' => $url,
             'about' => $question->specijalnost_naziv,
+            'author' => [
+                '@type' => 'Person',
+                'name' => trim((string) $question->ime_korisnika) !== '' ? trim((string) $question->ime_korisnika) : 'Anonimni korisnik',
+            ],
             'suggestedAnswer' => $suggestedAnswers,
         ];
 
         if ($acceptedAnswer) {
+            $acceptedDoctorName = trim((string) ($acceptedAnswer->doktor_ime ?? '') . ' ' . (string) ($acceptedAnswer->doktor_prezime ?? ''));
+            $acceptedDoctorUrl = $acceptedAnswer->doktor_slug
+                ? $this->buildUrl("doktor/{$acceptedAnswer->doktor_slug}")
+                : $this->buildUrl('doktori');
+            $acceptedAnswerUrl = $this->buildUrl("pitanja/{$question->slug}#odgovor-{$acceptedAnswer->id}");
+
             $mainEntity['acceptedAnswer'] = [
                 '@type' => 'Answer',
                 'text' => trim(strip_tags((string) $acceptedAnswer->sadrzaj)),
                 'dateCreated' => $this->toIsoDate($acceptedAnswer->created_at),
                 'dateModified' => $this->toIsoDate($acceptedAnswer->updated_at ?? $acceptedAnswer->created_at),
+                'url' => $acceptedAnswerUrl,
+                'author' => [
+                    '@type' => 'Person',
+                    'name' => $acceptedDoctorName !== '' ? $acceptedDoctorName : 'Doktor wizMedik',
+                    'url' => $acceptedDoctorUrl,
+                ],
             ];
         }
 
