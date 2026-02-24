@@ -58,6 +58,12 @@ return [
 
     'frontend_url' => env('APP_FRONTEND_URL', 'http://localhost:8080'),
 
+    'sitemap_output_path' => env('SITEMAP_OUTPUT_PATH', base_path('../frontend/dist')),
+
+    'sitemap_schedule_time' => env('SITEMAP_SCHEDULE_TIME', '02:10'),
+
+    'sitemap_schedule_timezone' => env('SITEMAP_SCHEDULE_TIMEZONE', 'Europe/Sarajevo'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
