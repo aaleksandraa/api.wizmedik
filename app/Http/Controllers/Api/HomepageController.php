@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BlogPost;
+use App\Models\BlogSettings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -175,9 +177,71 @@ class HomepageController extends Controller
                 $response['pitanja'] = [];
             }
 
-            // Blog posts - skip for now to avoid model issues
-            $response['blog_posts'] = [];
-            Log::info('Blog posts skipped for safety');
+            // Try to get blog posts for homepage (latest/featured from admin settings)
+            try {
+                $blogSettings = BlogSettings::get();
+                $homepageDisplay = $blogSettings->homepage_display ?? 'latest';
+                $homepageCount = max(1, min((int) ($blogSettings->homepage_count ?? 3), 12));
+
+                $query = BlogPost::with([
+                    'doktor:id,ime,prezime,slug',
+                    'categories:id,naziv,slug',
+                ])->published();
+
+                $featuredIds = array_values(array_filter(
+                    (array) ($blogSettings->featured_post_ids ?? []),
+                    fn ($id) => is_numeric($id)
+                ));
+
+                if ($homepageDisplay === 'featured' && !empty($featuredIds)) {
+                    $posts = $query
+                        ->whereIn('id', $featuredIds)
+                        ->orderBy('published_at', 'desc')
+                        ->get();
+
+                    // Keep manual featured order from admin settings
+                    $positionMap = array_flip(array_map('intval', $featuredIds));
+                    $posts = $posts
+                        ->sortBy(fn ($post) => $positionMap[$post->id] ?? PHP_INT_MAX)
+                        ->values()
+                        ->take($homepageCount);
+                } else {
+                    $posts = $query
+                        ->orderBy('published_at', 'desc')
+                        ->limit($homepageCount)
+                        ->get();
+                }
+
+                $response['blog_posts'] = $posts->map(function ($post) {
+                    $firstCategory = $post->categories->first();
+
+                    return [
+                        'id' => $post->id,
+                        'naslov' => $post->naslov,
+                        'slug' => $post->slug,
+                        'kratak_opis' => $post->excerpt,
+                        'sadrzaj' => $post->sadrzaj,
+                        'slika_url' => $post->thumbnail_url,
+                        'doktor' => $post->doktor ? [
+                            'id' => $post->doktor->id,
+                            'ime' => $post->doktor->ime,
+                            'prezime' => $post->doktor->prezime,
+                            'slug' => $post->doktor->slug,
+                        ] : null,
+                        'kategorija' => $firstCategory ? [
+                            'id' => $firstCategory->id,
+                            'naziv' => $firstCategory->naziv,
+                            'slug' => $firstCategory->slug,
+                        ] : null,
+                        'created_at' => ($post->published_at ?? $post->created_at)?->toDateTimeString(),
+                    ];
+                })->values()->all();
+
+                Log::info('Blog posts loaded: ' . count($response['blog_posts']));
+            } catch (\Exception $e) {
+                Log::error('Failed to load blog posts: ' . $e->getMessage());
+                $response['blog_posts'] = [];
+            }
 
             Log::info('Homepage API completed successfully');
 
