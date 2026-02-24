@@ -39,6 +39,8 @@ class HomepageController extends Controller
                 'all_cities' => [],
                 'pitanja' => [],
                 'blog_posts' => [],
+                'blog_posts_latest' => [],
+                'blog_posts_featured' => [],
                 'filters' => [
                     'specialties' => [],
                     'cities' => []
@@ -183,36 +185,12 @@ class HomepageController extends Controller
                 $homepageDisplay = $blogSettings->homepage_display ?? 'latest';
                 $homepageCount = max(1, min((int) ($blogSettings->homepage_count ?? 3), 12));
 
-                $query = BlogPost::with([
-                    'doktor:id,ime,prezime,slug',
-                    'categories:id,naziv,slug',
-                ])->published();
-
                 $featuredIds = array_values(array_filter(
                     (array) ($blogSettings->featured_post_ids ?? []),
                     fn ($id) => is_numeric($id)
                 ));
 
-                if ($homepageDisplay === 'featured' && !empty($featuredIds)) {
-                    $posts = $query
-                        ->whereIn('id', $featuredIds)
-                        ->orderBy('published_at', 'desc')
-                        ->get();
-
-                    // Keep manual featured order from admin settings
-                    $positionMap = array_flip(array_map('intval', $featuredIds));
-                    $posts = $posts
-                        ->sortBy(fn ($post) => $positionMap[$post->id] ?? PHP_INT_MAX)
-                        ->values()
-                        ->take($homepageCount);
-                } else {
-                    $posts = $query
-                        ->orderBy('published_at', 'desc')
-                        ->limit($homepageCount)
-                        ->get();
-                }
-
-                $response['blog_posts'] = $posts->map(function ($post) {
+                $mapPost = static function ($post) {
                     $firstCategory = $post->categories->first();
 
                     return [
@@ -235,12 +213,59 @@ class HomepageController extends Controller
                         ] : null,
                         'created_at' => ($post->published_at ?? $post->created_at)?->toDateTimeString(),
                     ];
-                })->values()->all();
+                };
+
+                $latestPosts = BlogPost::with([
+                    'doktor:id,ime,prezime,slug',
+                    'categories:id,naziv,slug',
+                ])
+                    ->published()
+                    ->orderBy('published_at', 'desc')
+                    ->limit($homepageCount)
+                    ->get();
+
+                $featuredPosts = collect();
+                if (!empty($featuredIds)) {
+                    $featuredPosts = BlogPost::with([
+                        'doktor:id,ime,prezime,slug',
+                        'categories:id,naziv,slug',
+                    ])
+                        ->published()
+                        ->whereIn('id', $featuredIds)
+                        ->get();
+
+                    // Keep manual featured order from admin settings
+                    $positionMap = array_flip(array_map('intval', $featuredIds));
+                    $featuredPosts = $featuredPosts
+                        ->sortBy(fn ($post) => $positionMap[$post->id] ?? PHP_INT_MAX)
+                        ->values()
+                        ->take($homepageCount);
+                }
+
+                $response['blog_posts_latest'] = $latestPosts
+                    ->map($mapPost)
+                    ->values()
+                    ->all();
+                $response['blog_posts_featured'] = $featuredPosts
+                    ->map($mapPost)
+                    ->values()
+                    ->all();
+
+                $selectedPosts = $homepageDisplay === 'featured' && $featuredPosts->isNotEmpty()
+                    ? $featuredPosts
+                    : $latestPosts;
+
+                $response['blog_posts'] = $selectedPosts
+                    ->map($mapPost)
+                    ->values()
+                    ->all();
 
                 Log::info('Blog posts loaded: ' . count($response['blog_posts']));
             } catch (\Exception $e) {
                 Log::error('Failed to load blog posts: ' . $e->getMessage());
                 $response['blog_posts'] = [];
+                $response['blog_posts_latest'] = [];
+                $response['blog_posts_featured'] = [];
             }
 
             Log::info('Homepage API completed successfully');
