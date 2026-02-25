@@ -13,6 +13,29 @@ use Illuminate\Validation\Rule;
 
 class BlogController extends Controller
 {
+    private function applyMetaDescriptionFallback(array $validated): array
+    {
+        $metaDescription = isset($validated['meta_description'])
+            ? trim((string) $validated['meta_description'])
+            : '';
+
+        if ($metaDescription !== '') {
+            return $validated;
+        }
+
+        $excerpt = isset($validated['excerpt'])
+            ? trim(strip_tags((string) $validated['excerpt']))
+            : '';
+
+        if ($excerpt === '') {
+            return $validated;
+        }
+
+        $validated['meta_description'] = Str::limit($excerpt, 160, '');
+
+        return $validated;
+    }
+
     // Public endpoints
     public function index(Request $request)
     {
@@ -181,6 +204,8 @@ class BlogController extends Controller
             unset($validated['reading_time']);
         }
 
+        $validated = $this->applyMetaDescriptionFallback($validated);
+
         $status = $validated['status'] ?? 'published';
 
         $post = BlogPost::create([
@@ -236,6 +261,8 @@ class BlogController extends Controller
             $validated['reading_time_manual'] = $validated['reading_time'];
             unset($validated['reading_time']);
         }
+
+        $validated = $this->applyMetaDescriptionFallback($validated);
 
         if (isset($validated['status']) && $validated['status'] === 'published' && !$post->published_at) {
             $validated['published_at'] = now();
@@ -299,6 +326,8 @@ class BlogController extends Controller
             unset($validated['reading_time']);
         }
 
+        $validated = $this->applyMetaDescriptionFallback($validated);
+
         $post = BlogPost::create([
             ...$validated,
             'autor_id' => auth()->id(),
@@ -335,6 +364,8 @@ class BlogController extends Controller
             $validated['reading_time_manual'] = $validated['reading_time'];
             unset($validated['reading_time']);
         }
+
+        $validated = $this->applyMetaDescriptionFallback($validated);
 
         if (isset($validated['status']) && $validated['status'] === 'published' && !$post->published_at) {
             $validated['published_at'] = now();
