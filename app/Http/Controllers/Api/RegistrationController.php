@@ -8,7 +8,6 @@ use App\Http\Requests\ClinicRegistrationRequest;
 use App\Models\RegistrationRequest;
 use App\Models\SiteSetting;
 use App\Mail\RegistrationVerificationMail;
-use App\Mail\RegistrationReceivedMail;
 use App\Mail\NewRegistrationRequestMail;
 use App\Services\EmailService;
 use Illuminate\Http\Request;
@@ -42,9 +41,6 @@ class RegistrationController extends Controller
 
             // Send verification email
             $this->sendVerificationEmail($registrationRequest);
-
-            // Send confirmation email
-            $this->sendConfirmationEmail($registrationRequest);
 
             // Send admin notification
             $this->sendAdminNotification($registrationRequest);
@@ -88,9 +84,6 @@ class RegistrationController extends Controller
             // Send verification email
             $this->sendVerificationEmail($registrationRequest);
 
-            // Send confirmation email
-            $this->sendConfirmationEmail($registrationRequest);
-
             // Send admin notification
             $this->sendAdminNotification($registrationRequest);
 
@@ -132,9 +125,6 @@ class RegistrationController extends Controller
 
             // Send verification email
             $this->sendVerificationEmail($registrationRequest);
-
-            // Send confirmation email
-            $this->sendConfirmationEmail($registrationRequest);
 
             // Send admin notification
             $this->sendAdminNotification($registrationRequest);
@@ -178,9 +168,6 @@ class RegistrationController extends Controller
             // Send verification email
             $this->sendVerificationEmail($registrationRequest);
 
-            // Send confirmation email
-            $this->sendConfirmationEmail($registrationRequest);
-
             // Send admin notification
             $this->sendAdminNotification($registrationRequest);
 
@@ -222,9 +209,6 @@ class RegistrationController extends Controller
 
             // Send verification email
             $this->sendVerificationEmail($registrationRequest);
-
-            // Send confirmation email
-            $this->sendConfirmationEmail($registrationRequest);
 
             // Send admin notification
             $this->sendAdminNotification($registrationRequest);
@@ -272,15 +256,23 @@ class RegistrationController extends Controller
         // Mark as verified
         $registrationRequest->markAsVerified();
 
-        // Check if auto-approve is enabled for free registrations
-        $isFree = $this->isRegistrationFree($registrationRequest->type);
-        $autoApprove = SiteSetting::get('registration_auto_approve', 'false') === 'true';
+        $autoApprove = $this->isAutoApproveEnabled($registrationRequest->type);
 
-        if ($isFree && $autoApprove) {
+        if ($autoApprove) {
             // Auto-approve and create profile
             $admin = \App\Models\User::where('role', 'admin')->first();
             if ($admin) {
-                app(AdminRegistrationController::class)->approveRequest($registrationRequest->id, $admin);
+                app(AdminRegistrationController::class)->approveRequest($registrationRequest->id, $admin, false);
+            } else {
+                \Log::warning('Auto-approve skipped: no admin user found', [
+                    'registration_id' => $registrationRequest->id,
+                    'type' => $registrationRequest->type,
+                ]);
+
+                return response()->json([
+                    'message' => 'Email je uspješno verifikovan! Vaš zahtjev će biti pregledan u najkraćem roku.',
+                    'auto_approved' => false,
+                ]);
             }
 
             return response()->json([
@@ -337,14 +329,22 @@ class RegistrationController extends Controller
         // Mark as verified
         $registrationRequest->markAsVerified();
 
-        // Check auto-approve
-        $isFree = $this->isRegistrationFree($registrationRequest->type);
-        $autoApprove = SiteSetting::get('registration_auto_approve', 'false') === 'true';
+        $autoApprove = $this->isAutoApproveEnabled($registrationRequest->type);
 
-        if ($isFree && $autoApprove) {
+        if ($autoApprove) {
             $admin = \App\Models\User::where('role', 'admin')->first();
             if ($admin) {
-                app(AdminRegistrationController::class)->approveRequest($registrationRequest->id, $admin);
+                app(AdminRegistrationController::class)->approveRequest($registrationRequest->id, $admin, false);
+            } else {
+                \Log::warning('Auto-approve skipped: no admin user found', [
+                    'registration_id' => $registrationRequest->id,
+                    'type' => $registrationRequest->type,
+                ]);
+
+                return response()->json([
+                    'message' => 'Email je uspješno verifikovan! Vaš zahtjev će biti pregledan u najkraćem roku.',
+                    'auto_approved' => false,
+                ]);
             }
 
             return response()->json([
@@ -402,13 +402,6 @@ class RegistrationController extends Controller
 
         // Send verification email
         $this->sendVerificationEmail($registrationRequest);
-
-        // Use EmailService to send all emails with proper delays
-        EmailService::sendHighPriority(
-            $registrationRequest->email,
-            new RegistrationVerificationMail($registrationRequest),
-            2
-        );
 
         return response()->json([
             'message' => 'Verifikacioni email je ponovo poslat.'
@@ -573,19 +566,6 @@ class RegistrationController extends Controller
     }
 
     /**
-     * Send confirmation email
-     */
-    private function sendConfirmationEmail(RegistrationRequest $registrationRequest): void
-    {
-        // Default priority - confirmation emails
-        EmailService::sendDefault(
-            $registrationRequest->email,
-            new RegistrationReceivedMail($registrationRequest),
-            5 // 5 second delay to stagger with verification email
-        );
-    }
-
-    /**
      * Send admin notification email
      */
     private function sendAdminNotification(RegistrationRequest $registrationRequest): void
@@ -628,11 +608,13 @@ class RegistrationController extends Controller
     }
 
     /**
-     * Check if registration is free
+     * Determine if registration should be auto-approved for the specific type.
      */
-    private function isRegistrationFree(string $type): bool
+    private function isAutoApproveEnabled(string $type): bool
     {
-        $key = $type . '_registration_free';
-        return SiteSetting::get($key, 'true') === 'true';
+        $globalAutoApprove = SiteSetting::get('registration_auto_approve', 'false') === 'true';
+        $typeAutoApprove = SiteSetting::get($type . '_auto_approve', 'false') === 'true';
+
+        return $globalAutoApprove || $typeAutoApprove;
     }
 }

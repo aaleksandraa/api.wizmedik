@@ -514,7 +514,7 @@ class AdminRegistrationController extends Controller
     /**
      * Public method for auto-approval (called from RegistrationController)
      */
-    public function approveRequest(int $id, User $admin): void
+    public function approveRequest(int $id, User $admin, bool $sendApprovalEmail = true): void
     {
         $registrationRequest = RegistrationRequest::findOrFail($id);
 
@@ -532,9 +532,11 @@ class AdminRegistrationController extends Controller
                 'care_home_id' => $result['care_home']->id ?? null,
             ]);
 
-            Mail::to($registrationRequest->email)->send(
-                new RegistrationApprovedMail($registrationRequest, $result['user'])
-            );
+            if ($sendApprovalEmail) {
+                Mail::to($registrationRequest->email)->send(
+                    new RegistrationApprovedMail($registrationRequest, $result['user'])
+                );
+            }
 
             DB::commit();
         } catch (\Exception $e) {
