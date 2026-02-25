@@ -445,10 +445,18 @@ class BlogController extends Controller
             'homepage_display' => 'in:featured,latest',
             'homepage_count' => 'integer|min:1|max:12',
             'featured_post_ids' => 'nullable|array',
+            'featured_post_ids.*' => 'integer|exists:blog_posts,id',
         ]);
 
+        if (array_key_exists('featured_post_ids', $validated)) {
+            $validated['featured_post_ids'] = array_values(array_unique(array_map(
+                static fn ($id) => (int) $id,
+                $validated['featured_post_ids'] ?? []
+            )));
+        }
+
         $settings->update($validated);
-        return response()->json($settings);
+        return response()->json($settings->fresh());
     }
 
     public function canDoctorsWrite()

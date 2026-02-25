@@ -93,7 +93,7 @@ class AdminRegistrationController extends Controller
         DB::beginTransaction();
         try {
             // Create user and profile
-            $result = $this->createUserAndProfile($registrationRequest);
+            $result = $this->createUserAndProfile($registrationRequest, auth()->user());
 
             // Update registration request
             $registrationRequest->approve(auth()->user());
@@ -106,6 +106,7 @@ class AdminRegistrationController extends Controller
                 'spa_id' => $result['spa']->id ?? null,
                 'care_home_id' => $result['care_home']->id ?? null,
             ]);
+            $this->ensureApprovedProfileIsVisible($registrationRequest);
 
             // Send approval email
             Mail::to($registrationRequest->email)->send(
@@ -310,7 +311,7 @@ class AdminRegistrationController extends Controller
     /**
      * Create user and profile (doctor, clinic, laboratory, or spa)
      */
-    private function createUserAndProfile(RegistrationRequest $registrationRequest): array
+    private function createUserAndProfile(RegistrationRequest $registrationRequest, ?User $approver = null): array
     {
         $decodedMessage = null;
         if (is_string($registrationRequest->message) && $registrationRequest->message !== '') {
@@ -380,6 +381,10 @@ class AdminRegistrationController extends Controller
                 'opis' => '',
                 'ocjena' => 0,
                 'broj_ocjena' => 0,
+                'aktivan' => true,
+                'verifikovan' => true,
+                'verifikovan_at' => now(),
+                'verifikovan_by' => $approver?->id,
                 'prihvata_online' => true,
                 'cijena_od' => 0,
                 'cijena_do' => 0,
@@ -505,6 +510,10 @@ class AdminRegistrationController extends Controller
                 'opis' => '',
                 'ocjena' => 0,
                 'broj_ocjena' => 0,
+                'aktivan' => true,
+                'verifikovan' => true,
+                'verifikovan_at' => now(),
+                'verifikovan_by' => $approver?->id,
             ]);
 
             return ['user' => $user, 'clinic' => $clinic];
@@ -520,7 +529,7 @@ class AdminRegistrationController extends Controller
 
         DB::beginTransaction();
         try {
-            $result = $this->createUserAndProfile($registrationRequest);
+            $result = $this->createUserAndProfile($registrationRequest, $admin);
 
             $registrationRequest->approve($admin);
             $registrationRequest->update([
@@ -531,6 +540,7 @@ class AdminRegistrationController extends Controller
                 'spa_id' => $result['spa']->id ?? null,
                 'care_home_id' => $result['care_home']->id ?? null,
             ]);
+            $this->ensureApprovedProfileIsVisible($registrationRequest);
 
             if ($sendApprovalEmail) {
                 Mail::to($registrationRequest->email)->send(
@@ -542,6 +552,33 @@ class AdminRegistrationController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
+        }
+    }
+
+    private function ensureApprovedProfileIsVisible(RegistrationRequest $registrationRequest): void
+    {
+        if ($registrationRequest->type === 'doctor' && $registrationRequest->doctor_id) {
+            $doctor = Doktor::find($registrationRequest->doctor_id);
+            if ($doctor) {
+                $doctor->update([
+                    'aktivan' => true,
+                    'verifikovan' => true,
+                    'verifikovan_at' => $doctor->verifikovan_at ?? now(),
+                    'verifikovan_by' => $doctor->verifikovan_by ?? $registrationRequest->reviewed_by,
+                ]);
+            }
+        }
+
+        if ($registrationRequest->type === 'clinic' && $registrationRequest->clinic_id) {
+            $clinic = Klinika::find($registrationRequest->clinic_id);
+            if ($clinic) {
+                $clinic->update([
+                    'aktivan' => true,
+                    'verifikovan' => true,
+                    'verifikovan_at' => $clinic->verifikovan_at ?? now(),
+                    'verifikovan_by' => $clinic->verifikovan_by ?? $registrationRequest->reviewed_by,
+                ]);
+            }
         }
     }
 }
