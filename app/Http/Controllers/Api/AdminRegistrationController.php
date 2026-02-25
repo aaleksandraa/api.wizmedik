@@ -412,6 +412,7 @@ class AdminRegistrationController extends Controller
                 'broj_recenzija' => 0,
                 'broj_pregleda' => 0,
                 'verifikovan' => true,
+                'verifikovan_at' => now(),
                 'aktivan' => true,
             ]);
 
@@ -577,6 +578,37 @@ class AdminRegistrationController extends Controller
                     'verifikovan' => true,
                     'verifikovan_at' => $clinic->verifikovan_at ?? now(),
                     'verifikovan_by' => $clinic->verifikovan_by ?? $registrationRequest->reviewed_by,
+                ]);
+            }
+        }
+
+        if ($registrationRequest->type === 'laboratory' && $registrationRequest->laboratory_id) {
+            $laboratory = \App\Models\Laboratorija::find($registrationRequest->laboratory_id);
+            if ($laboratory) {
+                $laboratory->update([
+                    'aktivan' => true,
+                    'verifikovan' => true,
+                    'verifikovan_at' => $laboratory->verifikovan_at ?? now(),
+                ]);
+            }
+        }
+
+        if ($registrationRequest->type === 'spa' && $registrationRequest->spa_id) {
+            $spa = \App\Models\Banja::find($registrationRequest->spa_id);
+            if ($spa) {
+                $spa->update([
+                    'aktivan' => true,
+                    'verifikovan' => true,
+                ]);
+            }
+        }
+
+        if ($registrationRequest->type === 'care_home' && $registrationRequest->care_home_id) {
+            $careHome = \App\Models\Dom::find($registrationRequest->care_home_id);
+            if ($careHome) {
+                $careHome->update([
+                    'aktivan' => true,
+                    'verifikovan' => true,
                 ]);
             }
         }

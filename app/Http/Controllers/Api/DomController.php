@@ -205,6 +205,7 @@ class DomController extends Controller
             ])
             ->where('slug', $slug)
             ->aktivan()
+            ->verifikovan()
             ->first();
 
             if (!$dom) {
@@ -240,7 +241,7 @@ class DomController extends Controller
         try {
             $dom = Dom::findOrFail($id);
 
-            if (!$dom->aktivan || !$dom->online_upit) {
+            if (!$dom->aktivan || !$dom->verifikovan || !$dom->online_upit) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Dom trenutno ne prima upite'
@@ -302,7 +303,7 @@ class DomController extends Controller
         try {
             $dom = Dom::findOrFail($id);
 
-            if (!$dom->aktivan) {
+            if (!$dom->aktivan || !$dom->verifikovan) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Dom trenutno ne prima recenzije'

@@ -159,6 +159,7 @@ class BanjaController extends Controller
             ])
             ->where('slug', $slug)
             ->aktivan()
+            ->verifikovan()
             ->first();
 
             if (!$banja) {
@@ -192,7 +193,7 @@ class BanjaController extends Controller
     public function getPaketi(int $id): JsonResponse
     {
         try {
-            $banja = Banja::aktivan()->findOrFail($id);
+            $banja = Banja::aktivan()->verifikovan()->findOrFail($id);
             $paketi = $banja->paketi()->aktivan()->ordered()->get();
 
             return response()->json([
@@ -215,7 +216,7 @@ class BanjaController extends Controller
     public function getRecenzije(Request $request, int $id): JsonResponse
     {
         try {
-            $banja = Banja::aktivan()->findOrFail($id);
+            $banja = Banja::aktivan()->verifikovan()->findOrFail($id);
 
             $query = $banja->odobreneRecenzije()->with('user');
             $perPage = min((int) $request->get('per_page', 10), 50);
@@ -249,7 +250,7 @@ class BanjaController extends Controller
         try {
             $banja = Banja::findOrFail($id);
 
-            if (!$banja->aktivan || !$banja->online_upit) {
+            if (!$banja->aktivan || !$banja->verifikovan || !$banja->online_upit) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Banja trenutno ne prima upite'
@@ -311,7 +312,7 @@ class BanjaController extends Controller
         try {
             $banja = Banja::findOrFail($id);
 
-            if (!$banja->aktivan) {
+            if (!$banja->aktivan || !$banja->verifikovan) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Banja trenutno ne prima recenzije'

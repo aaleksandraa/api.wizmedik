@@ -65,6 +65,7 @@ class HomepageController extends Controller
             try {
                 $doctors = DB::table('doktori')
                     ->where('aktivan', true)
+                    ->where('verifikovan', true)
                     ->whereNull('deleted_at')
                     ->select('id', 'slug', 'ime', 'prezime', 'specijalnost', 'grad')
                     ->limit(6)
@@ -81,6 +82,7 @@ class HomepageController extends Controller
             try {
                 $clinics = DB::table('klinike')
                     ->where('aktivan', true)
+                    ->where('verifikovan', true)
                     ->whereNull('deleted_at')
                     ->select('id', 'slug', 'naziv', 'grad', 'adresa')
                     ->limit(4)
@@ -129,6 +131,7 @@ class HomepageController extends Controller
             try {
                 $banje = DB::table('banje')
                     ->where('aktivan', true)
+                    ->where('verifikovan', true)
                     ->whereNull('deleted_at')
                     ->select('id', 'slug', 'naziv', 'grad', 'adresa')
                     ->limit(4)
@@ -145,6 +148,7 @@ class HomepageController extends Controller
             try {
                 $domovi = DB::table('domovi_njega')
                     ->where('aktivan', true)
+                    ->where('verifikovan', true)
                     ->whereNull('deleted_at')
                     ->select('id', 'slug', 'naziv', 'grad', 'adresa')
                     ->limit(4)

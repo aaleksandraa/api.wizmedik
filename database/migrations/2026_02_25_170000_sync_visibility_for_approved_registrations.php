@@ -38,6 +38,7 @@ return new class extends Migration
                  OR k.verifikovan_at IS NULL
               )
         ");
+
     }
 
     public function down(): void
