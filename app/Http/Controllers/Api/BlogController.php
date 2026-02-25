@@ -9,6 +9,7 @@ use App\Models\BlogSettings;
 use App\Models\Doktor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class BlogController extends Controller
 {
@@ -139,7 +140,8 @@ class BlogController extends Controller
         }
 
         return response()->json(
-            BlogPost::where('doktor_id', $doktor->id)
+            BlogPost::with('categories:id,naziv,slug')
+                ->where('doktor_id', $doktor->id)
                 ->orderBy('created_at', 'desc')
                 ->get()
         );
@@ -161,20 +163,32 @@ class BlogController extends Controller
 
         $validated = $request->validate([
             'naslov' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:blog_posts,slug',
             'sadrzaj' => 'required|string',
             'excerpt' => 'nullable|string|max:500',
             'thumbnail' => 'nullable|string',
+            'status' => 'sometimes|in:draft,published,archived',
             'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:blog_categories,id',
             'meta_title' => 'nullable|string|max:70',
             'meta_description' => 'nullable|string|max:160',
+            'meta_keywords' => 'nullable|string',
+            'reading_time' => 'nullable|integer|min:1|max:120',
         ]);
+
+        if (isset($validated['reading_time'])) {
+            $validated['reading_time_manual'] = $validated['reading_time'];
+            unset($validated['reading_time']);
+        }
+
+        $status = $validated['status'] ?? 'published';
 
         $post = BlogPost::create([
             ...$validated,
             'doktor_id' => $doktor->id,
             'autor_id' => $user->id,
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => $status,
+            'published_at' => $status === 'published' ? now() : null,
         ]);
 
         if (!empty($validated['category_ids'])) {
@@ -199,13 +213,33 @@ class BlogController extends Controller
 
         $validated = $request->validate([
             'naslov' => 'sometimes|string|max:255',
+            'slug' => [
+                'sometimes',
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('blog_posts', 'slug')->ignore($post->id),
+            ],
             'sadrzaj' => 'sometimes|string',
             'excerpt' => 'nullable|string|max:500',
             'thumbnail' => 'nullable|string',
+            'status' => 'sometimes|in:draft,published,archived',
             'category_ids' => 'nullable|array',
+            'category_ids.*' => 'integer|exists:blog_categories,id',
             'meta_title' => 'nullable|string|max:70',
             'meta_description' => 'nullable|string|max:160',
+            'meta_keywords' => 'nullable|string',
+            'reading_time' => 'nullable|integer|min:1|max:120',
         ]);
+
+        if (isset($validated['reading_time'])) {
+            $validated['reading_time_manual'] = $validated['reading_time'];
+            unset($validated['reading_time']);
+        }
+
+        if (isset($validated['status']) && $validated['status'] === 'published' && !$post->published_at) {
+            $validated['published_at'] = now();
+        }
 
         $post->update($validated);
 
