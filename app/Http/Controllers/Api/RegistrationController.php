@@ -7,9 +7,9 @@ use App\Http\Requests\DoctorRegistrationRequest;
 use App\Http\Requests\ClinicRegistrationRequest;
 use App\Models\RegistrationRequest;
 use App\Models\SiteSetting;
+use App\Models\User;
 use App\Mail\RegistrationVerificationMail;
 use App\Mail\NewRegistrationRequestMail;
-use App\Services\EmailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -255,6 +255,7 @@ class RegistrationController extends Controller
 
         // Mark as verified
         $registrationRequest->markAsVerified();
+        return $this->finalizePostVerification($registrationRequest);
 
         $autoApprove = $this->isAutoApproveEnabled($registrationRequest->type);
 
@@ -328,6 +329,7 @@ class RegistrationController extends Controller
 
         // Mark as verified
         $registrationRequest->markAsVerified();
+        return $this->finalizePostVerification($registrationRequest);
 
         $autoApprove = $this->isAutoApproveEnabled($registrationRequest->type);
 
@@ -557,11 +559,8 @@ class RegistrationController extends Controller
      */
     private function sendVerificationEmail(RegistrationRequest $registrationRequest): void
     {
-        // High priority - verification emails should be sent quickly
-        EmailService::sendHighPriority(
-            $registrationRequest->email,
-            new RegistrationVerificationMail($registrationRequest),
-            2 // 2 second delay
+        Mail::to($registrationRequest->email)->send(
+            new RegistrationVerificationMail($registrationRequest)
         );
     }
 
@@ -570,40 +569,43 @@ class RegistrationController extends Controller
      */
     private function sendAdminNotification(RegistrationRequest $registrationRequest): void
     {
-        try {
-            // Get admin email from settings, fallback to info@wizmedik.com
-            $adminEmail = SiteSetting::get('registration_admin_email');
+        $recipients = [];
+        $configuredAdminEmail = trim((string) SiteSetting::get('registration_admin_email', ''));
+        if ($configuredAdminEmail !== '' && filter_var($configuredAdminEmail, FILTER_VALIDATE_EMAIL)) {
+            $recipients[$configuredAdminEmail] = $configuredAdminEmail;
+        }
 
-            // If not set in settings, use default
-            if (empty($adminEmail)) {
-                $adminEmail = config('mail.admin_email', 'info@wizmedik.com');
+        $approverAdmin = $this->resolveApproverAdmin();
+        if ($approverAdmin && filter_var($approverAdmin->email, FILTER_VALIDATE_EMAIL)) {
+            $recipients[$approverAdmin->email] = $approverAdmin->email;
+        }
+
+        if (empty($recipients)) {
+            $fallback = trim((string) config('mail.admin_email', 'info@wizmedik.com'));
+            if ($fallback !== '' && filter_var($fallback, FILTER_VALIDATE_EMAIL)) {
+                $recipients[$fallback] = $fallback;
             }
+        }
 
-            \Log::info('Queueing admin notification', [
-                'admin_email' => $adminEmail,
+        if (empty($recipients)) {
+            \Log::warning('Admin registration notification skipped: no valid recipient email configured', [
                 'registration_id' => $registrationRequest->id,
                 'type' => $registrationRequest->type,
-                'user_email' => $registrationRequest->email,
             ]);
+            return;
+        }
 
-            // Default priority - admin notifications
-            EmailService::sendDefault(
-                $adminEmail,
-                new NewRegistrationRequestMail($registrationRequest),
-                10 // 10 second delay to send last
-            );
-
-            \Log::info('Admin notification queued successfully', [
-                'admin_email' => $adminEmail,
-                'registration_id' => $registrationRequest->id,
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Failed to queue admin notification email', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'registration_id' => $registrationRequest->id,
-            ]);
-            // Don't throw exception - registration should still succeed even if admin email fails
+        foreach ($recipients as $adminEmail) {
+            try {
+                Mail::to($adminEmail)->send(new NewRegistrationRequestMail($registrationRequest));
+            } catch (\Throwable $e) {
+                \Log::error('Failed to send admin registration notification email', [
+                    'registration_id' => $registrationRequest->id,
+                    'type' => $registrationRequest->type,
+                    'admin_email' => $adminEmail,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -612,9 +614,87 @@ class RegistrationController extends Controller
      */
     private function isAutoApproveEnabled(string $type): bool
     {
-        $globalAutoApprove = SiteSetting::get('registration_auto_approve', 'false') === 'true';
-        $typeAutoApprove = SiteSetting::get($type . '_auto_approve', 'false') === 'true';
+        $globalAutoApprove = $this->settingEnabled('registration_auto_approve');
+        $typeAutoApprove = $this->settingEnabled($type . '_auto_approve');
 
         return $globalAutoApprove || $typeAutoApprove;
+    }
+
+    private function finalizePostVerification(RegistrationRequest $registrationRequest)
+    {
+        if (!$this->isAutoApproveEnabled($registrationRequest->type)) {
+            return response()->json([
+                'message' => 'Email je uspješno verifikovan! Vaš zahtjev će biti pregledan u najkraćem roku.',
+                'auto_approved' => false,
+            ]);
+        }
+
+        $admin = $this->resolveApproverAdmin();
+        if (!$admin) {
+            \Log::warning('Auto-approve skipped: no admin user found', [
+                'registration_id' => $registrationRequest->id,
+                'type' => $registrationRequest->type,
+            ]);
+
+            return response()->json([
+                'message' => 'Email je uspješno verifikovan! Vaš zahtjev će biti pregledan u najkraćem roku.',
+                'auto_approved' => false,
+            ]);
+        }
+
+        try {
+            app(AdminRegistrationController::class)->approveRequest($registrationRequest->id, $admin, false);
+
+            return response()->json([
+                'message' => 'Email je uspješno verifikovan! Vaš profil je automatski aktiviran.',
+                'auto_approved' => true,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Auto-approve failed after verification', [
+                'registration_id' => $registrationRequest->id,
+                'type' => $registrationRequest->type,
+                'admin_id' => $admin->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Email je uspješno verifikovan! Vaš zahtjev će biti pregledan u najkraćem roku.',
+                'auto_approved' => false,
+            ]);
+        }
+    }
+
+    private function resolveApproverAdmin(): ?User
+    {
+        $legacyAdmin = User::query()
+            ->whereRaw("LOWER(COALESCE(role, '')) = ?", ['admin'])
+            ->orderBy('id')
+            ->first();
+
+        if ($legacyAdmin) {
+            return $legacyAdmin;
+        }
+
+        try {
+            return User::role('admin')->orderBy('id')->first();
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to resolve admin via role scope', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    private function settingEnabled(string $key): bool
+    {
+        $value = SiteSetting::get($key, 'false');
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
     }
 }
