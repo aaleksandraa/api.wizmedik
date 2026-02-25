@@ -127,7 +127,9 @@ Route::get('/blog/homepage', [\App\Http\Controllers\Api\BlogController::class, '
 Route::get('/blog/categories', [\App\Http\Controllers\Api\BlogController::class, 'categories']);
 Route::get('/blog/authors', [\App\Http\Controllers\Api\BlogController::class, 'authors']);
 Route::get('/blog/doctor/{doctorSlug}', [\App\Http\Controllers\Api\BlogController::class, 'doctorPosts']);
-Route::get('/blog/{slug}', [\App\Http\Controllers\Api\BlogController::class, 'show']);
+Route::get('/blog/{slug}', [\App\Http\Controllers\Api\BlogController::class, 'show'])
+    // Prevent route conflict with authenticated doctor blog endpoints.
+    ->where('slug', '^(?!my-posts$|can-write$|can-doctors-write$).+');
 
 // Public pitanja (Q&A) routes with rate limiting
 Route::get('/pitanja', [\App\Http\Controllers\Api\PitanjeController::class, 'index']);
