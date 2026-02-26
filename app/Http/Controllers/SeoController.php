@@ -763,6 +763,7 @@ class SeoController extends Controller
             'author' => [
                 '@type' => 'Person',
                 'name' => trim((string) $question->ime_korisnika) !== '' ? trim((string) $question->ime_korisnika) : 'Anonimni korisnik',
+                'url' => $url . '#question-author',
             ],
             'suggestedAnswer' => $suggestedAnswers,
         ];
