@@ -226,7 +226,7 @@ class NotifikacijaService
                 self::createNotifikacija(
                     $doktor->user_id,
                     'novo_pitanje',
-                    'Novo pitanje iz vaÅ¡e specijalnosti',
+                    'Novo pitanje iz vaše specijalnosti',
                     "Korisnik {$pitanje->ime_korisnika} je postavio pitanje: \"{$pitanje->naslov}\"",
                     [
                         'pitanje_id' => $pitanje->id,
@@ -250,8 +250,8 @@ class NotifikacijaService
             self::createNotifikacija(
                 $pitanje->user_id,
                 'odgovor_na_pitanje',
-                'Dobili ste odgovor na vaÅ¡e pitanje',
-                "{$doktorIme} je odgovorio na vaÅ¡e pitanje: \"{$pitanje->naslov}\"",
+                'Dobili ste odgovor na vaše pitanje',
+                "{$doktorIme} je odgovorio na vaše pitanje: \"{$pitanje->naslov}\"",
                 [
                     'pitanje_id' => $pitanje->id,
                     'pitanje_slug' => $pitanje->slug,
