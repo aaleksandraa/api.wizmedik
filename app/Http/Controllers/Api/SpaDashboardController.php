@@ -425,7 +425,7 @@ class SpaDashboardController extends Controller
             \Log::error('Spa toggle active error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri promjeni statusa banje'
+                'message' => 'Greška pri promjeni statusa banje'
             ], 500);
         }
     }
@@ -476,7 +476,7 @@ class SpaDashboardController extends Controller
             \Log::error('Spa inquiries error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri dohvatanju upita'
+                'message' => 'Greška pri dohvatanju upita'
             ], 500);
         }
     }
@@ -542,7 +542,7 @@ class SpaDashboardController extends Controller
             \Log::error('Spa reviews error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri dohvatanju recenzija'
+                'message' => 'Greška pri dohvatanju recenzija'
             ], 500);
         }
     }
@@ -560,14 +560,14 @@ class SpaDashboardController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Status upita je aÅ¾uriran',
+                'message' => 'Status upita je ažuriran',
                 'data' => $upit
             ]);
         } catch (\Exception $e) {
             \Log::error('Spa inquiry status update error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri aÅ¾uriranju statusa upita'
+                'message' => 'Greška pri ažuriranju statusa upita'
             ], 500);
         }
     }

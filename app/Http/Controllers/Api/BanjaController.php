@@ -205,7 +205,7 @@ class BanjaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri dohvatanju paketa'
+                'message' => 'Greška pri dohvatanju paketa'
             ], 500);
         }
     }
@@ -237,7 +237,7 @@ class BanjaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri dohvatanju recenzija'
+                'message' => 'Greška pri dohvatanju recenzija'
             ], 500);
         }
     }

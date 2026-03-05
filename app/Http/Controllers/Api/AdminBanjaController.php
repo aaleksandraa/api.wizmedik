@@ -396,7 +396,7 @@ class AdminBanjaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri dohvatanju audit loga'
+                'message' => 'Greška pri dohvatanju audit loga'
             ], 500);
         }
     }
@@ -442,7 +442,7 @@ class AdminBanjaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri dohvatanju recenzija'
+                'message' => 'Greška pri dohvatanju recenzija'
             ], 500);
         }
     }
@@ -466,7 +466,7 @@ class AdminBanjaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri odobravanju recenzije'
+                'message' => 'Greška pri odobravanju recenzije'
             ], 500);
         }
     }
@@ -489,7 +489,7 @@ class AdminBanjaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri brisanju recenzije'
+                'message' => 'Greška pri brisanju recenzije'
             ], 500);
         }
     }
@@ -544,7 +544,7 @@ class AdminBanjaController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'GreÅ¡ka pri dohvatanju upita'
+                'message' => 'Greška pri dohvatanju upita'
             ], 500);
         }
     }

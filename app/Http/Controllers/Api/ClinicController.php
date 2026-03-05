@@ -45,6 +45,8 @@ class ClinicController extends Controller
         $clinic = Klinika::where('slug', $slug)
             ->with(['doktori' => function($q) {
                 $q->aktivan()->verifikovan();
+            }, 'specijalnosti' => function($q) {
+                $q->select('specijalnosti.id', 'specijalnosti.naziv', 'specijalnosti.slug');
             }])
             ->first();
 

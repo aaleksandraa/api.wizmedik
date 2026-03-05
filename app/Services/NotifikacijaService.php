@@ -73,7 +73,7 @@ class NotifikacijaService
             self::createNotifikacija(
                 $termin->user_id,
                 'termin_zakazan',
-                'Termin uspjeÅ¡no zakazan',
+                'Termin uspješno zakazan',
                 self::getTerminPoruka($termin, 'patient'),
                 $terminData
             );
@@ -136,8 +136,8 @@ class NotifikacijaService
             self::createNotifikacija(
                 $klinika->user_id,
                 'doktor_zahtjev',
-                'Novi zahtjev za pridruÅ¾ivanje',
-                "Dr. {$doktor->ime} {$doktor->prezime} ({$doktor->specijalnost}) Å¾eli se pridruÅ¾iti vaÅ¡oj klinici.",
+                'Novi zahtjev za pridruživanje',
+                "Dr. {$doktor->ime} {$doktor->prezime} ({$doktor->specijalnost}) želi se pridružiti vašoj klinici.",
                 ['zahtjev_id' => $zahtjev->id, 'doktor_id' => $doktor->id]
             );
         }
@@ -161,8 +161,8 @@ class NotifikacijaService
             self::createNotifikacija(
                 $doktor->user_id,
                 'klinika_poziv',
-                'Poziv za pridruÅ¾ivanje klinici',
-                "Klinika {$klinika->naziv} vas poziva da se pridruÅ¾ite njihovom timu.",
+                'Poziv za pridruživanje klinici',
+                "Klinika {$klinika->naziv} vas poziva da se pridružite njihovom timu.",
                 ['zahtjev_id' => $zahtjev->id, 'klinika_id' => $klinika->id]
             );
         }
@@ -292,7 +292,7 @@ class NotifikacijaService
         $datum = \Carbon\Carbon::parse($termin->datum_vrijeme)->format('d.m.Y. H:i');
 
         if ($recipientType === 'patient') {
-            return "VaÅ¡ termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} je zakazan za {$datum}.";
+            return "Vaš termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} je zakazan za {$datum}.";
         } elseif ($recipientType === 'doctor') {
             $pacijent = $termin->user
                 ? "{$termin->user->ime} {$termin->user->prezime}"
@@ -370,7 +370,7 @@ class NotifikacijaService
                 self::createNotifikacija(
                     $termin->user_id,
                     'termin_otkazan',
-                    'VaÅ¡ termin je otkazan',
+                    'Vaš termin je otkazan',
                     self::getTerminOtkazanPoruka($termin, 'patient', $cancelledBy),
                     $terminData
                 );
@@ -412,7 +412,7 @@ class NotifikacijaService
         };
 
         if ($recipientType === 'patient') {
-            return "VaÅ¡ termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} za {$datum} je otkazan od strane {$cancelledByText}.";
+            return "Vaš termin kod Dr. {$termin->doktor->ime} {$termin->doktor->prezime} za {$datum} je otkazan od strane {$cancelledByText}.";
         } elseif ($recipientType === 'doctor') {
             return "Termin sa pacijentom {$pacijent} za {$datum} je otkazan od strane {$cancelledByText}.";
         } else {
