@@ -36,6 +36,34 @@ class BlogController extends Controller
         return $validated;
     }
 
+    private function normalizeFeaturedPostIds(array $ids, int $limit = 12): array
+    {
+        $limit = max(1, min(12, $limit));
+
+        $normalized = array_values(array_unique(array_filter(
+            array_map(static fn ($id) => is_numeric($id) ? (int) $id : null, $ids),
+            static fn ($id) => is_int($id) && $id > 0
+        )));
+
+        if (empty($normalized)) {
+            return [];
+        }
+
+        $existingIds = BlogPost::whereIn('id', $normalized)
+            ->pluck('id')
+            ->map(static fn ($id) => (int) $id)
+            ->all();
+
+        $existingLookup = array_flip($existingIds);
+
+        $filtered = array_values(array_filter(
+            $normalized,
+            static fn ($id) => isset($existingLookup[$id])
+        ));
+
+        return array_slice($filtered, 0, $limit);
+    }
+
     // Public endpoints
     public function index(Request $request)
     {
@@ -84,12 +112,20 @@ class BlogController extends Controller
     public function homepage()
     {
         $settings = BlogSettings::get();
+        $featuredIds = $this->normalizeFeaturedPostIds(
+            $settings->featured_post_ids ?? [],
+            (int) ($settings->homepage_count ?? 3)
+        );
 
-        if ($settings->homepage_display === 'featured' && $settings->featured_post_ids) {
+        if ($settings->homepage_display === 'featured' && !empty($featuredIds)) {
             $posts = BlogPost::with(['doktor:id,ime,prezime,slug,slika_profila'])
                 ->published()
-                ->whereIn('id', $settings->featured_post_ids)
-                ->orderByRaw('FIELD(id, ' . implode(',', $settings->featured_post_ids) . ')')
+                ->whereIn('id', $featuredIds)
+                ->orderByRaw('CASE id ' . implode(' ', array_map(
+                    static fn ($id, $position) => 'WHEN ' . (int) $id . ' THEN ' . (int) $position,
+                    $featuredIds,
+                    array_keys($featuredIds)
+                )) . ' ELSE ' . count($featuredIds) . ' END')
                 ->get();
         } else {
             $posts = BlogPost::with(['doktor:id,ime,prezime,slug,slika_profila'])
@@ -513,7 +549,18 @@ class BlogController extends Controller
     // Settings
     public function getSettings()
     {
-        return response()->json(BlogSettings::get());
+        $settings = BlogSettings::get();
+        $normalizedFeatured = $this->normalizeFeaturedPostIds(
+            $settings->featured_post_ids ?? [],
+            (int) ($settings->homepage_count ?? 3)
+        );
+
+        if (($settings->featured_post_ids ?? []) !== $normalizedFeatured) {
+            $settings->update(['featured_post_ids' => $normalizedFeatured]);
+            $settings = $settings->fresh();
+        }
+
+        return response()->json($settings);
     }
 
     public function updateSettings(Request $request)
@@ -525,14 +572,20 @@ class BlogController extends Controller
             'homepage_display' => 'in:featured,latest',
             'homepage_count' => 'integer|min:1|max:12',
             'featured_post_ids' => 'nullable|array',
-            'featured_post_ids.*' => 'integer|exists:blog_posts,id',
+            'featured_post_ids.*' => 'integer',
         ]);
 
         if (array_key_exists('featured_post_ids', $validated)) {
-            $validated['featured_post_ids'] = array_values(array_unique(array_map(
-                static fn ($id) => (int) $id,
-                $validated['featured_post_ids'] ?? []
-            )));
+            $limit = (int) ($validated['homepage_count'] ?? $settings->homepage_count ?? 3);
+            $validated['featured_post_ids'] = $this->normalizeFeaturedPostIds(
+                $validated['featured_post_ids'] ?? [],
+                $limit
+            );
+        } elseif (array_key_exists('homepage_count', $validated)) {
+            $validated['featured_post_ids'] = $this->normalizeFeaturedPostIds(
+                $settings->featured_post_ids ?? [],
+                (int) $validated['homepage_count']
+            );
         }
 
         $settings->update($validated);
