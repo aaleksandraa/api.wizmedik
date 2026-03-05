@@ -119,6 +119,13 @@ class SeoController extends Controller
             return $this->getLaboratoriesListingMeta($matches[1]);
         }
 
+        if ($path === 'apoteke') {
+            return $this->getPharmaciesListingMeta();
+        }
+        if (preg_match('/^apoteke\/([^\/]+)$/', $path, $matches)) {
+            return $this->getPharmaciesListingMeta($matches[1]);
+        }
+
         if ($path === 'banje') {
             return $this->getSpasListingMeta();
         }
@@ -142,6 +149,9 @@ class SeoController extends Controller
         }
         if (preg_match('/^laboratorija\/([^\/]+)$/', $path, $matches)) {
             return $this->getLaboratoryMeta($matches[1]);
+        }
+        if (preg_match('/^apoteka\/([^\/]+)$/', $path, $matches)) {
+            return $this->getPharmacyMeta($matches[1]);
         }
         if (preg_match('/^banja\/([^\/]+)$/', $path, $matches)) {
             return $this->getSpaMeta($matches[1]);
@@ -265,6 +275,38 @@ class SeoController extends Controller
         $description = "Pronadite medicinske laboratorije{$locationPart}. Uporedite analize, cijene, radno vrijeme i kontakt podatke za {$count}+ laboratorija.";
 
         $path = $citySlug ? "laboratorije/{$citySlug}" : 'laboratorije';
+        $url = $this->buildUrl($path);
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
+    private function getPharmaciesListingMeta(?string $citySlug = null): array
+    {
+        $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+
+        $query = DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified');
+
+        if ($city) {
+            $query->whereRaw('LOWER(COALESCE(apoteke_poslovnice.grad_naziv, \'\')) = ?', [mb_strtolower($city)]);
+        }
+        $count = (clone $query)->count();
+
+        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
+        $title = "Apoteke{$locationPart} | wizMedik";
+        $description = "Pronadjite dezurne i otvorene apoteke{$locationPart}. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom.";
+
+        $path = $citySlug ? "apoteke/{$citySlug}" : 'apoteke';
         $url = $this->buildUrl($path);
         $schema = $this->buildCollectionSchema($title, $description, $url, $count);
 
@@ -543,6 +585,17 @@ class SeoController extends Controller
             ->where('verifikovan', true)
             ->count();
 
+        $pharmacyCount = DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->whereRaw('LOWER(COALESCE(apoteke_poslovnice.grad_naziv, \'\')) = ?', [mb_strtolower($city->naziv)])
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->count();
+
         $spaCount = DB::table('banje')
             ->whereRaw('LOWER(grad) = ?', [mb_strtolower($city->naziv)])
             ->whereNull('deleted_at')
@@ -558,7 +611,7 @@ class SeoController extends Controller
             ->count();
 
         $title = "Zdravstvene usluge u {$city->naziv} | wizMedik";
-        $description = "U {$city->naziv} pronađite {$doctorCount}+ doktora, {$clinicCount}+ klinika, {$labCount}+ laboratorija, {$spaCount}+ banja i {$careHomeCount}+ domova za njegu.";
+        $description = "U {$city->naziv} pronadjite {$doctorCount}+ doktora, {$clinicCount}+ klinika, {$labCount}+ laboratorija, {$pharmacyCount}+ apoteka, {$spaCount}+ banja i {$careHomeCount}+ domova za njegu.";
         $image = $this->defaultImage();
         $url = $this->buildUrl("grad/{$slug}");
 
@@ -592,6 +645,62 @@ class SeoController extends Controller
         return [
             'title' => "<title>{$title}</title>",
             'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
+        ];
+    }
+
+    private function getPharmacyMeta(string $slug): array
+    {
+        $pharmacy = DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->select(
+                'apoteke_poslovnice.naziv',
+                'apoteke_poslovnice.slug',
+                'apoteke_poslovnice.grad_naziv',
+                'apoteke_poslovnice.adresa',
+                'apoteke_poslovnice.kratki_opis',
+                'apoteke_poslovnice.profilna_slika_url',
+                'apoteke_poslovnice.is_24h',
+                'apoteke_firme.naziv_brenda'
+            )
+            ->where('apoteke_poslovnice.slug', $slug)
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->first();
+
+        if (!$pharmacy) {
+            return $this->getDefaultMeta();
+        }
+
+        $city = $pharmacy->grad_naziv ?: 'BiH';
+        $title = "{$pharmacy->naziv} - Apoteka u {$city} | wizMedik";
+        $description = $this->cleanDescription(
+            $pharmacy->kratki_opis ?? null,
+            "Kontakt i radno vrijeme apoteke {$pharmacy->naziv} u {$city}. Provjerite lokaciju i dostupnost."
+        );
+        $image = $this->absoluteImage($pharmacy->profilna_slika_url ?? null);
+        $url = $this->buildUrl("apoteka/{$slug}");
+
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Pharmacy',
+            'name' => $pharmacy->naziv,
+            'url' => $url,
+            'image' => $image,
+            'address' => [
+                '@type' => 'PostalAddress',
+                'streetAddress' => $pharmacy->adresa,
+                'addressLocality' => $city,
+                'addressCountry' => 'BA',
+            ],
+        ];
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -815,8 +924,8 @@ class SeoController extends Controller
 
     private function getDefaultMeta(): array
     {
-        $title = 'wizMedik - Pronadite doktore, klinike, laboratorije, banje i domove njege';
-        $description = 'Vodeca platforma za pronalazenje zdravstvenih usluga i online zakazivanje termina u Bosni i Hercegovini.';
+        $title = 'wizMedik - Pronadite doktore, klinike, laboratorije, apoteke, banje i domove njege';
+        $description = 'Vodeca platforma za pronalazenje zdravstvenih usluga, apoteka i online zakazivanje termina u Bosni i Hercegovini.';
         $image = $this->defaultImage();
         $url = $this->buildUrl('/');
 
@@ -994,7 +1103,7 @@ HTML;
         $path = trim($request->path(), '/');
         $query = $request->query();
 
-        if (!in_array($path, ['doktori', 'klinike', 'laboratorije', 'banje', 'domovi-njega'], true)) {
+        if (!in_array($path, ['doktori', 'klinike', 'laboratorije', 'apoteke', 'banje', 'domovi-njega'], true)) {
             return null;
         }
 
@@ -1035,7 +1144,7 @@ HTML;
             return null;
         }
 
-        if (in_array($path, ['laboratorije', 'banje', 'domovi-njega'], true)) {
+        if (in_array($path, ['laboratorije', 'apoteke', 'banje', 'domovi-njega'], true)) {
             $citySlug = $city ? $this->queryValueToSlug($city) : null;
             if ($citySlug && count($query) === 1) {
                 return $this->buildUrl("{$path}/{$citySlug}");

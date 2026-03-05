@@ -53,6 +53,7 @@ Route::middleware(['throttle:5,60', 'detect.bots'])->group(function () {
     Route::post('/register/laboratory', [RegistrationController::class, 'registerLaboratory']);
     Route::post('/register/spa', [RegistrationController::class, 'registerSpa']);
     Route::post('/register/care-home', [RegistrationController::class, 'registerCareHome']);
+    Route::post('/register/pharmacy', [RegistrationController::class, 'registerPharmacy']);
 });
 
 // Email verification routes
@@ -167,6 +168,12 @@ Route::post('/banje/{id}/recenzija', [\App\Http\Controllers\Api\BanjaController:
 // Public laboratory routes
 Route::get('/laboratorije', [\App\Http\Controllers\Api\LaboratorijaController::class, 'index']);
 Route::get('/laboratorije/gradovi/all', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getGradovi']);
+
+// Public pharmacy routes
+Route::get('/apoteke', [\App\Http\Controllers\Api\ApotekaController::class, 'index']);
+Route::get('/apoteke/nearby', [\App\Http\Controllers\Api\ApotekaController::class, 'nearby']);
+Route::get('/apoteke/dezurne', [\App\Http\Controllers\Api\ApotekaController::class, 'dezurne']);
+Route::get('/apoteke/{slug}', [\App\Http\Controllers\Api\ApotekaController::class, 'show']);
 
 // Public MKB-10 routes
 Route::get('/mkb10/kategorije', [\App\Http\Controllers\Api\Mkb10Controller::class, 'kategorije']);
@@ -487,6 +494,42 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/upload-slike', [\App\Http\Controllers\Api\DomDashboardController::class, 'uploadSlike']);
     });
 
+    // Pharmacy dashboard (pharmacy owner)
+    Route::middleware('role:pharmacy_owner')->prefix('pharmacy')->group(function () {
+        Route::get('/profile', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'profile']);
+        Route::put('/profile', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'updateProfile']);
+
+        Route::get('/branches', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'branches']);
+        Route::post('/branches', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'storeBranch']);
+        Route::put('/branches/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'updateBranch']);
+        Route::delete('/branches/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'deleteBranch']);
+        Route::post('/branches/{id}/profile-image', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'uploadProfileImage']);
+        Route::post('/branches/{id}/gallery-images', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'uploadGalleryImages']);
+        Route::delete('/branches/{id}/gallery-images/{imageId}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'deleteGalleryImage']);
+        Route::put('/branches/{id}/hours', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'updateHours']);
+        Route::post('/branches/{id}/hour-exceptions', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'storeHourException']);
+
+        Route::get('/branches/{id}/duty-shifts', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'indexDutyShifts']);
+        Route::post('/branches/{id}/duty-shifts', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'storeDutyShift']);
+        Route::put('/branches/{branchId}/duty-shifts/{dutyId}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'updateDutyShift']);
+        Route::delete('/branches/{branchId}/duty-shifts/{dutyId}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'deleteDutyShift']);
+
+        Route::get('/discounts', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'indexDiscounts']);
+        Route::post('/discounts', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'storeDiscount']);
+        Route::put('/discounts/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'updateDiscount']);
+        Route::delete('/discounts/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'deleteDiscount']);
+
+        Route::get('/promotions', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'indexPromotions']);
+        Route::post('/promotions', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'storePromotion']);
+        Route::put('/promotions/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'updatePromotion']);
+        Route::delete('/promotions/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'deletePromotion']);
+
+        Route::get('/special-offers', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'indexSpecialOffers']);
+        Route::post('/special-offers', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'storeSpecialOffer']);
+        Route::put('/special-offers/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'updateSpecialOffer']);
+        Route::delete('/special-offers/{id}', [\App\Http\Controllers\Api\PharmacyDashboardController::class, 'deleteSpecialOffer']);
+    });
+
     // Admin routes (admin only)
     Route::prefix('admin')->middleware('role:admin')->group(function () {
         Route::get('/users', [AdminController::class, 'getUsers']);
@@ -538,6 +581,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/registration-requests/{id}', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'delete']);
         Route::get('/registration-settings', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'getSettings']);
         Route::put('/registration-settings', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'updateSettings']);
+        Route::get('/pharmacies/pending', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'pending']);
+        Route::post('/pharmacies/{id}/verify', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'verify']);
+        Route::post('/pharmacies/{id}/reject', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'reject']);
+        Route::post('/pharmacies/{id}/suspend', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'suspend']);
+        Route::post('/pharmacy-branches/{id}/verify', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'verifyBranch']);
+        Route::post('/pharmacy-duty/import', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'importDuty']);
 
         // Blog Management
         Route::get('/blog/posts', [\App\Http\Controllers\Api\BlogController::class, 'adminIndex']);
@@ -681,3 +730,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 Route::get('/medical-calendar', [MedicalCalendarController::class, 'index']);
 Route::get('/medical-calendar/{id}', [MedicalCalendarController::class, 'show']);
 Route::get('/medical-calendar/categories/list', [MedicalCalendarController::class, 'getCategories']);
+
+// API fallback must always return JSON (never SPA HTML)
+Route::fallback(function () {
+    return response()->json([
+        'message' => 'API endpoint not found.',
+    ], 404);
+});

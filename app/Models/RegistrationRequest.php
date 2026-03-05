@@ -42,6 +42,7 @@ class RegistrationRequest extends Model
         'laboratory_id',
         'spa_id',
         'care_home_id',
+        'pharmacy_firm_id',
         'expires_at',
     ];
 
@@ -97,6 +98,11 @@ class RegistrationRequest extends Model
         return $this->belongsTo(Dom::class, 'care_home_id');
     }
 
+    public function pharmacyFirm()
+    {
+        return $this->belongsTo(ApotekaFirma::class, 'pharmacy_firm_id');
+    }
+
     public function specialty()
     {
         return $this->belongsTo(Specijalnost::class, 'specijalnost_id');
@@ -146,6 +152,11 @@ class RegistrationRequest extends Model
     public function scopeCareHome($query)
     {
         return $query->where('type', 'care_home');
+    }
+
+    public function scopePharmacy($query)
+    {
+        return $query->where('type', 'pharmacy');
     }
 
     /**

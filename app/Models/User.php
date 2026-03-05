@@ -116,6 +116,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(Banja::class);
     }
 
+    public function apotekaFirma()
+    {
+        return $this->hasOne(ApotekaFirma::class, 'owner_user_id');
+    }
+
     public function termini()
     {
         return $this->hasMany(Termin::class);
@@ -160,6 +165,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isPatient()
     {
         return $this->hasRole('patient');
+    }
+
+    public function isPharmacyOwner()
+    {
+        return $this->hasRole('pharmacy_owner');
     }
 
     public function getFullNameAttribute()

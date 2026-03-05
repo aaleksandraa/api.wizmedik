@@ -7,6 +7,10 @@ use App\Models\RegistrationRequest;
 use App\Models\User;
 use App\Models\Doktor;
 use App\Models\Klinika;
+use App\Models\ApotekaFirma;
+use App\Models\ApotekaPoslovnica;
+use App\Models\ApotekaRadnoVrijeme;
+use App\Models\Grad;
 use App\Models\SiteSetting;
 use App\Mail\RegistrationApprovedMail;
 use App\Mail\RegistrationRejectedMail;
@@ -24,11 +28,11 @@ class AdminRegistrationController extends Controller
      */
     public function index(Request $request)
     {
-        $query = RegistrationRequest::with(['reviewer', 'specialty', 'laboratory', 'spa', 'careHome'])
+        $query = RegistrationRequest::with(['reviewer', 'specialty', 'laboratory', 'spa', 'careHome', 'pharmacyFirm'])
             ->orderBy('created_at', 'desc');
 
         // Filter by type
-        if ($request->has('type') && in_array($request->type, ['doctor', 'clinic', 'laboratory', 'spa', 'care_home'])) {
+        if ($request->has('type') && in_array($request->type, ['doctor', 'clinic', 'laboratory', 'spa', 'care_home', 'pharmacy'])) {
             $query->where('type', $request->type);
         }
 
@@ -66,7 +70,7 @@ class AdminRegistrationController extends Controller
      */
     public function show(int $id)
     {
-        $request = RegistrationRequest::with(['reviewer', 'specialty', 'user', 'doctor', 'clinic', 'laboratory', 'spa', 'careHome'])
+        $request = RegistrationRequest::with(['reviewer', 'specialty', 'user', 'doctor', 'clinic', 'laboratory', 'spa', 'careHome', 'pharmacyFirm'])
             ->findOrFail($id);
 
         return response()->json($request);
@@ -105,6 +109,7 @@ class AdminRegistrationController extends Controller
                 'laboratory_id' => $result['laboratory']->id ?? null,
                 'spa_id' => $result['spa']->id ?? null,
                 'care_home_id' => $result['care_home']->id ?? null,
+                'pharmacy_firm_id' => $result['pharmacy_firm']->id ?? null,
             ]);
             $this->ensureApprovedProfileIsVisible($registrationRequest);
 
@@ -118,7 +123,7 @@ class AdminRegistrationController extends Controller
             return response()->json([
                 'message' => 'Zahtjev je uspješno odobren.',
                 'user' => $result['user'],
-                'profile' => $result['doctor'] ?? $result['clinic'] ?? $result['laboratory'] ?? $result['spa'] ?? $result['care_home'],
+                'profile' => $result['doctor'] ?? $result['clinic'] ?? $result['laboratory'] ?? $result['spa'] ?? $result['care_home'] ?? $result['pharmacy_firm'],
             ]);
 
         } catch (\Exception $e) {
@@ -194,6 +199,9 @@ class AdminRegistrationController extends Controller
                     if ($registrationRequest->care_home_id) {
                         \App\Models\Dom::where('id', $registrationRequest->care_home_id)->delete();
                     }
+                    if ($registrationRequest->pharmacy_firm_id) {
+                        \App\Models\ApotekaFirma::where('id', $registrationRequest->pharmacy_firm_id)->delete();
+                    }
 
                     // Delete user (this will cascade delete related data)
                     $user->delete();
@@ -250,6 +258,11 @@ class AdminRegistrationController extends Controller
             'care_home_registration_price' => 'nullable|numeric|min:0',
             'care_home_auto_approve' => 'required|boolean',
             'care_home_registration_message' => 'nullable|string|max:1000',
+            'pharmacy_registration_enabled' => 'sometimes|boolean',
+            'pharmacy_registration_free' => 'sometimes|boolean',
+            'pharmacy_registration_price' => 'nullable|numeric|min:0',
+            'pharmacy_auto_approve' => 'sometimes|boolean',
+            'pharmacy_registration_message' => 'nullable|string|max:1000',
             'registration_admin_email' => 'nullable|email',
             'registration_auto_approve' => 'required|boolean',
             'registration_require_documents' => 'required|boolean',
@@ -300,6 +313,11 @@ class AdminRegistrationController extends Controller
             'care_home_registration_price' => (float) SiteSetting::get('care_home_registration_price', 0),
             'care_home_auto_approve' => SiteSetting::get('care_home_auto_approve', 'false') === 'true',
             'care_home_registration_message' => SiteSetting::get('care_home_registration_message', ''),
+            'pharmacy_registration_enabled' => SiteSetting::get('pharmacy_registration_enabled', 'true') === 'true',
+            'pharmacy_registration_free' => SiteSetting::get('pharmacy_registration_free', 'true') === 'true',
+            'pharmacy_registration_price' => (float) SiteSetting::get('pharmacy_registration_price', 0),
+            'pharmacy_auto_approve' => SiteSetting::get('pharmacy_auto_approve', 'false') === 'true',
+            'pharmacy_registration_message' => SiteSetting::get('pharmacy_registration_message', ''),
             'registration_admin_email' => SiteSetting::get('registration_admin_email', ''),
             'registration_auto_approve' => SiteSetting::get('registration_auto_approve', 'false') === 'true',
             'registration_require_documents' => SiteSetting::get('registration_require_documents', 'false') === 'true',
@@ -339,6 +357,7 @@ class AdminRegistrationController extends Controller
             'laboratory' => 'laboratory',
             'spa' => 'spa_manager',
             'care_home' => 'dom_manager',
+            'pharmacy' => 'pharmacy_owner',
         ];
 
         $roleName = $roleMapping[$registrationRequest->type] ?? 'patient';
@@ -498,6 +517,69 @@ class AdminRegistrationController extends Controller
             }
 
             return ['user' => $user, 'care_home' => $careHome];
+        } elseif ($registrationRequest->type === 'pharmacy') {
+            $cityName = trim((string) $registrationRequest->grad);
+            $city = null;
+            if ($cityName !== '') {
+                $city = Grad::query()
+                    ->whereRaw('LOWER(naziv) = ?', [mb_strtolower($cityName)])
+                    ->orWhere('slug', Str::slug($cityName))
+                    ->first();
+            }
+
+            $pharmacyFirm = ApotekaFirma::create([
+                'owner_user_id' => $user->id,
+                'naziv_brenda' => $messageData['naziv_brenda'] ?? $registrationRequest->naziv,
+                'pravni_naziv' => $messageData['pravni_naziv'] ?? null,
+                'jib' => $messageData['jib'] ?? null,
+                'broj_licence' => $messageData['broj_licence'] ?? null,
+                'telefon' => $registrationRequest->telefon,
+                'email' => $publicEmail,
+                'website' => $messageData['website'] ?? null,
+                'opis' => $messageData['opis'] ?? $textMessage,
+                'status' => 'verified',
+                'is_active' => true,
+                'verified_at' => now(),
+                'verified_by' => $approver?->id,
+            ]);
+
+            $branchName = trim((string) ($messageData['branch_naziv'] ?? ''));
+            if ($branchName === '') {
+                $branchName = $registrationRequest->naziv . ' - Glavna poslovnica';
+            }
+
+            $pharmacyBranch = ApotekaPoslovnica::create([
+                'firma_id' => $pharmacyFirm->id,
+                'naziv' => $branchName,
+                'slug' => ApotekaPoslovnica::generateUniqueSlug($branchName),
+                'grad_id' => $city?->id,
+                'grad_naziv' => $city?->naziv ?? $registrationRequest->grad,
+                'adresa' => $registrationRequest->adresa,
+                'postanski_broj' => $messageData['postanski_broj'] ?? null,
+                'latitude' => $messageData['latitude'] ?? null,
+                'longitude' => $messageData['longitude'] ?? null,
+                'telefon' => $registrationRequest->telefon,
+                'email' => $publicEmail,
+                'kratki_opis' => $messageData['kratki_opis'] ?? null,
+                'google_maps_link' => $messageData['google_maps_link'] ?? null,
+                'is_24h' => (bool) ($messageData['is_24h'] ?? false),
+                'is_active' => true,
+                'is_verified' => true,
+                'verified_at' => now(),
+                'verified_by' => $approver?->id,
+            ]);
+
+            foreach (range(1, 7) as $day) {
+                ApotekaRadnoVrijeme::create([
+                    'poslovnica_id' => $pharmacyBranch->id,
+                    'day_of_week' => $day,
+                    'open_time' => in_array($day, [1, 2, 3, 4, 5, 6], true) ? '08:00' : null,
+                    'close_time' => in_array($day, [1, 2, 3, 4, 5], true) ? '20:00' : (in_array($day, [6], true) ? '14:00' : null),
+                    'closed' => $day === 7,
+                ]);
+            }
+
+            return ['user' => $user, 'pharmacy_firm' => $pharmacyFirm, 'pharmacy_branch' => $pharmacyBranch];
         } else {
             // Create clinic profile
             $clinic = Klinika::create([
@@ -540,6 +622,7 @@ class AdminRegistrationController extends Controller
                 'laboratory_id' => $result['laboratory']->id ?? null,
                 'spa_id' => $result['spa']->id ?? null,
                 'care_home_id' => $result['care_home']->id ?? null,
+                'pharmacy_firm_id' => $result['pharmacy_firm']->id ?? null,
             ]);
             $this->ensureApprovedProfileIsVisible($registrationRequest);
 
@@ -610,6 +693,27 @@ class AdminRegistrationController extends Controller
                     'aktivan' => true,
                     'verifikovan' => true,
                 ]);
+            }
+        }
+
+        if ($registrationRequest->type === 'pharmacy' && $registrationRequest->pharmacy_firm_id) {
+            $firm = ApotekaFirma::find($registrationRequest->pharmacy_firm_id);
+            if ($firm) {
+                $firm->update([
+                    'is_active' => true,
+                    'status' => 'verified',
+                    'verified_at' => $firm->verified_at ?? now(),
+                    'verified_by' => $firm->verified_by ?? $registrationRequest->reviewed_by,
+                ]);
+
+                ApotekaPoslovnica::query()
+                    ->where('firma_id', $firm->id)
+                    ->update([
+                        'is_active' => true,
+                        'is_verified' => true,
+                        'verified_at' => now(),
+                        'verified_by' => $registrationRequest->reviewed_by,
+                    ]);
             }
         }
     }

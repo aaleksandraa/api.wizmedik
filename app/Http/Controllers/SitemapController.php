@@ -136,6 +136,7 @@ class SitemapController extends Controller
             'sitemap-specialties.xml',
             'sitemap-cities.xml',
             'sitemap-laboratories.xml',
+            'sitemap-pharmacies.xml',
             'sitemap-spas.xml',
             'sitemap-care-homes.xml',
             'sitemap-doctor-city-specialties.xml',
@@ -169,6 +170,7 @@ class SitemapController extends Controller
             ['url' => '/specijalnosti', 'priority' => '0.9', 'changefreq' => 'weekly'],
             ['url' => '/gradovi', 'priority' => '0.8', 'changefreq' => 'weekly'],
             ['url' => '/laboratorije', 'priority' => '0.8', 'changefreq' => 'daily'],
+            ['url' => '/apoteke', 'priority' => '0.8', 'changefreq' => 'daily'],
             ['url' => '/banje', 'priority' => '0.8', 'changefreq' => 'weekly'],
             ['url' => '/banje/indikacije-terapije', 'priority' => '0.7', 'changefreq' => 'weekly'],
             ['url' => '/domovi-njega', 'priority' => '0.8', 'changefreq' => 'weekly'],
@@ -334,6 +336,7 @@ class SitemapController extends Controller
             ['prefix' => 'doktori', 'rows' => $this->cityRowsForTable('doktori')],
             ['prefix' => 'klinike', 'rows' => $this->cityRowsForTable('klinike')],
             ['prefix' => 'laboratorije', 'rows' => $this->cityRowsForTable('laboratorije')],
+            ['prefix' => 'apoteke', 'rows' => $this->pharmacyCityRows()],
             ['prefix' => 'banje', 'rows' => $this->cityRowsForTable('banje')],
             ['prefix' => 'domovi-njega', 'rows' => $this->cityRowsForTable('domovi_njega')],
         ];
@@ -387,6 +390,39 @@ class SitemapController extends Controller
                 $lab->updated_at,
                 'weekly',
                 '0.7'
+            );
+        }
+
+        $xml .= '</urlset>';
+
+        return response($xml, 200)->header('Content-Type', 'application/xml');
+    }
+
+    public function pharmacies()
+    {
+        $baseUrl = $this->getBaseUrl();
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+        $pharmacies = DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->select('apoteke_poslovnice.slug', 'apoteke_poslovnice.updated_at')
+            ->get();
+
+        foreach ($pharmacies as $pharmacy) {
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/apoteka/' . $pharmacy->slug,
+                $pharmacy->updated_at,
+                'weekly',
+                '0.75'
             );
         }
 
@@ -576,5 +612,22 @@ class SitemapController extends Controller
         $xml .= '</urlset>';
 
         return response($xml, 200)->header('Content-Type', 'application/xml');
+    }
+
+    private function pharmacyCityRows(): Collection
+    {
+        return DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->whereNotNull('apoteke_poslovnice.grad_naziv')
+            ->where('apoteke_poslovnice.grad_naziv', '!=', '')
+            ->selectRaw('apoteke_poslovnice.grad_naziv as grad, MAX(apoteke_poslovnice.updated_at) AS updated_at')
+            ->groupBy('apoteke_poslovnice.grad_naziv')
+            ->get();
     }
 }

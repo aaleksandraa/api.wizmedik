@@ -23,6 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $laboratoryRole = Role::firstOrCreate(['name' => 'laboratory']);
         $spaManagerRole = Role::firstOrCreate(['name' => 'spa_manager']);
         $domManagerRole = Role::firstOrCreate(['name' => 'dom_manager']);
+        $pharmacyOwnerRole = Role::firstOrCreate(['name' => 'pharmacy_owner']);
         $patientRole = Role::firstOrCreate(['name' => 'patient']);
 
         // Create permissions (or get existing)
@@ -42,6 +43,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage laboratory profile',
             'manage spa profile',
             'manage dom profile',
+            'manage pharmacy profile',
         ];
 
         foreach ($permissions as $permission) {
@@ -77,6 +79,11 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $domManagerRole->givePermissionTo([
             'manage dom profile',
+            'manage own profile',
+        ]);
+
+        $pharmacyOwnerRole->givePermissionTo([
+            'manage pharmacy profile',
             'manage own profile',
         ]);
 

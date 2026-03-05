@@ -62,6 +62,7 @@ class DatabaseSeeder extends Seeder
             // Laboratory system
             KategorijeAnalizaSeeder::class,
             LaboratorijeSeeder::class,
+            PharmacyDemoSeeder::class,
 
             // Spa/Rehabilitation system
             VrsteBanjaSeeder::class,

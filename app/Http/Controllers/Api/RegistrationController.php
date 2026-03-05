@@ -230,6 +230,42 @@ class RegistrationController extends Controller
     }
 
     /**
+     * Register a new pharmacy owner/company
+     */
+    public function registerPharmacy(\App\Http\Requests\PharmacyRegistrationRequest $request)
+    {
+        try {
+            $key = 'register-pharmacy:' . $request->ip();
+            if (RateLimiter::tooManyAttempts($key, 5)) {
+                $seconds = RateLimiter::availableIn($key);
+                return response()->json([
+                    'message' => "Previse pokusaja. Pokusajte ponovo za {$seconds} sekundi."
+                ], 429);
+            }
+
+            RateLimiter::hit($key, 3600);
+
+            $registrationRequest = $this->createRegistrationRequest('pharmacy', $request);
+            $this->sendVerificationEmail($registrationRequest);
+            $this->sendAdminNotification($registrationRequest);
+
+            return response()->json([
+                'message' => 'Zahtjev za registraciju je uspjesno poslat. Molimo provjerite vas email za verifikaciju.',
+                'request_id' => $registrationRequest->id,
+            ], 201);
+        } catch (\Exception $e) {
+            \Log::error('Pharmacy registration error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'message' => 'Doslo je do greske na serveru. Molimo pokusajte ponovo.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+                'error_id' => \Str::uuid(),
+            ], 500);
+        }
+    }
+
+    /**
      * Verify email with token
      */
     public function verifyEmail(string $token)
@@ -446,6 +482,12 @@ class RegistrationController extends Controller
                 'price' => (float) SiteSetting::get('care_home_registration_price', 0),
                 'message' => SiteSetting::get('care_home_registration_message', ''),
             ],
+            'pharmacy' => [
+                'enabled' => SiteSetting::get('pharmacy_registration_enabled', 'true') === 'true',
+                'free' => SiteSetting::get('pharmacy_registration_free', 'true') === 'true',
+                'price' => (float) SiteSetting::get('pharmacy_registration_price', 0),
+                'message' => SiteSetting::get('pharmacy_registration_message', ''),
+            ],
             'require_documents' => SiteSetting::get('registration_require_documents', 'false') === 'true',
         ]);
     }
@@ -456,7 +498,7 @@ class RegistrationController extends Controller
     private function createRegistrationRequest(string $type, $request): RegistrationRequest
     {
         // For profiles with separate login/public email, prefer account_email for login if provided
-        $accountEmail = in_array($type, ['spa', 'care_home', 'laboratory'])
+        $accountEmail = in_array($type, ['spa', 'care_home', 'laboratory', 'pharmacy'])
             ? ($request->account_email ?: $request->email)
             : $request->email;
 
@@ -530,6 +572,25 @@ class RegistrationController extends Controller
                 'website' => $request->website,
                 'opis' => $request->opis,
                 'napomena' => $request->napomena,
+            ]);
+        } elseif ($type === 'pharmacy') {
+            $data['naziv'] = $request->naziv_brenda;
+            $data['ime'] = $request->ime;
+            $data['message'] = json_encode([
+                'public_email' => $request->email,
+                'naziv_brenda' => $request->naziv_brenda,
+                'pravni_naziv' => $request->pravni_naziv,
+                'broj_licence' => $request->broj_licence,
+                'website' => $request->website,
+                'opis' => $request->opis,
+                'branch_naziv' => $request->branch_naziv,
+                'postanski_broj' => $request->postanski_broj,
+                'latitude' => $request->latitude,
+                'longitude' => $request->longitude,
+                'google_maps_link' => $request->google_maps_link,
+                'is_24h' => (bool) ($request->is_24h ?? false),
+                'kratki_opis' => $request->kratki_opis,
+                'message' => $request->message,
             ]);
         } else {
             $data['naziv'] = $request->naziv;

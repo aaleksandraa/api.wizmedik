@@ -219,6 +219,7 @@ class AuthController extends Controller
         $mappedRole = match ($legacyRole) {
             'spa' => 'spa_manager',
             'care_home', 'care_home_manager' => 'dom_manager',
+            'pharmacy' => 'pharmacy_owner',
             default => $legacyRole !== '' ? $legacyRole : 'patient',
         };
 

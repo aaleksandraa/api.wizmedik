@@ -13,6 +13,7 @@ Route::get('/sitemap-clinics.xml', [SitemapController::class, 'clinics']);
 Route::get('/sitemap-specialties.xml', [SitemapController::class, 'specialties']);
 Route::get('/sitemap-cities.xml', [SitemapController::class, 'cities']);
 Route::get('/sitemap-laboratories.xml', [SitemapController::class, 'laboratories']);
+Route::get('/sitemap-pharmacies.xml', [SitemapController::class, 'pharmacies']);
 Route::get('/sitemap-spas.xml', [SitemapController::class, 'spas']);
 Route::get('/sitemap-care-homes.xml', [SitemapController::class, 'careHomes']);
 Route::get('/sitemap-doctor-city-specialties.xml', [SitemapController::class, 'doctorCitySpecialties']);
@@ -35,7 +36,7 @@ Route::get('/storage/{folder}/{filename}', function ($folder, $filename) {
 
 // SEO-friendly catch-all route (must be last)
 // Serves index.html with dynamic meta tags for all SPA routes
-// IMPORTANT: Exclude sitemap.xml and other XML files
+// IMPORTANT: Exclude API and sitemap routes so backend APIs never hit SPA fallback
 Route::get('/{any}', [SeoController::class, 'index'])
-    ->where('any', '^(?!sitemap).*')  // Exclude sitemap routes
+    ->where('any', '^(?!(api|sitemap)(/|$)).*')
     ->middleware('web');
