@@ -590,6 +590,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Blog Management
         Route::get('/blog/posts', [\App\Http\Controllers\Api\BlogController::class, 'adminIndex']);
+        Route::get('/blog/export', [\App\Http\Controllers\Api\BlogController::class, 'adminExport']);
         Route::post('/blog/posts', [\App\Http\Controllers\Api\BlogController::class, 'adminStore']);
         Route::put('/blog/posts/{id}', [\App\Http\Controllers\Api\BlogController::class, 'adminUpdate']);
         Route::delete('/blog/posts/{id}', [\App\Http\Controllers\Api\BlogController::class, 'adminDestroy']);

@@ -386,6 +386,86 @@ class BlogController extends Controller
         return response()->json(['message' => 'Članak obrisan']);
     }
 
+    public function adminExport()
+    {
+        $posts = BlogPost::with([
+            'categories:id,naziv,slug,opis,sort_order',
+            'doktor:id,ime,prezime,specijalnost,slug',
+            'autor:id,name,email',
+        ])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $payload = [
+            'exported_at' => now()->toIso8601String(),
+            'source' => [
+                'app_name' => config('app.name'),
+                'app_url' => config('app.url'),
+            ],
+            'exported_by' => [
+                'id' => auth()->id(),
+                'name' => auth()->user()?->name,
+                'email' => auth()->user()?->email,
+            ],
+            'total_posts' => $posts->count(),
+            'posts' => $posts->map(function (BlogPost $post) {
+                return [
+                    'id' => $post->id,
+                    'naslov' => $post->naslov,
+                    'slug' => $post->slug,
+                    'excerpt' => $post->excerpt,
+                    'sadrzaj' => $post->sadrzaj,
+                    'thumbnail' => $post->thumbnail,
+                    'status' => $post->status,
+                    'featured' => (bool) $post->featured,
+                    'views' => (int) $post->views,
+                    'meta_title' => $post->meta_title,
+                    'meta_description' => $post->meta_description,
+                    'meta_keywords' => $post->meta_keywords,
+                    'reading_time' => $post->reading_time,
+                    'reading_time_manual' => $post->reading_time_manual,
+                    'published_at' => optional($post->published_at)->toIso8601String(),
+                    'created_at' => optional($post->created_at)->toIso8601String(),
+                    'updated_at' => optional($post->updated_at)->toIso8601String(),
+                    'author' => $post->autor ? [
+                        'id' => $post->autor->id,
+                        'name' => $post->autor->name,
+                        'email' => $post->autor->email,
+                    ] : null,
+                    'doctor' => $post->doktor ? [
+                        'id' => $post->doktor->id,
+                        'ime' => $post->doktor->ime,
+                        'prezime' => $post->doktor->prezime,
+                        'specijalnost' => $post->doktor->specijalnost,
+                        'slug' => $post->doktor->slug,
+                    ] : null,
+                    'categories' => $post->categories->map(function ($category) {
+                        return [
+                            'id' => $category->id,
+                            'naziv' => $category->naziv,
+                            'slug' => $category->slug,
+                            'opis' => $category->opis,
+                            'sort_order' => $category->sort_order,
+                        ];
+                    })->values()->all(),
+                ];
+            })->values()->all(),
+        ];
+
+        $fileName = 'blog-posts-backup-' . now()->format('Y-m-d_His') . '.json';
+        $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return response()->streamDownload(
+            static function () use ($json) {
+                echo $json;
+            },
+            $fileName,
+            [
+                'Content-Type' => 'application/json; charset=UTF-8',
+            ]
+        );
+    }
+
     // Categories admin
     public function adminStoreCategory(Request $request)
     {

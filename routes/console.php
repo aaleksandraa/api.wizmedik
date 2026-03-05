@@ -15,3 +15,15 @@ Schedule::command(
     ->timezone((string) config('app.sitemap_schedule_timezone'))
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/sitemap-schedule.log'));
+
+Schedule::command('backup:run --only-db')
+    ->dailyAt('02:00')
+    ->timezone((string) config('app.timezone', 'Europe/Sarajevo'))
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/database-backup-schedule.log'));
+
+Schedule::command('backup:clean')
+    ->dailyAt('02:30')
+    ->timezone((string) config('app.timezone', 'Europe/Sarajevo'))
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/database-backup-schedule.log'));

@@ -6,8 +6,9 @@ SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 APP_DIR=/var/www/zdravlje-bih
 
-# Database Backup - Daily at 2 AM
-0 2 * * * ${APP_DIR}/backend/scripts/backup-database.sh >> /var/log/backup-db.log 2>&1
+# Database Backup - handled by Laravel scheduler (routes/console.php)
+# If scheduler is disabled, uncomment this fallback:
+# 0 2 * * * ${APP_DIR}/backend/scripts/backup-database.sh >> /var/log/backup-db.log 2>&1
 
 # File Backup - Daily at 3 AM
 0 3 * * * ${APP_DIR}/backend/scripts/backup-files.sh >> /var/log/backup-files.log 2>&1
