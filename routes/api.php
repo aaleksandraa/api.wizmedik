@@ -581,7 +581,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/registration-requests/{id}', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'delete']);
         Route::get('/registration-settings', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'getSettings']);
         Route::put('/registration-settings', [\App\Http\Controllers\Api\AdminRegistrationController::class, 'updateSettings']);
+
+        // Pharmacy management
+        Route::get('/pharmacies', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'index']);
+        Route::post('/pharmacies', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'store']);
         Route::get('/pharmacies/pending', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'pending']);
+        Route::put('/pharmacies/{id}', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'update'])->whereNumber('id');
+        Route::delete('/pharmacies/{id}', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'destroy'])->whereNumber('id');
         Route::post('/pharmacies/{id}/verify', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'verify']);
         Route::post('/pharmacies/{id}/reject', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'reject']);
         Route::post('/pharmacies/{id}/suspend', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'suspend']);
