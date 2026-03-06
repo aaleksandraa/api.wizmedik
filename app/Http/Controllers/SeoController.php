@@ -10,6 +10,11 @@ class SeoController extends Controller
 {
     public function index(Request $request)
     {
+        $canonicalRedirect = $this->normalizeCanonicalRedirect($request);
+        if ($canonicalRedirect) {
+            return redirect($canonicalRedirect, 301);
+        }
+
         $normalizedUrl = $this->normalizeListingQueryUrl($request);
         if ($normalizedUrl) {
             return redirect($normalizedUrl, 301);
@@ -17,6 +22,7 @@ class SeoController extends Controller
 
         $path = trim($request->path(), '/');
         $metaTags = $this->getMetaTagsForPath($path);
+        $statusCode = $metaTags['status'] ?? 200;
 
         // Try multiple paths for index.html
         $indexPath = base_path('../frontend/dist/index.html');
@@ -35,6 +41,7 @@ class SeoController extends Controller
         }
 
         $html = file_get_contents($indexPath);
+        $html = $this->stripExistingSeoTags($html);
 
         // Inject meta tags before </head>
         $html = str_replace(
@@ -50,13 +57,18 @@ class SeoController extends Controller
             $html
         );
 
-        return response($html)->header('Content-Type', 'text/html');
+        return response($html, $statusCode)->header('Content-Type', 'text/html');
     }
 
     private function getMetaTagsForPath(string $path): array
     {
         if ($path === '' || $path === 'index.php') {
             return $this->getDefaultMeta();
+        }
+
+        $staticMeta = $this->getStaticMetaForPath($path);
+        if ($staticMeta !== null) {
+            return $staticMeta;
         }
 
         if ($path === 'gradovi') {
@@ -177,7 +189,7 @@ class SeoController extends Controller
             return $this->getAskQuestionMeta();
         }
 
-        return $this->getDefaultMeta();
+        return $this->getNotFoundMeta($path);
     }
 
     private function getDoctorsListingMeta(?string $citySlug = null, ?string $specialtySlug = null): array
@@ -484,7 +496,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$doctor) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("doktor/{$slug}");
         }
 
         $title = "Dr. {$doctor->ime} {$doctor->prezime} - {$doctor->specijalnost} | wizMedik";
@@ -508,7 +520,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$clinic) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("klinika/{$slug}");
         }
 
         $title = "{$clinic->naziv} - Klinika u {$clinic->grad} | wizMedik";
@@ -532,7 +544,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$specialty) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("specijalnost/{$slug}");
         }
 
         $doctorCount = DB::table('doktori')
@@ -561,7 +573,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$city) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("grad/{$slug}");
         }
 
         $doctorCount = DB::table('doktori')
@@ -631,7 +643,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$lab) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("laboratorija/{$slug}");
         }
 
         $title = "{$lab->naziv} - Laboratorija u {$lab->grad} | wizMedik";
@@ -672,7 +684,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$pharmacy) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("apoteka/{$slug}");
         }
 
         $city = $pharmacy->grad_naziv ?: 'BiH';
@@ -714,7 +726,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$spa) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("banja/{$slug}");
         }
 
         $title = "{$spa->naziv} - Banja u {$spa->grad} | wizMedik";
@@ -741,7 +753,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$home) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("dom-njega/{$slug}");
         }
 
         $title = "{$home->naziv} - Dom njege u {$home->grad} | wizMedik";
@@ -768,7 +780,7 @@ class SeoController extends Controller
             ->first();
 
         if (!$post) {
-            return $this->getDefaultMeta();
+            return $this->getNotFoundMeta("blog/{$slug}");
         }
 
         $title = "{$post->naslov} | wizMedik Blog";
@@ -942,6 +954,188 @@ class SeoController extends Controller
         return [
             'title' => "<title>{$title}</title>",
             'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', null, 'noindex, nofollow'),
+        ];
+    }
+
+    private function getNotFoundMeta(string $path): array
+    {
+        $title = '404 - Stranica nije pronadjena | wizMedik';
+        $description = 'Trazeni sadrzaj nije pronadjen.';
+        $url = $this->buildUrl($path);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', null, 'noindex, nofollow'),
+            'status' => 404,
+        ];
+    }
+
+    private function getStaticMetaForPath(string $path): ?array
+    {
+        if ($path === 'about') {
+            return $this->simplePageMeta(
+                'O wizMedik platformi | wizMedik',
+                'Saznajte vise o wizMedik platformi za pronalazak doktora, klinika, laboratorija i apoteka u Bosni i Hercegovini.',
+                'about'
+            );
+        }
+
+        if ($path === 'contact') {
+            return $this->simplePageMeta(
+                'Kontakt | wizMedik',
+                'Kontaktirajte wizMedik tim za podrsku, saradnju i dodatne informacije o platformi.',
+                'contact'
+            );
+        }
+
+        if ($path === 'specijalnosti') {
+            return $this->simplePageMeta(
+                'Medicinske specijalnosti | wizMedik',
+                'Pregledajte medicinske specijalnosti i pronadjite doktore i klinike za oblast koja vas zanima.',
+                'specijalnosti'
+            );
+        }
+
+        if ($path === 'kalkulatori') {
+            return $this->simplePageMeta(
+                'Zdravstveni kalkulatori | wizMedik',
+                'Koristite zdravstvene kalkulatore za brzu informativnu procjenu i planiranje zdravstvenih ciljeva.',
+                'kalkulatori'
+            );
+        }
+
+        if ($path === 'faq') {
+            return $this->simplePageMeta(
+                'Cesta pitanja | wizMedik',
+                'Odgovori na najcesca pitanja o koristenju wizMedik platforme, pretrazi i zakazivanju.',
+                'faq'
+            );
+        }
+
+        if ($path === 'politika-privatnosti' || $path === 'privacy-policy') {
+            return $this->simplePageMeta(
+                'Politika privatnosti | wizMedik',
+                'Procitajte kako wizMedik prikuplja, cuva i obraduje licne podatke korisnika.',
+                'politika-privatnosti'
+            );
+        }
+
+        if ($path === 'uslovi-koristenja' || $path === 'terms-of-service') {
+            return $this->simplePageMeta(
+                'Uslovi koristenja | wizMedik',
+                'Upoznajte se sa uslovima koristenja wizMedik platforme i pravilima upotrebe.',
+                'uslovi-koristenja'
+            );
+        }
+
+        if ($path === 'cookie-policy') {
+            return $this->simplePageMeta(
+                'Politika kolacica | wizMedik',
+                'Informacije o vrstama kolacica koje wizMedik koristi i nacinu upravljanja postavkama privatnosti.',
+                'cookie-policy'
+            );
+        }
+
+        if ($path === 'registration-options') {
+            return $this->simplePageMeta(
+                'Registracija na platformu | wizMedik',
+                'Odaberite tip registracije i pridruzite se wizMedik platformi kao zdravstveni profesionalac ili ustanova.',
+                'registration-options'
+            );
+        }
+
+        if ($path === 'register/doctor') {
+            return $this->simplePageMeta(
+                'Registracija doktora | wizMedik',
+                'Kreirajte profil doktora na wizMedik i budite vidljiviji pacijentima koji traze pregled.',
+                'register/doctor'
+            );
+        }
+
+        if ($path === 'register/clinic') {
+            return $this->simplePageMeta(
+                'Registracija klinike | wizMedik',
+                'Registrujte kliniku na wizMedik platformu i predstavite usluge, tim i termine pacijentima.',
+                'register/clinic'
+            );
+        }
+
+        if ($path === 'register/laboratory') {
+            return $this->simplePageMeta(
+                'Registracija laboratorije | wizMedik',
+                'Registrujte laboratoriju i omogucite pacijentima laksi pristup analizama i informacijama.',
+                'register/laboratory'
+            );
+        }
+
+        if ($path === 'register/pharmacy') {
+            return $this->simplePageMeta(
+                'Registracija apoteke | wizMedik',
+                'Registrujte apoteku i poslovnice na wizMedik platformu radi bolje lokalne vidljivosti.',
+                'register/pharmacy'
+            );
+        }
+
+        if ($path === 'register/spa') {
+            return $this->simplePageMeta(
+                'Registracija banje | wizMedik',
+                'Registrujte banju ili rehabilitacioni centar i predstavite terapije i smjestajne kapacitete.',
+                'register/spa'
+            );
+        }
+
+        if ($path === 'register/care-home') {
+            return $this->simplePageMeta(
+                'Registracija doma za njegu | wizMedik',
+                'Registrujte dom za njegu i prikazite usluge, smjestaj i kontakt informacije korisnicima.',
+                'register/care-home'
+            );
+        }
+
+        if (preg_match('/^register\/verify\/[^\/]+$/', $path)) {
+            return $this->getNoindexMeta(
+                'Verifikacija registracije | wizMedik',
+                'Verifikacija registracije korisnickog naloga.',
+                $path
+            );
+        }
+
+        if (in_array($path, ['auth', 'forgot-password', 'reset-password'], true)) {
+            return $this->getNoindexMeta(
+                'Korisnicki pristup | wizMedik',
+                'Siguran pristup korisnickom nalogu na wizMedik platformi.',
+                $path
+            );
+        }
+
+        if (in_array($path, [
+            'dashboard',
+            'doctor-dashboard',
+            'clinic-dashboard',
+            'laboratory-dashboard',
+            'pharmacy-dashboard',
+            'spa-dashboard',
+            'dom-dashboard',
+            'my-blog-posts',
+            'blog/editor',
+        ], true) || str_starts_with($path, 'admin') || preg_match('/^blog\/editor\/[^\/]+$/', $path)) {
+            return $this->getNoindexMeta(
+                'Privatna stranica | wizMedik',
+                'Privatna korisnicka stranica.',
+                $path
+            );
+        }
+
+        return null;
+    }
+
+    private function simplePageMeta(string $title, string $description, string $path): array
+    {
+        $url = $this->buildUrl($path);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website'),
         ];
     }
 
@@ -1160,5 +1354,52 @@ HTML;
         $slug = Str::slug($decoded);
 
         return $slug !== '' ? $slug : rawurlencode(trim($decoded));
+    }
+
+    private function normalizeCanonicalRedirect(Request $request): ?string
+    {
+        $pathInfo = $request->getPathInfo();
+        $path = trim($request->path(), '/');
+        $queryString = $request->getQueryString();
+
+        if ($pathInfo !== '/' && str_ends_with($pathInfo, '/')) {
+            $trimmedPath = trim($pathInfo, '/');
+            return $this->appendQueryString($this->buildUrl($trimmedPath), $queryString);
+        }
+
+        $aliases = [
+            'kontakt' => 'contact',
+            'o-nama' => 'about',
+        ];
+
+        if (isset($aliases[$path])) {
+            return $this->appendQueryString($this->buildUrl($aliases[$path]), $queryString);
+        }
+
+        return null;
+    }
+
+    private function appendQueryString(string $url, ?string $queryString): string
+    {
+        if ($queryString === null || $queryString === '') {
+            return $url;
+        }
+
+        return $url . '?' . $queryString;
+    }
+
+    private function stripExistingSeoTags(string $html): string
+    {
+        $patterns = [
+            '/\s*<meta[^>]+name=(["\'])description\1[^>]*>\s*/i',
+            '/\s*<meta[^>]+name=(["\'])robots\1[^>]*>\s*/i',
+            '/\s*<link[^>]+rel=(["\'])canonical\1[^>]*>\s*/i',
+            '/\s*<meta[^>]+property=(["\'])og:[^"\']+\1[^>]*>\s*/i',
+            '/\s*<meta[^>]+name=(["\'])twitter:[^"\']+\1[^>]*>\s*/i',
+        ];
+
+        $stripped = preg_replace($patterns, "\n", $html);
+
+        return $stripped ?? $html;
     }
 }

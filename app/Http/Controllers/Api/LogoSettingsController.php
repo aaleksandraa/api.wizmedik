@@ -16,6 +16,7 @@ class LogoSettingsController extends Controller
         $logoUrl = SiteSetting::where('key', 'logo_url')->value('value');
         $logoEnabled = SiteSetting::where('key', 'logo_enabled')->value('value');
         $logoType = SiteSetting::where('key', 'logo_type')->value('value');
+        $logoHtml = SiteSetting::where('key', 'logo_html')->value('value');
 
         // Footer logo settings
         $footerLogoUrl = SiteSetting::where('key', 'footer_logo_url')->value('value');
@@ -55,6 +56,7 @@ class LogoSettingsController extends Controller
             'logo_url' => $logoUrl ?: null,
             'logo_enabled' => $isEnabled,
             'logo_type' => $logoType ?: 'text',
+            'logo_html' => $logoHtml ?: null,
             'footer_logo_url' => $footerLogoUrl ?: null,
             'footer_logo_enabled' => $isFooterEnabled,
             'footer_logo_type' => $footerLogoType ?: 'text',
@@ -76,6 +78,7 @@ class LogoSettingsController extends Controller
             'logo_url' => 'nullable|string|max:500',
             'logo_enabled' => 'required|boolean',
             'logo_type' => 'required|in:image,text',
+            'logo_html' => 'nullable|string|max:65000',
             'footer_logo_url' => 'nullable|string|max:500',
             'footer_logo_enabled' => 'required|boolean',
             'footer_logo_type' => 'required|in:image,text',
@@ -120,6 +123,18 @@ class LogoSettingsController extends Controller
             SiteSetting::create([
                 'key' => 'logo_type',
                 'value' => $validated['logo_type']
+            ]);
+        }
+
+        // Update or create logo_html (custom header HTML snippet)
+        $logoHtml = SiteSetting::where('key', 'logo_html')->first();
+        if ($logoHtml) {
+            $logoHtml->value = $validated['logo_html'] ?? '';
+            $logoHtml->save();
+        } else {
+            SiteSetting::create([
+                'key' => 'logo_html',
+                'value' => $validated['logo_html'] ?? ''
             ]);
         }
 
@@ -237,6 +252,7 @@ class LogoSettingsController extends Controller
                 'logo_url' => $validated['logo_url'] ?? '',
                 'logo_enabled' => $validated['logo_enabled'],
                 'logo_type' => $validated['logo_type'],
+                'logo_html' => $validated['logo_html'] ?? '',
                 'footer_logo_url' => $validated['footer_logo_url'] ?? '',
                 'footer_logo_enabled' => $validated['footer_logo_enabled'],
                 'footer_logo_type' => $validated['footer_logo_type'],
