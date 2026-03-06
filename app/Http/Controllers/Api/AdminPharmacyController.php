@@ -28,7 +28,7 @@ class AdminPharmacyController extends Controller
         $query = ApotekaFirma::query()
             ->with([
                 'owner:id,name,ime,prezime,email,role',
-                'poslovnice' => fn (Builder $builder) => $builder->orderBy('id'),
+                'poslovnice' => fn ($query) => $query->orderBy('id'),
             ])
             ->withCount('poslovnice')
             ->orderByDesc('created_at');
@@ -165,7 +165,7 @@ class AdminPharmacyController extends Controller
             'data' => $this->transformFirm(
                 ApotekaFirma::with([
                     'owner:id,name,ime,prezime,email,role',
-                    'poslovnice' => fn (Builder $builder) => $builder->orderBy('id'),
+                    'poslovnice' => fn ($query) => $query->orderBy('id'),
                 ])->findOrFail($firm->id)
             ),
         ], 201);
@@ -175,7 +175,7 @@ class AdminPharmacyController extends Controller
     {
         $firm = ApotekaFirma::with([
             'owner:id,name,ime,prezime,email,role',
-            'poslovnice' => fn (Builder $builder) => $builder->orderBy('id'),
+            'poslovnice' => fn ($query) => $query->orderBy('id'),
         ])->findOrFail($id);
 
         $validated = $request->validate([
@@ -309,7 +309,7 @@ class AdminPharmacyController extends Controller
 
         $fresh = ApotekaFirma::with([
             'owner:id,name,ime,prezime,email,role',
-            'poslovnice' => fn (Builder $builder) => $builder->orderBy('id'),
+            'poslovnice' => fn ($query) => $query->orderBy('id'),
         ])->findOrFail($id);
 
         return response()->json([
