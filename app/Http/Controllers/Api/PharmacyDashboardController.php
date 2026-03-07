@@ -570,13 +570,23 @@ class PharmacyDashboardController extends Controller
         $data = $request->validate($rules);
         $this->ensureValidBranchScope($firm, $data['poslovnica_id'] ?? null);
 
-        if (
-            array_key_exists('discount_percent', $data) ||
-            array_key_exists('discount_amount', $data)
-        ) {
-            if (($data['discount_percent'] ?? null) === null && ($data['discount_amount'] ?? null) === null) {
-                abort(422, 'Potrebno je unijeti procenat ili fiksni iznos popusta.');
+        $hasPercentKey = array_key_exists('discount_percent', $data);
+        $hasAmountKey = array_key_exists('discount_amount', $data);
+        $hasPercentValue = $hasPercentKey && $data['discount_percent'] !== null;
+        $hasAmountValue = $hasAmountKey && $data['discount_amount'] !== null;
+
+        if (!$partial || $hasPercentKey || $hasAmountKey) {
+            if (($hasPercentValue && $hasAmountValue) || (!$hasPercentValue && !$hasAmountValue)) {
+                abort(422, 'Potrebno je unijeti ili procenat ili fiksni iznos popusta (samo jedno polje).');
             }
+        }
+
+        if ($hasPercentValue) {
+            $data['discount_amount'] = null;
+        }
+
+        if ($hasAmountValue) {
+            $data['discount_percent'] = null;
         }
 
         if (!$partial || array_key_exists('poslovnica_id', $data)) {
