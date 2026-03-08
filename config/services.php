@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    'captcha' => [
+        // Supported values: recaptcha, hcaptcha
+        'provider' => env('CAPTCHA_PROVIDER', 'recaptcha'),
+        'enabled' => env('CAPTCHA_ENABLED', false),
+        'site_key' => env('CAPTCHA_SITE_KEY'),
+        'secret' => env('CAPTCHA_SECRET'),
+        'min_score' => (float) env('CAPTCHA_MIN_SCORE', 0.5),
+    ],
+
+    'bot_protection' => [
+        'block_suspicious' => env('BOT_BLOCK_SUSPICIOUS', false),
+        'suspicious_threshold' => (int) env('BOT_SUSPICIOUS_THRESHOLD', 2),
+    ],
+
 ];

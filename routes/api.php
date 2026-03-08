@@ -45,8 +45,10 @@ Route::post('/password/forgot', [AuthController::class, 'forgotPassword'])
 Route::post('/password/reset', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:5,60'); // 5 attempts per 60 minutes
 
-// Test email endpoint (local only)
-Route::post('/test-email', [AuthController::class, 'testEmail']);
+// Test email endpoint (local/testing only)
+if (app()->environment(['local', 'testing'])) {
+    Route::post('/test-email', [AuthController::class, 'testEmail']);
+}
 
 // Registration routes (for different entity types) with bot detection
 Route::middleware(['throttle:5,60', 'detect.bots'])->group(function () {
@@ -82,7 +84,8 @@ Route::get('/doctors/{id}/services', [DoctorController::class, 'getServices'])->
 Route::get('/doctors/{id}', [DoctorController::class, 'showById'])->where('id', '[0-9]+');
 
 // Public appointment routes (guest booking)
-Route::post('/appointments/guest', [AppointmentController::class, 'storeGuest']);
+Route::post('/appointments/guest', [AppointmentController::class, 'storeGuest'])
+    ->middleware(['throttle:10,15', 'detect.bots']);
 
 // Public calendar sync route (iCal feed)
 Route::get('/calendar/ical/{token}.ics', [CalendarSyncController::class, 'generateICalFeed']);
@@ -101,7 +104,8 @@ Route::get('/specialties/{slug}', [SpecialtyController::class, 'show']);
 
 // Homepage data
 Route::get('/homepage', [HomepageController::class, 'getData']);
-Route::post('/homepage/clear-cache', [HomepageController::class, 'clearCache']);
+Route::post('/homepage/clear-cache', [HomepageController::class, 'clearCache'])
+    ->middleware(['auth:sanctum', 'role:admin', 'throttle:10,1']);
 
 // Settings (public)
 Route::get('/settings/templates', [SettingsController::class, 'getTemplates']);
@@ -139,7 +143,7 @@ Route::get('/pitanja', [\App\Http\Controllers\Api\PitanjeController::class, 'ind
 Route::get('/pitanja/tagovi/popularni', [\App\Http\Controllers\Api\PitanjeController::class, 'popularniTagovi']);
 Route::get('/pitanja/{slug}', [\App\Http\Controllers\Api\PitanjeController::class, 'show']);
 Route::post('/pitanja', [\App\Http\Controllers\Api\PitanjeController::class, 'store'])
-    ->middleware('throttle:5,60'); // 5 questions per 60 minutes
+    ->middleware(['throttle:5,60', 'detect.bots']); // 5 questions per 60 minutes + bot detection
 Route::post('/pitanja/{id}/odgovori', [\App\Http\Controllers\Api\PitanjeController::class, 'odgovori'])->middleware('auth:sanctum');
 Route::post('/pitanja/odgovori/{id}/lajk', [\App\Http\Controllers\Api\PitanjeController::class, 'lajkujOdgovor'])
     ->middleware('throttle:20,5'); // 20 likes per 5 minutes

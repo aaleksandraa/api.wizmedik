@@ -67,13 +67,11 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        // Log incoming request for debugging
+        // Log incoming request metadata without sensitive payload.
         Log::info('Login attempt START', [
             'email' => $request->email,
             'ip' => $request->ip(),
             'has_password' => !empty($request->password),
-            'password_length' => strlen($request->password ?? ''),
-            'all_data' => $request->all(),
         ]);
 
         try {
@@ -245,11 +243,15 @@ class AuthController extends Controller
      */
     public function testEmail(Request $request)
     {
-        if (!app()->environment('local')) {
-            return response()->json(['message' => 'Test endpoint only available in local environment'], 403);
+        if (!app()->environment(['local', 'testing'])) {
+            return response()->json(['message' => 'Test endpoint only available in local/testing environment'], 403);
         }
 
         try {
+            $request->validate([
+                'email' => 'nullable|email:rfc|max:255',
+            ]);
+
             $testEmail = $request->input('email', 'test@example.com');
 
             // Test basic mail configuration

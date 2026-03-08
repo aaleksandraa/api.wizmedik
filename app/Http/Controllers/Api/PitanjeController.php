@@ -9,8 +9,9 @@ use App\Models\NotifikacijaPitanja;
 use App\Models\Doktor;
 use App\Services\NotifikacijaService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class PitanjeController extends Controller
 {
@@ -103,7 +104,11 @@ class PitanjeController extends Controller
             'specijalnost_id' => 'required|exists:specijalnosti,id',
             'tagovi' => 'nullable|array|max:5',
             'tagovi.*' => 'string|max:50',
-            'captcha_token' => 'required|string', // Za Google reCAPTCHA ili hCaptcha
+            'captcha_token' => 'required|string|max:2048',
+            'captcha_a' => 'nullable|integer|min:0|max:1000',
+            'captcha_b' => 'nullable|integer|min:0|max:1000',
+            'captcha_answer' => 'nullable|integer|min:0|max:2000',
+            'website' => 'nullable|string|max:0', // Honeypot
         ]);
 
         if ($validator->fails()) {
@@ -113,8 +118,12 @@ class PitanjeController extends Controller
             ], 422);
         }
 
-        // TODO: Verifikuj CAPTCHA token
-        // $this->verifyCaptcha($request->captcha_token);
+        $captchaCheck = $this->verifyCaptcha($request);
+        if (!$captchaCheck['ok']) {
+            return response()->json([
+                'message' => $captchaCheck['message'],
+            ], 422);
+        }
 
         // Spam protection - max 3 pitanja po IP u 24h (skip for logged-in users)
         $ipAdresa = $request->ip();
@@ -333,5 +342,105 @@ class PitanjeController extends Controller
 
         // Also create main notifications (for Navbar bell icon)
         NotifikacijaService::novoPitanje($pitanje, $doktori);
+    }
+
+    /**
+     * Verify captcha token (external provider if configured, otherwise fallback math check).
+     *
+     * @return array{ok:bool,message:string}
+     */
+    private function verifyCaptcha(Request $request): array
+    {
+        $enabled = (bool) config('services.captcha.enabled', false);
+        $secret = (string) config('services.captcha.secret', '');
+        $provider = strtolower((string) config('services.captcha.provider', 'recaptcha'));
+        $token = (string) $request->input('captcha_token', '');
+
+        if ($enabled && $secret !== '') {
+            $verifyUrl = $provider === 'hcaptcha'
+                ? 'https://hcaptcha.com/siteverify'
+                : 'https://www.google.com/recaptcha/api/siteverify';
+
+            try {
+                $response = Http::asForm()
+                    ->timeout(6)
+                    ->post($verifyUrl, [
+                        'secret' => $secret,
+                        'response' => $token,
+                        'remoteip' => $request->ip(),
+                    ]);
+
+                if (!$response->ok()) {
+                    Log::warning('Captcha verify failed due to non-200 response', [
+                        'provider' => $provider,
+                        'status' => $response->status(),
+                    ]);
+
+                    return [
+                        'ok' => false,
+                        'message' => 'Captcha verifikacija trenutno nije dostupna. Pokusajte ponovo.',
+                    ];
+                }
+
+                $payload = $response->json() ?? [];
+                $success = (bool) ($payload['success'] ?? false);
+                if (!$success) {
+                    return [
+                        'ok' => false,
+                        'message' => 'Captcha verifikacija nije uspjela.',
+                    ];
+                }
+
+                if ($provider !== 'hcaptcha' && isset($payload['score'])) {
+                    $score = (float) $payload['score'];
+                    $minScore = (float) config('services.captcha.min_score', 0.5);
+                    if ($score < $minScore) {
+                        return [
+                            'ok' => false,
+                            'message' => 'Captcha verifikacija nije uspjela.',
+                        ];
+                    }
+                }
+
+                return [
+                    'ok' => true,
+                    'message' => '',
+                ];
+            } catch (\Throwable $e) {
+                Log::error('Captcha verification exception', [
+                    'provider' => $provider,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return [
+                    'ok' => false,
+                    'message' => 'Captcha verifikacija trenutno nije dostupna. Pokusajte ponovo.',
+                ];
+            }
+        }
+
+        // Fallback server-side math verification to preserve current flow.
+        $a = $request->input('captcha_a');
+        $b = $request->input('captcha_b');
+        $answer = $request->input('captcha_answer');
+
+        if (!is_numeric($a) || !is_numeric($b) || !is_numeric($answer)) {
+            return [
+                'ok' => false,
+                'message' => 'Captcha verifikacija nije uspjela.',
+            ];
+        }
+
+        if (((int) $a + (int) $b) !== (int) $answer) {
+            return [
+                'ok' => false,
+                'message' => 'Captcha verifikacija nije uspjela.',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'message' => '',
+        ];
     }
 }

@@ -55,10 +55,16 @@ class HomepageController extends Controller
                 Log::info('Database connection successful');
             } catch (\Exception $e) {
                 Log::error('Database connection failed: ' . $e->getMessage());
-                return response()->json(array_merge($response, [
+                $payload = array_merge($response, [
                     'error' => 'Database connection failed',
-                    'message' => $e->getMessage()
-                ]), 500);
+                    'message' => 'Privremeni problem sa ucitavanjem podataka.',
+                ]);
+
+                if ($this->shouldExposeErrorDetails()) {
+                    $payload['debug_message'] = $e->getMessage();
+                }
+
+                return response()->json($payload, 500);
             }
 
             // Try to get doctors (safest table)
@@ -280,13 +286,19 @@ class HomepageController extends Controller
             Log::error('Homepage API fatal error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
 
-            return response()->json([
+            $payload = [
                 'error' => 'Homepage API failed',
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => config('app.debug') ? $e->getTraceAsString() : 'Enable debug mode for trace'
-            ], 500);
+                'message' => 'Doslo je do greske na serveru. Molimo pokusajte ponovo.',
+            ];
+
+            if ($this->shouldExposeErrorDetails()) {
+                $payload['debug_message'] = $e->getMessage();
+                $payload['file'] = $e->getFile();
+                $payload['line'] = $e->getLine();
+                $payload['trace'] = $e->getTraceAsString();
+            }
+
+            return response()->json($payload, 500);
         }
     }
 
@@ -300,7 +312,19 @@ class HomepageController extends Controller
             Log::info('Cache clear requested (no cache in simple version)');
             return response()->json(['message' => 'Cache cleared (simple version)']);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            Log::error('Homepage cache clear failed: ' . $e->getMessage());
+
+            $payload = ['error' => 'Cache clear failed.'];
+            if ($this->shouldExposeErrorDetails()) {
+                $payload['debug_message'] = $e->getMessage();
+            }
+
+            return response()->json($payload, 500);
         }
+    }
+
+    private function shouldExposeErrorDetails(): bool
+    {
+        return app()->environment(['local', 'testing']) || (bool) config('app.debug');
     }
 }
