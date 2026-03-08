@@ -57,6 +57,8 @@ class GenerateSitemap extends Command
             'sitemap-doctors.xml' => 'doctors',
             'sitemap-clinics.xml' => 'clinics',
             'sitemap-laboratories.xml' => 'laboratories',
+            'sitemap-lijekovi.xml' => 'medicines',
+            'sitemap-pharmacies.xml' => 'pharmacies',
             'sitemap-spas.xml' => 'spas',
             'sitemap-care-homes.xml' => 'careHomes',
             'sitemap-doctor-city-specialties.xml' => 'doctorCitySpecialties',

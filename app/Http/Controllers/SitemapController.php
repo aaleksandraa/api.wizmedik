@@ -136,6 +136,7 @@ class SitemapController extends Controller
             'sitemap-specialties.xml',
             'sitemap-cities.xml',
             'sitemap-laboratories.xml',
+            'sitemap-lijekovi.xml',
             'sitemap-pharmacies.xml',
             'sitemap-spas.xml',
             'sitemap-care-homes.xml',
@@ -170,6 +171,7 @@ class SitemapController extends Controller
             ['url' => '/specijalnosti', 'priority' => '0.9', 'changefreq' => 'weekly'],
             ['url' => '/gradovi', 'priority' => '0.8', 'changefreq' => 'weekly'],
             ['url' => '/laboratorije', 'priority' => '0.8', 'changefreq' => 'daily'],
+            ['url' => '/lijekovi', 'priority' => '0.9', 'changefreq' => 'daily'],
             ['url' => '/apoteke', 'priority' => '0.8', 'changefreq' => 'daily'],
             ['url' => '/banje', 'priority' => '0.8', 'changefreq' => 'weekly'],
             ['url' => '/banje/indikacije-terapije', 'priority' => '0.7', 'changefreq' => 'weekly'],
@@ -388,6 +390,33 @@ class SitemapController extends Controller
                 $xml,
                 $baseUrl . '/laboratorija/' . $lab->slug,
                 $lab->updated_at,
+                'weekly',
+                '0.7'
+            );
+        }
+
+        $xml .= '</urlset>';
+
+        return response($xml, 200)->header('Content-Type', 'application/xml');
+    }
+
+    public function medicines()
+    {
+        $baseUrl = $this->getBaseUrl();
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+        $medicines = DB::table('lijekovi')
+            ->whereNotNull('slug')
+            ->select('slug', 'updated_at')
+            ->get();
+
+        foreach ($medicines as $medicine) {
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/lijekovi/' . $medicine->slug,
+                $medicine->updated_at,
                 'weekly',
                 '0.7'
             );

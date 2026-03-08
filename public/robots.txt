@@ -38,6 +38,8 @@ Allow: /blog
 Allow: /blog/
 Allow: /pitanja
 Allow: /pitanja/
+Allow: /lijekovi
+Allow: /lijekovi/
 
 # Googlebot specific
 User-agent: Googlebot
@@ -64,3 +66,4 @@ Allow: /
 
 # Sitemap location
 Sitemap: https://wizmedik.com/sitemap.xml
+Sitemap: https://wizmedik.com/sitemap-lijekovi.xml

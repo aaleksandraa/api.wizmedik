@@ -19,7 +19,9 @@ use App\Http\Controllers\Api\{
     LogoSettingsController,
     CalendarSyncController,
     RegistrationController,
-    MedicalCalendarController
+    MedicalCalendarController,
+    AdminLijekController,
+    RfzoListaController
 };
 use App\Http\Controllers\HealthCheckController;
 
@@ -183,6 +185,11 @@ Route::get('/mkb10/dijagnoze', [\App\Http\Controllers\Api\Mkb10Controller::class
 Route::get('/mkb10/dijagnoze/{kod}', [\App\Http\Controllers\Api\Mkb10Controller::class, 'dijagnoza']);
 Route::get('/mkb10/podkategorije/{kategorijaId}', [\App\Http\Controllers\Api\Mkb10Controller::class, 'podkategorije']);
 Route::get('/mkb10/settings', [\App\Http\Controllers\Api\Mkb10Controller::class, 'settings']);
+
+// Public lijekovi routes
+Route::get('/lijekovi', [\App\Http\Controllers\Api\LijekController::class, 'index']);
+Route::get('/lijekovi/{slug}', [\App\Http\Controllers\Api\LijekController::class, 'show']);
+Route::get('/rfzo-liste', [RfzoListaController::class, 'index']);
 
 Route::get('/laboratorije/kategorije/all', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getKategorije']);
 Route::get('/laboratorije/statistics', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getAllStatistics']);
@@ -722,6 +729,19 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/pitanja', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getQuestions']);
     Route::put('/pitanja/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateQuestion']);
     Route::delete('/pitanja/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteQuestion']);
+
+    // Lijekovi - Admin routes
+    Route::get('/lijekovi', [AdminLijekController::class, 'index']);
+    Route::put('/lijekovi/{id}', [AdminLijekController::class, 'update']);
+    Route::post('/lijekovi/import-xml', [AdminLijekController::class, 'importXml']);
+    Route::post('/lijekovi/import-registar', [AdminLijekController::class, 'importRegistar']);
+    Route::get('/lijekovi/audit-quality', [AdminLijekController::class, 'qualityAudit']);
+
+    // RFZO liste - Admin routes
+    Route::get('/rfzo-liste', [RfzoListaController::class, 'adminIndex']);
+    Route::post('/rfzo-liste', [RfzoListaController::class, 'store']);
+    Route::put('/rfzo-liste/{id}', [RfzoListaController::class, 'update']);
+    Route::delete('/rfzo-liste/{id}', [RfzoListaController::class, 'destroy']);
 
     // Medical Calendar - Admin routes
     Route::get('/medical-calendar', [MedicalCalendarController::class, 'adminIndex']);

@@ -152,6 +152,10 @@ class SeoController extends Controller
             return $this->getCareHomesListingMeta($matches[1]);
         }
 
+        if ($path === 'lijekovi') {
+            return $this->getMedicinesListingMeta();
+        }
+
         // Profile routes
         if (preg_match('/^doktor\/([^\/]+)$/', $path, $matches)) {
             return $this->getDoctorMeta($matches[1]);
@@ -170,6 +174,9 @@ class SeoController extends Controller
         }
         if (preg_match('/^dom-njega\/([^\/]+)$/', $path, $matches)) {
             return $this->getCareHomeMeta($matches[1]);
+        }
+        if (preg_match('/^lijekovi\/([^\/]+)$/', $path, $matches)) {
+            return $this->getMedicineMeta($matches[1]);
         }
 
         // Other SEO-enabled pages
@@ -382,6 +389,21 @@ class SeoController extends Controller
         ];
     }
 
+    private function getMedicinesListingMeta(): array
+    {
+        $count = DB::table('lijekovi')->count();
+
+        $title = 'Lijekovi - cijene, doplate i indikacije | wizMedik';
+        $description = "Pretrazite {$count}+ lijekova sa aktuelnom cijenom, participacijom i indikacijama iz RFZO cjenovnika.";
+        $url = $this->buildUrl('lijekovi');
+        $schema = $this->buildCollectionSchema($title, $description, $url, $count);
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+        ];
+    }
+
     private function getCitiesListingMeta(): array
     {
         $count = DB::table('gradovi')
@@ -507,6 +529,51 @@ class SeoController extends Controller
         return [
             'title' => "<title>{$title}</title>",
             'meta' => $this->buildMetaTags($title, $description, $image, $url, 'profile'),
+        ];
+    }
+
+    private function getMedicineMeta(string $slug): array
+    {
+        $lijek = DB::table('lijekovi')
+            ->where('slug', $slug)
+            ->first();
+
+        if (!$lijek) {
+            return $this->getNotFoundMeta("lijekovi/{$slug}");
+        }
+
+        $naziv = $lijek->naziv ?: $lijek->naziv_lijeka ?: 'Lijek';
+        $title = "{$naziv} - profil lijeka i fond podaci | wizMedik";
+
+        $descriptionParts = [];
+        if (!empty($lijek->doza)) {
+            $descriptionParts[] = $lijek->doza;
+        }
+        if (!empty($lijek->pakovanje)) {
+            $descriptionParts[] = $lijek->pakovanje;
+        }
+        if (!empty($lijek->brend)) {
+            $descriptionParts[] = 'Brend: ' . $lijek->brend;
+        }
+        if (!empty($lijek->aktuelna_cijena)) {
+            $descriptionParts[] = 'Aktuelna cijena: ' . number_format((float) $lijek->aktuelna_cijena, 2, ',', '.') . ' KM';
+        }
+        if (!empty($lijek->aktuelni_iznos_participacije)) {
+            $descriptionParts[] = 'Doplata osiguranika: ' . number_format((float) $lijek->aktuelni_iznos_participacije, 2, ',', '.') . ' KM';
+        }
+
+        $description = $naziv;
+        if (!empty($descriptionParts)) {
+            $description .= '. ' . implode('. ', $descriptionParts) . '.';
+        } else {
+            $description .= '. Pregled osnovnih podataka, cijene i indikacija.';
+        }
+
+        $url = $this->buildUrl("lijekovi/{$slug}");
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'profile'),
         ];
     }
 
