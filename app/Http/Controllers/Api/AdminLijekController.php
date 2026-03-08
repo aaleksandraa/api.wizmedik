@@ -129,17 +129,6 @@ class AdminLijekController extends Controller
 
     public function importXml(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'xml_file' => 'required|file|max:51200',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
         if (!function_exists('simplexml_load_file')) {
             return response()->json([
                 'success' => false,
@@ -147,26 +136,62 @@ class AdminLijekController extends Controller
             ], 500);
         }
 
-        $uploadedFile = $request->file('xml_file');
-        $extension = strtolower((string) $uploadedFile->getClientOriginalExtension());
-        if ($extension !== 'xml') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Odabrani fajl mora biti XML.',
-            ], 422);
+        $useDefault = $this->normalizeBooleanInput($request->input('use_default')) === true;
+        $absolutePath = null;
+        $isTemporaryUpload = false;
+
+        if ($useDefault) {
+            $absolutePath = public_path('cjenovnik-lijekova_wf.xml');
+            if (!is_file($absolutePath)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Podrazumijevani XML fajl nije pronadjen na serveru.',
+                    'expected_path' => $absolutePath,
+                ], 422);
+            }
+        } else {
+            if ($uploadIssue = $this->detectUploadIssue('xml_file')) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => [
+                        'xml_file' => [$uploadIssue],
+                    ],
+                ], 422);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'xml_file' => 'required|file|uploaded|max:102400',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $uploadedFile = $request->file('xml_file');
+            $extension = strtolower((string) $uploadedFile->getClientOriginalExtension());
+            if ($extension !== 'xml') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Odabrani fajl mora biti XML.',
+                ], 422);
+            }
+
+            $tempFilename = 'lijekovi-import-' . now()->format('Ymd_His') . '-' . Str::random(8) . '.xml';
+            $storedPath = $uploadedFile->storeAs('tmp', $tempFilename);
+
+            if (!$storedPath) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Neuspjelo privremeno cuvanje XML fajla.',
+                ], 500);
+            }
+
+            $absolutePath = storage_path('app/' . $storedPath);
+            $isTemporaryUpload = true;
         }
-
-        $tempFilename = 'lijekovi-import-' . now()->format('Ymd_His') . '-' . Str::random(8) . '.xml';
-        $storedPath = $uploadedFile->storeAs('tmp', $tempFilename);
-
-        if (!$storedPath) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Neuspjelo privremeno cuvanje XML fajla.',
-            ], 500);
-        }
-
-        $absolutePath = storage_path('app/' . $storedPath);
 
         try {
             $exitCode = Artisan::call('lijekovi:import', [
@@ -196,7 +221,7 @@ class AdminLijekController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         } finally {
-            if (is_file($absolutePath)) {
+            if ($isTemporaryUpload && $absolutePath !== null && is_file($absolutePath)) {
                 @unlink($absolutePath);
             }
         }
@@ -204,8 +229,22 @@ class AdminLijekController extends Controller
 
     public function importRegistar(Request $request): JsonResponse
     {
+        if ($uploadIssue = $this->detectUploadIssue('registar_file')) {
+            return response()->json([
+                'success' => false,
+                'errors' => [
+                    'registar_file' => [$uploadIssue],
+                ],
+            ], 422);
+        }
+
+        $request->merge([
+            'truncate' => $this->normalizeBooleanInput($request->input('truncate')),
+            'allow_overwrite' => $this->normalizeBooleanInput($request->input('allow_overwrite')),
+        ]);
+
         $validator = Validator::make($request->all(), [
-            'registar_file' => 'required|file|max:51200',
+            'registar_file' => 'required|file|uploaded|max:102400',
             'truncate' => 'nullable|boolean',
             'allow_overwrite' => 'nullable|boolean',
         ]);
@@ -348,5 +387,60 @@ class AdminLijekController extends Controller
         }
 
         return array_slice($lines, -$maxLines);
+    }
+
+    private function normalizeBooleanInput(mixed $value): mixed
+    {
+        if ($value === null || is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value)) {
+            if ($value === 1) {
+                return true;
+            }
+            if ($value === 0) {
+                return false;
+            }
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+
+            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
+                return false;
+            }
+        }
+
+        return $value;
+    }
+
+    private function detectUploadIssue(string $field): ?string
+    {
+        if (!isset($_FILES[$field])) {
+            return null;
+        }
+
+        $errorCode = (int) ($_FILES[$field]['error'] ?? UPLOAD_ERR_OK);
+        if ($errorCode === UPLOAD_ERR_OK || $errorCode === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+
+        $baseMessage = match ($errorCode) {
+            UPLOAD_ERR_INI_SIZE => 'Upload nije uspio jer je fajl veci od server limita (php.ini).',
+            UPLOAD_ERR_FORM_SIZE => 'Upload nije uspio jer je fajl veci od dozvoljene velicine forme.',
+            UPLOAD_ERR_PARTIAL => 'Upload nije zavrsen (fajl je poslan samo djelimicno).',
+            UPLOAD_ERR_NO_TMP_DIR => 'Upload nije uspio jer server nema privremeni folder za upload.',
+            UPLOAD_ERR_CANT_WRITE => 'Upload nije uspio jer server ne moze upisati fajl na disk.',
+            UPLOAD_ERR_EXTENSION => 'Upload je zaustavljen od PHP ekstenzije na serveru.',
+            default => 'Upload fajla nije uspio zbog nepoznate server greske.',
+        };
+
+        return $baseMessage . ' upload_max_filesize=' . ini_get('upload_max_filesize') . ', post_max_size=' . ini_get('post_max_size') . '.';
     }
 }
