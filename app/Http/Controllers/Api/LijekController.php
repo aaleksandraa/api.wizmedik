@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lijek;
+use App\Models\LijekFondZapis;
 use App\Support\LijekCacheVersion;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
@@ -56,6 +58,8 @@ class LijekController extends Controller
                     'aktuelni_iznos_participacije',
                     'aktuelna_lista_id',
                     'aktuelni_broj_indikacija',
+                    'aktuelna_verzija_od',
+                    'aktuelna_verzija_do',
                 ]);
 
             if (!empty($validated['search'])) {
@@ -105,15 +109,68 @@ class LijekController extends Controller
                 }
             }
 
-            return $query
+            $paginator = $query
                 ->orderByRaw("COALESCE(naziv, naziv_lijeka, '') ASC")
                 ->paginate($perPage);
+
+            $this->appendCurrentIndicationsToList($paginator);
+
+            return $paginator;
         });
 
         return response()->json([
             'success' => true,
             'data' => $lijekovi,
         ]);
+    }
+
+    private function appendCurrentIndicationsToList(LengthAwarePaginator $paginator): void
+    {
+        $items = $paginator->getCollection();
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $medicineIds = $items->pluck('id')->filter()->values();
+        if ($medicineIds->isEmpty()) {
+            return;
+        }
+
+        $rowsByMedicine = LijekFondZapis::query()
+            ->select([
+                'lijek_id',
+                'indikacija_oznaka',
+                'indikacija_naziv',
+                'verzija_od',
+                'verzija_do',
+            ])
+            ->whereIn('lijek_id', $medicineIds)
+            ->orderBy('lijek_id')
+            ->get()
+            ->groupBy('lijek_id');
+
+        foreach ($items as $item) {
+            $currentRows = $this->filterRowsForCurrentPeriod(
+                $rowsByMedicine->get($item->id, collect()),
+                $item->aktuelna_verzija_od?->toDateString(),
+                $item->aktuelna_verzija_do?->toDateString()
+            );
+
+            $item->setAttribute('indikacije', $this->extractIndications($currentRows));
+            $item->makeHidden(['aktuelna_verzija_od', 'aktuelna_verzija_do']);
+        }
+    }
+
+    private function filterRowsForCurrentPeriod(Collection $rows, ?string $verzijaOd, ?string $verzijaDo): Collection
+    {
+        return $rows
+            ->filter(function ($row) use ($verzijaOd, $verzijaDo) {
+                $rowOd = $row->verzija_od?->toDateString();
+                $rowDo = $row->verzija_do?->toDateString();
+
+                return $rowOd === $verzijaOd && $rowDo === $verzijaDo;
+            })
+            ->values();
     }
 
     public function show(string $slug): JsonResponse
