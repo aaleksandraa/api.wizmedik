@@ -28,7 +28,7 @@ class PharmacyRegistrationRequest extends FormRequest
             'opis' => ['nullable', 'string', 'max:5000'],
 
             // Public contact
-            'email' => ['required', 'email:rfc', 'max:255'],
+            'email' => ['required', 'email:rfc,dns', 'max:255'],
             'telefon' => ['required', 'string', 'max:64', 'regex:/^[\d\s\+\-\(\)]+$/'],
             'website' => ['nullable', 'url', 'max:255'],
 
@@ -47,7 +47,7 @@ class PharmacyRegistrationRequest extends FormRequest
             'kratki_opis' => ['nullable', 'string', 'max:2000'],
 
             // Account
-            'account_email' => ['required', 'email:rfc', 'max:255', 'unique:users,email'],
+            'account_email' => ['required', 'email:rfc,dns', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(12)
                 ->mixedCase()
                 ->numbers()

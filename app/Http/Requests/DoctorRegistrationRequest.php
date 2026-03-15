@@ -47,7 +47,7 @@ class DoctorRegistrationRequest extends FormRequest
             // Contact
             'email' => [
                 'required',
-                'email:rfc',
+                'email:rfc,dns',
                 'max:255',
                 'unique:users,email',
                 'unique:doktori,email',

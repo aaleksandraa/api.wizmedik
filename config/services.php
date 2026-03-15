@@ -47,6 +47,10 @@ return [
     'bot_protection' => [
         'block_suspicious' => env('BOT_BLOCK_SUSPICIOUS', false),
         'suspicious_threshold' => (int) env('BOT_SUSPICIOUS_THRESHOLD', 2),
+        'blocked_email_domains' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('BOT_BLOCKED_EMAIL_DOMAINS', 'privatemoe.ae'))
+        ))),
     ],
 
 ];

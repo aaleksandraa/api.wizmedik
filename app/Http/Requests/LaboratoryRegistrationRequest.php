@@ -27,7 +27,7 @@ class LaboratoryRegistrationRequest extends FormRequest
             'kratak_opis' => ['nullable', 'string', 'max:500'],
 
             // Contact information (public)
-            'email' => ['required', 'email:rfc', 'max:255', 'unique:laboratorije,email'],
+            'email' => ['required', 'email:rfc,dns', 'max:255', 'unique:laboratorije,email'],
             'telefon' => ['required', 'string', 'max:20', 'regex:/^[\d\s\+\-\(\)]+$/'],
             'telefon_2' => ['nullable', 'string', 'max:20', 'regex:/^[\d\s\+\-\(\)]+$/'],
             'website' => ['nullable', 'url', 'max:255'],
@@ -48,7 +48,7 @@ class LaboratoryRegistrationRequest extends FormRequest
             'ime' => ['required', 'string', 'max:200'], // Contact person name
 
             // Authentication (account email - for login)
-            'account_email' => ['nullable', 'email:rfc', 'max:255', 'unique:users,email'],
+            'account_email' => ['nullable', 'email:rfc,dns', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(12)
                 ->mixedCase()
                 ->numbers()

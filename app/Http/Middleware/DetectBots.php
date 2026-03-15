@@ -29,7 +29,7 @@ class DetectBots
      * Suspicious patterns in requests.
      */
     protected array $suspiciousPatterns = [
-        'email' => '/test@test\.com|admin@|root@|noreply@/i',
+        'email' => '/test@test\.com|admin@|root@|noreply@|^(ads|adt)_[0-9]{3,}@/i',
         'name' => '/test|admin|root|bot|spam/i',
     ];
 
@@ -39,6 +39,8 @@ class DetectBots
     public function handle(Request $request, Closure $next): Response
     {
         $userAgent = $request->userAgent() ?? '';
+        $email = (string) $request->input('email', '');
+        $accountEmail = (string) $request->input('account_email', '');
 
         foreach ($this->botPatterns as $pattern) {
             if (preg_match($pattern, $userAgent)) {
@@ -53,6 +55,34 @@ class DetectBots
                     'message' => 'Zahtev nije dozvoljen.',
                 ], 403);
             }
+        }
+
+        if ($this->hasBlockedEmailDomain($email) || $this->hasBlockedEmailDomain($accountEmail)) {
+            Log::warning('Blocked email domain detected in request', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
+                'email' => $email,
+                'account_email' => $accountEmail,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Email domena nije podrzana.',
+            ], 422);
+        }
+
+        if ($this->hasHardBlockedEmailPattern($email) || $this->hasHardBlockedEmailPattern($accountEmail)) {
+            Log::warning('Hard-blocked email pattern detected in request', [
+                'ip' => $request->ip(),
+                'path' => $request->path(),
+                'email' => $email,
+                'account_email' => $accountEmail,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Email adresa nije podrzana.',
+            ], 422);
         }
 
         if ($this->hasSuspiciousData($request)) {
@@ -117,5 +147,38 @@ class DetectBots
 
         return false;
     }
-}
 
+    protected function hasBlockedEmailDomain(string $email): bool
+    {
+        if ($email === '' || !str_contains($email, '@')) {
+            return false;
+        }
+
+        $domain = strtolower((string) strrchr($email, '@'));
+        $domain = ltrim($domain, '@');
+        if ($domain === '') {
+            return false;
+        }
+
+        $blockedDomains = config('services.bot_protection.blocked_email_domains', []);
+        if (!is_array($blockedDomains)) {
+            return false;
+        }
+
+        $normalizedBlockedDomains = array_map(
+            static fn ($item) => strtolower(trim((string) $item)),
+            $blockedDomains
+        );
+
+        return in_array($domain, array_filter($normalizedBlockedDomains), true);
+    }
+
+    protected function hasHardBlockedEmailPattern(string $email): bool
+    {
+        if ($email === '') {
+            return false;
+        }
+
+        return (bool) preg_match('/^(ads|adt)_[0-9]{3,}@/i', $email);
+    }
+}

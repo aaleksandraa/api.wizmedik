@@ -26,7 +26,7 @@ class SpaRegistrationRequest extends FormRequest
             'opis' => ['nullable', 'string', 'max:5000'],
 
             // Contact information (public)
-            'email' => ['required', 'email:rfc', 'max:255', 'unique:banje,email'],
+            'email' => ['required', 'email:rfc,dns', 'max:255', 'unique:banje,email'],
             'telefon' => ['required', 'string', 'max:20', 'regex:/^[\d\s\+\-\(\)]+$/'],
             'website' => ['nullable', 'url', 'max:255'],
 
@@ -46,7 +46,7 @@ class SpaRegistrationRequest extends FormRequest
             'kontakt_prezime' => ['required', 'string', 'max:100'],
 
             // Authentication (account email - for login)
-            'account_email' => ['required', 'email:rfc', 'max:255', 'unique:users,email'],
+            'account_email' => ['required', 'email:rfc,dns', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(12)
                 ->mixedCase()
                 ->numbers()
