@@ -39,7 +39,28 @@ class SpecialtyController extends Controller
             now()->addDays(30),
             function () use ($slug) {
                 return Specijalnost::where('slug', $slug)
-                    ->with(['children', 'parent', 'doktori', 'klinike'])
+                    ->with([
+                        'children',
+                        'parent',
+                        'doktori',
+                        'klinike',
+                        'servicePages' => function ($query) {
+                            $query->published()
+                                ->select([
+                                    'id',
+                                    'specialty_id',
+                                    'naziv',
+                                    'slug',
+                                    'kratki_opis',
+                                    'status',
+                                    'is_indexable',
+                                    'sort_order',
+                                    'published_at',
+                                ])
+                                ->orderBy('sort_order')
+                                ->orderBy('naziv');
+                        },
+                    ])
                     ->firstOrFail();
             }
         );

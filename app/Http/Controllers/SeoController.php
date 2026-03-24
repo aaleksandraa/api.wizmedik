@@ -180,6 +180,9 @@ class SeoController extends Controller
         }
 
         // Other SEO-enabled pages
+        if (preg_match('/^specijalnost\/([^\/]+)\/([^\/]+)$/', $path, $matches)) {
+            return $this->getSpecialtyServiceMeta($matches[1], $matches[2]);
+        }
         if (preg_match('/^specijalnost\/([^\/]+)$/', $path, $matches)) {
             return $this->getSpecialtyMeta($matches[1]);
         }
@@ -630,6 +633,74 @@ class SeoController extends Controller
         return [
             'title' => "<title>{$title}</title>",
             'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website'),
+        ];
+    }
+
+    private function getSpecialtyServiceMeta(string $specialtySlug, string $serviceSlug): array
+    {
+        $service = DB::table('specialty_service_pages')
+            ->join('specijalnosti', 'specijalnosti.id', '=', 'specialty_service_pages.specialty_id')
+            ->where('specijalnosti.slug', $specialtySlug)
+            ->where('specialty_service_pages.slug', $serviceSlug)
+            ->whereNull('specialty_service_pages.deleted_at')
+            ->where('specialty_service_pages.status', 'published')
+            ->where('specijalnosti.aktivan', true)
+            ->where(function ($query) {
+                $query->whereNull('specialty_service_pages.published_at')
+                    ->orWhere('specialty_service_pages.published_at', '<=', now());
+            })
+            ->select([
+                'specialty_service_pages.naziv',
+                'specialty_service_pages.kratki_opis',
+                'specialty_service_pages.meta_title',
+                'specialty_service_pages.meta_description',
+                'specialty_service_pages.meta_keywords',
+                'specialty_service_pages.canonical_url',
+                'specialty_service_pages.og_image',
+                'specialty_service_pages.is_indexable',
+                'specijalnosti.naziv as specialty_naziv',
+            ])
+            ->first();
+
+        if (!$service) {
+            return $this->getNotFoundMeta("specijalnost/{$specialtySlug}/{$serviceSlug}");
+        }
+
+        $title = $service->meta_title
+            ?: "{$service->naziv} | {$service->specialty_naziv} | wizMedik";
+
+        $description = $service->meta_description
+            ?: $this->cleanDescription(
+                $service->kratki_opis ?? null,
+                "Detaljan pregled usluge {$service->naziv} iz oblasti {$service->specialty_naziv}."
+            );
+
+        $image = $this->absoluteImage($service->og_image ?? null);
+
+        $defaultUrl = $this->buildUrl("specijalnost/{$specialtySlug}/{$serviceSlug}");
+        $url = !empty($service->canonical_url) ? (string) $service->canonical_url : $defaultUrl;
+
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'MedicalWebPage',
+            'name' => $service->naziv,
+            'description' => $description,
+            'url' => $url,
+            'about' => [
+                '@type' => 'MedicalSpecialty',
+                'name' => $service->specialty_naziv,
+            ],
+        ];
+
+        if (!empty($service->meta_keywords)) {
+            $schema['keywords'] = $service->meta_keywords;
+        }
+
+        $robots = (bool) $service->is_indexable ? 'index, follow' : 'noindex, follow';
+
+        return [
+            'title' => "<title>{$title}</title>",
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'article', $schema, $robots),
         ];
     }
 

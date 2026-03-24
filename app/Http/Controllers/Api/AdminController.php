@@ -353,6 +353,47 @@ class AdminController extends Controller
             ->all();
     }
 
+    /**
+     * Normalize specialty services to a consistent shape:
+     * [
+     *   ['naziv' => '...', 'opis' => '...', 'url' => '...']
+     * ]
+     */
+    private function normalizeSpecialtyServices(array $services): array
+    {
+        return collect($services)
+            ->map(function ($item) {
+                if (is_string($item)) {
+                    $naziv = trim($item);
+                    return $naziv === '' ? null : ['naziv' => $naziv];
+                }
+
+                if (!is_array($item)) {
+                    return null;
+                }
+
+                $naziv = trim((string) ($item['naziv'] ?? ''));
+                $opis = trim((string) ($item['opis'] ?? ''));
+                $url = trim((string) ($item['url'] ?? $item['link'] ?? ''));
+
+                if ($naziv === '') {
+                    return null;
+                }
+
+                return array_filter(
+                    [
+                        'naziv' => $naziv,
+                        'opis' => $opis !== '' ? $opis : null,
+                        'url' => $url !== '' ? $url : null,
+                    ],
+                    fn($value) => $value !== null
+                );
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     // Specialties Management
     public function createSpecialty(Request $request)
     {
@@ -399,6 +440,7 @@ class AdminController extends Controller
             'usluge' => 'nullable|array',
             'usluge.*.naziv' => 'nullable|string',
             'usluge.*.opis' => 'nullable|string',
+            'usluge.*.url' => 'nullable|string|max:2048',
             'uvodni_tekst' => 'nullable|string',
             'zakljucni_tekst' => 'nullable|string',
             'canonical_url' => 'nullable|url',
@@ -419,9 +461,7 @@ class AdminController extends Controller
         }
 
         if (isset($validated['usluge'])) {
-            $validated['usluge'] = array_values(array_filter($validated['usluge'], function($item) {
-                return !empty($item['naziv']);
-            }));
+            $validated['usluge'] = $this->normalizeSpecialtyServices($validated['usluge']);
         }
 
         // Handle icon upload if present
@@ -497,6 +537,9 @@ class AdminController extends Controller
             'faq' => 'nullable|array',
             'prikazi_usluge' => 'boolean',
             'usluge' => 'nullable|array',
+            'usluge.*.naziv' => 'nullable|string',
+            'usluge.*.opis' => 'nullable|string',
+            'usluge.*.url' => 'nullable|string|max:2048',
             'uvodni_tekst' => 'nullable|string',
             'zakljucni_tekst' => 'nullable|string',
             'canonical_url' => 'nullable|url',
@@ -517,9 +560,7 @@ class AdminController extends Controller
         }
 
         if (isset($validated['usluge'])) {
-            $validated['usluge'] = array_values(array_filter($validated['usluge'], function($item) {
-                return !empty($item['naziv']);
-            }));
+            $validated['usluge'] = $this->normalizeSpecialtyServices($validated['usluge']);
         }
 
         // Handle icon deletion (when icon_url is explicitly set to empty string)

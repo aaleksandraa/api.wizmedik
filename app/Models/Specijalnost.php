@@ -136,6 +136,11 @@ class Specijalnost extends Model
         return $this->belongsToMany(Klinika::class, 'klinika_specijalnost');
     }
 
+    public function servicePages()
+    {
+        return $this->hasMany(SpecialtyServicePage::class, 'specialty_id');
+    }
+
     // Scopes
     public function scopeActive($query)
     {

@@ -134,6 +134,7 @@ class SitemapController extends Controller
             'sitemap-doctors.xml',
             'sitemap-clinics.xml',
             'sitemap-specialties.xml',
+            'sitemap-service-pages.xml',
             'sitemap-cities.xml',
             'sitemap-laboratories.xml',
             'sitemap-lijekovi.xml',
@@ -300,6 +301,48 @@ class SitemapController extends Controller
                 $specialty->updated_at,
                 'weekly',
                 '0.8'
+            );
+        }
+
+        $xml .= '</urlset>';
+
+        return response($xml, 200)->header('Content-Type', 'application/xml');
+    }
+
+    public function servicePages()
+    {
+        $baseUrl = $this->getBaseUrl();
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+        $pages = DB::table('specialty_service_pages')
+            ->join('specijalnosti', 'specijalnosti.id', '=', 'specialty_service_pages.specialty_id')
+            ->whereNull('specialty_service_pages.deleted_at')
+            ->where('specialty_service_pages.status', 'published')
+            ->where('specialty_service_pages.is_indexable', true)
+            ->whereNotNull('specialty_service_pages.slug')
+            ->whereNotNull('specijalnosti.slug')
+            ->where('specijalnosti.aktivan', true)
+            ->where(function ($query) {
+                $query->whereNull('specialty_service_pages.published_at')
+                    ->orWhere('specialty_service_pages.published_at', '<=', now());
+            })
+            ->select([
+                'specialty_service_pages.slug as service_slug',
+                'specijalnosti.slug as specialty_slug',
+                'specialty_service_pages.updated_at',
+                'specialty_service_pages.published_at',
+            ])
+            ->get();
+
+        foreach ($pages as $page) {
+            $this->appendUrl(
+                $xml,
+                $baseUrl . '/specijalnost/' . $page->specialty_slug . '/' . $page->service_slug,
+                $page->updated_at ?: $page->published_at,
+                'monthly',
+                '0.75'
             );
         }
 

@@ -21,7 +21,8 @@ use App\Http\Controllers\Api\{
     RegistrationController,
     MedicalCalendarController,
     AdminLijekController,
-    RfzoListaController
+    RfzoListaController,
+    SpecialtyServicePageController
 };
 use App\Http\Controllers\HealthCheckController;
 
@@ -100,6 +101,7 @@ Route::get('/specialties', [SpecialtyController::class, 'index']);
 Route::get('/specialties/with-counts', [SpecialtyController::class, 'withCounts']);
 Route::get('/specialties/search-data', [SpecialtyController::class, 'searchData']);
 Route::get('/specialties/smart-search/{query}', [SpecialtyController::class, 'smartSearch']);
+Route::get('/specialties/{specialtySlug}/services/{serviceSlug}', [SpecialtyServicePageController::class, 'showBySlugs']);
 Route::get('/specialties/{slug}', [SpecialtyController::class, 'show']);
 
 // Homepage data
@@ -565,6 +567,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/specialties/{id}', [AdminController::class, 'updateSpecialty']);
         Route::delete('/specialties/{id}', [AdminController::class, 'deleteSpecialty']);
         Route::post('/specialties/reorder', [AdminController::class, 'updateSpecialtySortOrder']);
+
+        // Specialty service pages (SEO landing pages for services)
+        Route::get('/service-pages', [SpecialtyServicePageController::class, 'adminIndex']);
+        Route::get('/service-pages/{id}', [SpecialtyServicePageController::class, 'adminShow']);
+        Route::post('/service-pages', [SpecialtyServicePageController::class, 'adminStore']);
+        Route::put('/service-pages/{id}', [SpecialtyServicePageController::class, 'adminUpdate']);
+        Route::delete('/service-pages/{id}', [SpecialtyServicePageController::class, 'adminDestroy']);
 
         // Admin Settings
         Route::get('/settings/templates', [SettingsController::class, 'getTemplates']);

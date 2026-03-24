@@ -11,6 +11,7 @@ Route::get('/sitemap-pages.xml', [SitemapController::class, 'pages']);
 Route::get('/sitemap-doctors.xml', [SitemapController::class, 'doctors']);
 Route::get('/sitemap-clinics.xml', [SitemapController::class, 'clinics']);
 Route::get('/sitemap-specialties.xml', [SitemapController::class, 'specialties']);
+Route::get('/sitemap-service-pages.xml', [SitemapController::class, 'servicePages']);
 Route::get('/sitemap-cities.xml', [SitemapController::class, 'cities']);
 Route::get('/sitemap-laboratories.xml', [SitemapController::class, 'laboratories']);
 Route::get('/sitemap-pharmacies.xml', [SitemapController::class, 'pharmacies']);
