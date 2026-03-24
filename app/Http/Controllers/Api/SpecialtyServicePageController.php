@@ -150,7 +150,49 @@ class SpecialtyServicePageController extends Controller
     {
         $prefix = $isUpdate ? 'sometimes|' : '';
 
-        $validated = $request->validate([
+        $data = $request->all();
+
+        foreach ([
+            'naziv',
+            'slug',
+            'kratki_opis',
+            'sadrzaj',
+            'meta_title',
+            'meta_description',
+            'meta_keywords',
+            'canonical_url',
+            'og_image',
+        ] as $field) {
+            if (array_key_exists($field, $data) && is_string($data[$field])) {
+                $trimmed = trim($data[$field]);
+                $data[$field] = $trimmed === '' ? null : $trimmed;
+            }
+        }
+
+        if (array_key_exists('status', $data) && is_string($data['status'])) {
+            $data['status'] = mb_strtolower(trim($data['status']));
+        }
+
+        if (array_key_exists('is_indexable', $data)) {
+            $normalizedBool = filter_var($data['is_indexable'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($normalizedBool !== null) {
+                $data['is_indexable'] = $normalizedBool;
+            }
+        }
+
+        if (array_key_exists('sort_order', $data) && ($data['sort_order'] === '' || $data['sort_order'] === null)) {
+            $data['sort_order'] = 0;
+        }
+
+        if (array_key_exists('canonical_url', $data)) {
+            $data['canonical_url'] = $this->normalizeOptionalUrl($data['canonical_url'] ?? null);
+        }
+
+        if (array_key_exists('og_image', $data)) {
+            $data['og_image'] = $this->normalizeOptionalUrl($data['og_image'] ?? null);
+        }
+
+        $validated = validator($data, [
             'specialty_id' => $prefix . 'required|integer|exists:specijalnosti,id',
             'naziv' => $prefix . 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
@@ -162,9 +204,9 @@ class SpecialtyServicePageController extends Controller
             'meta_title' => 'nullable|string|max:70',
             'meta_description' => 'nullable|string|max:160',
             'meta_keywords' => 'nullable|string|max:255',
-            'canonical_url' => 'nullable|url|max:2048',
+            'canonical_url' => 'nullable|string|max:2048',
             'og_image' => 'nullable|string|max:2048',
-        ]);
+        ])->validate();
 
         if (array_key_exists('slug', $validated)) {
             $validated['slug'] = trim((string) $validated['slug']);
@@ -174,6 +216,33 @@ class SpecialtyServicePageController extends Controller
         }
 
         return $validated;
+    }
+
+    private function normalizeOptionalUrl(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $url = trim($value);
+        if ($url === '') {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $url)) {
+            return $url;
+        }
+
+        if (preg_match('/^[^\/\s]+\.[^\/\s]+/', $url)) {
+            return 'https://' . $url;
+        }
+
+        if (Str::startsWith($url, '/')) {
+            $baseUrl = rtrim((string) config('app.frontend_url', config('app.url', 'https://wizmedik.com')), '/');
+            return $baseUrl . '/' . ltrim($url, '/');
+        }
+
+        return null;
     }
 
     private function ensureUniqueSlug(

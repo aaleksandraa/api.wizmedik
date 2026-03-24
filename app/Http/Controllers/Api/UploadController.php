@@ -33,34 +33,15 @@ class UploadController extends Controller
                 return response()->json(['error' => 'File too large'], 400);
             }
 
-            // Security: Verify image dimensions (prevent decompression bombs)
-            try {
-                $imageInfo = getimagesize($imageFile->getRealPath());
-                if ($imageInfo === false) {
-                    return response()->json(['error' => 'Invalid image file'], 400);
-                }
+            $extension = strtolower((string) $imageFile->getClientOriginalExtension());
 
-                // Prevent extremely large images (max 10000x10000)
-                if ($imageInfo[0] > 10000 || $imageInfo[1] > 10000) {
-                    return response()->json(['error' => 'Image dimensions too large'], 400);
-                }
-            } catch (\Exception $e) {
-                return response()->json(['error' => 'Invalid image file'], 400);
-            }
-
-            // Unique ime fajla
-            $extension = $imageFile->getClientOriginalExtension();
-
-            // For SVG files, keep original format
-            if (strtolower($extension) === 'svg') {
+            // SVG: save directly without raster processing
+            if ($extension === 'svg') {
                 $filename = time() . '_' . uniqid() . '.svg';
                 $publicPath = "{$folder}/{$filename}";
 
-                // Save SVG directly without processing
                 Storage::disk('public')->put($publicPath, file_get_contents($imageFile->getRealPath()));
 
-                // Generate full URL
-                // Use request host to generate correct URL for current environment
                 $baseUrl = $request->getSchemeAndHttpHost();
                 $url = $baseUrl . '/storage/' . $publicPath;
 
@@ -78,8 +59,21 @@ class UploadController extends Controller
                 ]);
             }
 
-            $filename = time() . '_' . uniqid() . '.webp';
-            $path = "public/{$folder}/{$filename}";
+            // Security: Verify image dimensions (prevent decompression bombs)
+            try {
+                $imageInfo = getimagesize($imageFile->getRealPath());
+                if ($imageInfo === false) {
+                    return response()->json(['error' => 'Invalid image file'], 400);
+                }
+
+                // Prevent extremely large images (max 10000x10000)
+                if ($imageInfo[0] > 10000 || $imageInfo[1] > 10000) {
+                    return response()->json(['error' => 'Image dimensions too large'], 400);
+                }
+            } catch (\Exception $e) {
+                return response()->json(['error' => 'Invalid image file'], 400);
+            }
+            $baseFilename = time() . '_' . uniqid();
 
             /*
                 -- Obrada slike:
@@ -91,7 +85,18 @@ class UploadController extends Controller
                 3) Convert to WebP (80% quality)
             */
 
-            $img = Image::read($imageFile);
+            try {
+                $img = Image::read($imageFile);
+            } catch (\Throwable $decodeException) {
+                \Log::warning('Image decode failed', [
+                    'error' => $decodeException->getMessage(),
+                    'folder' => $folder,
+                ]);
+
+                return response()->json([
+                    'error' => 'Unable to process this image format.'
+                ], 400);
+            }
 
             // Resize based on folder type
             if ($folder === 'logos') {
@@ -135,28 +140,59 @@ class UploadController extends Controller
                     'new_ratio' => $newRatio,
                     'ratio_maintained' => abs($originalRatio - $newRatio) < 0.01
                 ]);
-            } elseif ($folder !== 'blog') {
+            } elseif ($folder === 'blog') {
+                // Blog / service editor images: keep quality, but cap max size to prevent memory crashes
+                $img->resize(2400, 2400, function ($constraint) {
+                    $constraint->aspectRatio();
+                    $constraint->upsize();
+                });
+            } else {
                 // Standard images: max 800x800
                 $img->resize(800, 800, function ($constraint) {
                     $constraint->aspectRatio();
                     $constraint->upsize();
                 });
             }
-            // Blog images keep original size
 
-            // WebP encoding
-            $encoded = $img->toWebp(quality: 80);
+            $publicPath = '';
+            $encodedBinary = '';
+
+            // Try WebP first, fallback to JPEG if WebP is unavailable on server
+            try {
+                $publicPath = "{$folder}/{$baseFilename}.webp";
+                $encodedBinary = (string) $img->toWebp(quality: 80);
+            } catch (\Throwable $webpException) {
+                \Log::warning('WebP encoding failed, falling back to JPEG', [
+                    'error' => $webpException->getMessage(),
+                    'folder' => $folder,
+                ]);
+
+                try {
+                    $publicPath = "{$folder}/{$baseFilename}.jpg";
+                    $encodedBinary = (string) $img->toJpeg(quality: 85);
+                } catch (\Throwable $jpegException) {
+                    \Log::warning('JPEG encoding fallback failed, storing original bytes', [
+                        'error' => $jpegException->getMessage(),
+                        'folder' => $folder,
+                    ]);
+
+                    $safeExtension = in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)
+                        ? $extension
+                        : 'jpg';
+                    $publicPath = "{$folder}/{$baseFilename}.{$safeExtension}";
+                    $encodedBinary = (string) file_get_contents($imageFile->getRealPath());
+                }
+            }
 
             // Log file size
             \Log::info('Image processed', [
-                'original_size' => strlen($imageFile->get()),
-                'encoded_size'  => strlen($encoded),
-                'path'          => $path
+                'original_size' => $imageFile->getSize(),
+                'encoded_size'  => strlen($encodedBinary),
+                'path'          => $publicPath
             ]);
 
             // Snimanje fajla na public disk
-            $publicPath = "{$folder}/{$filename}";
-            $saved = Storage::disk('public')->put($publicPath, $encoded);
+            $saved = Storage::disk('public')->put($publicPath, $encodedBinary);
 
             \Log::info('Storage put result', [
                 'saved'       => $saved,
