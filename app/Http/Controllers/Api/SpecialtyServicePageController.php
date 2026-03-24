@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Specijalnost;
 use App\Models\SpecialtyServicePage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -156,7 +157,6 @@ class SpecialtyServicePageController extends Controller
             'naziv',
             'slug',
             'kratki_opis',
-            'sadrzaj',
             'meta_title',
             'meta_description',
             'meta_keywords',
@@ -173,6 +173,42 @@ class SpecialtyServicePageController extends Controller
             $data['status'] = mb_strtolower(trim($data['status']));
         }
 
+        if (array_key_exists('specialty_id', $data)) {
+            $data['specialty_id'] = is_numeric($data['specialty_id'])
+                ? (int) $data['specialty_id']
+                : 0;
+        }
+
+        if ($isUpdate) {
+            if (array_key_exists('specialty_id', $data)) {
+                if ($data['specialty_id'] <= 0 || !Specijalnost::whereKey($data['specialty_id'])->exists()) {
+                    unset($data['specialty_id']);
+                }
+            }
+        } else {
+            if (
+                !array_key_exists('specialty_id', $data)
+                || $data['specialty_id'] <= 0
+                || !Specijalnost::whereKey($data['specialty_id'])->exists()
+            ) {
+                $fallbackSpecialtyId = Specijalnost::query()->where('aktivan', true)->value('id')
+                    ?? Specijalnost::query()->value('id');
+                if ($fallbackSpecialtyId) {
+                    $data['specialty_id'] = (int) $fallbackSpecialtyId;
+                }
+            }
+        }
+
+        if ($isUpdate) {
+            if (array_key_exists('status', $data) && !in_array($data['status'], ['draft', 'published'], true)) {
+                unset($data['status']);
+            }
+        } else {
+            if (!array_key_exists('status', $data) || !in_array($data['status'], ['draft', 'published'], true)) {
+                $data['status'] = 'draft';
+            }
+        }
+
         if (array_key_exists('is_indexable', $data)) {
             $normalizedBool = filter_var($data['is_indexable'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             if ($normalizedBool !== null) {
@@ -182,6 +218,20 @@ class SpecialtyServicePageController extends Controller
 
         if (array_key_exists('sort_order', $data) && ($data['sort_order'] === '' || $data['sort_order'] === null)) {
             $data['sort_order'] = 0;
+        }
+        if (array_key_exists('sort_order', $data) && is_numeric($data['sort_order'])) {
+            $data['sort_order'] = max(0, (int) $data['sort_order']);
+        }
+
+        $data['naziv'] = $this->normalizeMaxString($data['naziv'] ?? null, 255);
+        $data['slug'] = $this->normalizeMaxString($data['slug'] ?? null, 255);
+        $data['kratki_opis'] = $this->normalizeMaxString($data['kratki_opis'] ?? null, 1000);
+        $data['meta_title'] = $this->normalizeMaxString($data['meta_title'] ?? null, 70);
+        $data['meta_description'] = $this->normalizeMaxString($data['meta_description'] ?? null, 160);
+        $data['meta_keywords'] = $this->normalizeMaxString($data['meta_keywords'] ?? null, 255);
+
+        if (array_key_exists('sadrzaj', $data) && is_string($data['sadrzaj'])) {
+            $data['sadrzaj'] = trim($data['sadrzaj']) === '' ? null : $data['sadrzaj'];
         }
 
         if (array_key_exists('canonical_url', $data)) {
@@ -193,7 +243,7 @@ class SpecialtyServicePageController extends Controller
         }
 
         $validated = validator($data, [
-            'specialty_id' => $prefix . 'required|integer|exists:specijalnosti,id',
+            'specialty_id' => $prefix . 'required|integer|min:1',
             'naziv' => $prefix . 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'kratki_opis' => 'nullable|string|max:1000',
@@ -216,6 +266,20 @@ class SpecialtyServicePageController extends Controller
         }
 
         return $validated;
+    }
+
+    private function normalizeMaxString(mixed $value, int $maxLength): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $text = trim($value);
+        if ($text === '') {
+            return null;
+        }
+
+        return mb_substr($text, 0, $maxLength);
     }
 
     private function normalizeOptionalUrl(mixed $value): ?string
