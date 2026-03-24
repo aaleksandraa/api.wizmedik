@@ -17,6 +17,7 @@ class SpecialtyServicePage extends Model
         'sadrzaj',
         'status',
         'is_indexable',
+        'show_doctor_cta',
         'sort_order',
         'published_at',
         'meta_title',
@@ -29,6 +30,7 @@ class SpecialtyServicePage extends Model
 
     protected $casts = [
         'is_indexable' => 'boolean',
+        'show_doctor_cta' => 'boolean',
         'published_at' => 'datetime',
     ];
 
@@ -52,4 +54,3 @@ class SpecialtyServicePage extends Model
             });
     }
 }
-

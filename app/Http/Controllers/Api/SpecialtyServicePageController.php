@@ -216,6 +216,19 @@ class SpecialtyServicePageController extends Controller
             }
         }
 
+        if (array_key_exists('show_doctor_cta', $data)) {
+            $normalizedBool = filter_var($data['show_doctor_cta'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($normalizedBool !== null) {
+                $data['show_doctor_cta'] = $normalizedBool;
+            } elseif ($isUpdate) {
+                unset($data['show_doctor_cta']);
+            } else {
+                $data['show_doctor_cta'] = true;
+            }
+        } elseif (!$isUpdate) {
+            $data['show_doctor_cta'] = true;
+        }
+
         if (array_key_exists('sort_order', $data) && ($data['sort_order'] === '' || $data['sort_order'] === null)) {
             $data['sort_order'] = 0;
         }
@@ -250,6 +263,7 @@ class SpecialtyServicePageController extends Controller
             'sadrzaj' => 'nullable|string',
             'status' => $prefix . 'required|in:draft,published',
             'is_indexable' => 'sometimes|boolean',
+            'show_doctor_cta' => 'sometimes|boolean',
             'sort_order' => 'nullable|integer|min:0',
             'meta_title' => 'nullable|string|max:70',
             'meta_description' => 'nullable|string|max:160',
@@ -376,6 +390,7 @@ class SpecialtyServicePageController extends Controller
             'sadrzaj' => $page->sadrzaj,
             'status' => $page->status,
             'is_indexable' => (bool) $page->is_indexable,
+            'show_doctor_cta' => (bool) ($page->show_doctor_cta ?? true),
             'sort_order' => (int) $page->sort_order,
             'published_at' => optional($page->published_at)->toIso8601String(),
             'meta_title' => $page->meta_title,
