@@ -7,6 +7,7 @@ use App\Models\BlogPost;
 use App\Models\BlogCategory;
 use App\Models\BlogSettings;
 use App\Models\Doktor;
+use App\Services\SeoStaticPageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -62,6 +63,44 @@ class BlogController extends Controller
         ));
 
         return array_slice($filtered, 0, $limit);
+    }
+
+    private function isPublishedForSeo(BlogPost $post): bool
+    {
+        if ($post->status !== 'published') {
+            return false;
+        }
+
+        if (!$post->published_at) {
+            return true;
+        }
+
+        return $post->published_at->lte(now());
+    }
+
+    private function syncBlogSeoAfterUpsert(BlogPost $post, ?string $previousSlug = null): void
+    {
+        $service = app(SeoStaticPageService::class);
+        $service->prerenderPath('blog');
+
+        if (!empty($previousSlug) && $previousSlug !== $post->slug) {
+            $service->deletePath('blog/' . $previousSlug);
+        }
+
+        $currentPath = 'blog/' . $post->slug;
+        if ($this->isPublishedForSeo($post)) {
+            $service->prerenderPath($currentPath);
+            return;
+        }
+
+        $service->deletePath($currentPath);
+    }
+
+    private function syncBlogSeoAfterDelete(string $slug): void
+    {
+        $service = app(SeoStaticPageService::class);
+        $service->deletePath('blog/' . $slug);
+        $service->prerenderPath('blog');
     }
 
     // Public endpoints
@@ -256,6 +295,9 @@ class BlogController extends Controller
             $post->categories()->sync($validated['category_ids']);
         }
 
+        $post->refresh();
+        $this->syncBlogSeoAfterUpsert($post);
+
         return response()->json($post->load('categories'), 201);
     }
 
@@ -268,6 +310,7 @@ class BlogController extends Controller
         }
 
         $post = BlogPost::where('id', $id)->where('doktor_id', $doktor->id)->first();
+        $originalSlug = (string) optional($post)->slug;
         if (!$post) {
             return response()->json(['message' => 'Članak nije pronađen'], 404);
         }
@@ -310,6 +353,9 @@ class BlogController extends Controller
             $post->categories()->sync($validated['category_ids']);
         }
 
+        $post->refresh();
+        $this->syncBlogSeoAfterUpsert($post, $originalSlug);
+
         return response()->json($post->load('categories'));
     }
 
@@ -325,7 +371,9 @@ class BlogController extends Controller
         if (!$post) {
             return response()->json(['message' => 'Članak nije pronađen'], 404);
         }
+        $slug = (string) $post->slug;
         $post->delete();
+        $this->syncBlogSeoAfterDelete($slug);
 
         return response()->json(['message' => 'Članak obrisan']);
     }
@@ -374,12 +422,16 @@ class BlogController extends Controller
             $post->categories()->sync($validated['category_ids']);
         }
 
+        $post->refresh();
+        $this->syncBlogSeoAfterUpsert($post);
+
         return response()->json($post->load('categories'), 201);
     }
 
     public function adminUpdate(Request $request, $id)
     {
         $post = BlogPost::findOrFail($id);
+        $originalSlug = (string) $post->slug;
 
         $validated = $request->validate([
             'naslov' => 'sometimes|string|max:255',
@@ -413,12 +465,18 @@ class BlogController extends Controller
             $post->categories()->sync($validated['category_ids']);
         }
 
+        $post->refresh();
+        $this->syncBlogSeoAfterUpsert($post, $originalSlug);
+
         return response()->json($post->load('categories'));
     }
 
     public function adminDestroy($id)
     {
-        BlogPost::findOrFail($id)->delete();
+        $post = BlogPost::findOrFail($id);
+        $slug = (string) $post->slug;
+        $post->delete();
+        $this->syncBlogSeoAfterDelete($slug);
         return response()->json(['message' => 'Članak obrisan']);
     }
 

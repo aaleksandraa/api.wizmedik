@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Specijalnost;
 use App\Models\SpecialtyServicePage;
+use App\Services\SeoStaticPageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -87,6 +88,7 @@ class SpecialtyServicePageController extends Controller
 
         $this->clearSpecialtyCacheById((int) $page->specialty_id);
         $page->load(['specialty:id,naziv,slug']);
+        $this->syncServicePageSeoAfterUpsert($page);
 
         return response()->json([
             'message' => 'Stranica usluge je uspješno kreirana.',
@@ -97,6 +99,9 @@ class SpecialtyServicePageController extends Controller
     public function adminUpdate(Request $request, int $id): JsonResponse
     {
         $page = SpecialtyServicePage::findOrFail($id);
+        $page->loadMissing('specialty:id,slug');
+        $previousSpecialtySlug = $page->specialty?->slug;
+        $previousServiceSlug = $page->slug;
         $originalSpecialtyId = (int) $page->specialty_id;
         $validated = $this->validatePayload($request, true);
 
@@ -128,6 +133,7 @@ class SpecialtyServicePageController extends Controller
         $page->refresh()->load(['specialty:id,naziv,slug']);
         $this->clearSpecialtyCacheById($originalSpecialtyId);
         $this->clearSpecialtyCacheById((int) $page->specialty_id);
+        $this->syncServicePageSeoAfterUpsert($page, $previousSpecialtySlug, $previousServiceSlug);
 
         return response()->json([
             'message' => 'Stranica usluge je uspješno ažurirana.',
@@ -138,9 +144,13 @@ class SpecialtyServicePageController extends Controller
     public function adminDestroy(int $id): JsonResponse
     {
         $page = SpecialtyServicePage::findOrFail($id);
+        $page->loadMissing('specialty:id,slug');
         $specialtyId = (int) $page->specialty_id;
+        $specialtySlug = $page->specialty?->slug;
+        $serviceSlug = $page->slug;
         $page->delete();
         $this->clearSpecialtyCacheById($specialtyId);
+        $this->syncServicePageSeoAfterDelete($specialtySlug, $serviceSlug);
 
         return response()->json([
             'message' => 'Stranica usluge je obrisana.',
@@ -371,6 +381,84 @@ class SpecialtyServicePageController extends Controller
 
         if (!empty($slug)) {
             \Cache::forget("specialty:{$slug}");
+        }
+    }
+
+    private function isPublishedAndIndexable(SpecialtyServicePage $page): bool
+    {
+        if ($page->status !== 'published') {
+            return false;
+        }
+
+        if (!(bool) $page->is_indexable) {
+            return false;
+        }
+
+        if (!$page->published_at) {
+            return true;
+        }
+
+        return $page->published_at->lte(now());
+    }
+
+    private function buildServicePath(?string $specialtySlug, ?string $serviceSlug): ?string
+    {
+        if (empty($specialtySlug) || empty($serviceSlug)) {
+            return null;
+        }
+
+        return 'specijalnost/' . trim($specialtySlug, '/') . '/' . trim($serviceSlug, '/');
+    }
+
+    private function syncServicePageSeoAfterUpsert(
+        SpecialtyServicePage $page,
+        ?string $previousSpecialtySlug = null,
+        ?string $previousServiceSlug = null
+    ): void {
+        $service = app(SeoStaticPageService::class);
+
+        $service->prerenderPath('specijalnosti');
+
+        $currentSpecialtySlug = $page->specialty?->slug;
+        if (!empty($currentSpecialtySlug)) {
+            $service->prerenderPath('specijalnost/' . $currentSpecialtySlug);
+        }
+
+        if (!empty($previousSpecialtySlug) && $previousSpecialtySlug !== $currentSpecialtySlug) {
+            $service->prerenderPath('specijalnost/' . $previousSpecialtySlug);
+        }
+
+        $oldPath = $this->buildServicePath($previousSpecialtySlug, $previousServiceSlug);
+        $newPath = $this->buildServicePath($currentSpecialtySlug, $page->slug);
+
+        if (!empty($oldPath) && $oldPath !== $newPath) {
+            $service->deletePath($oldPath);
+        }
+
+        if (empty($newPath)) {
+            return;
+        }
+
+        if ($this->isPublishedAndIndexable($page)) {
+            $service->prerenderPath($newPath);
+            return;
+        }
+
+        $service->deletePath($newPath);
+    }
+
+    private function syncServicePageSeoAfterDelete(?string $specialtySlug, ?string $serviceSlug): void
+    {
+        $service = app(SeoStaticPageService::class);
+        $service->prerenderPath('specijalnosti');
+
+        if (!empty($specialtySlug)) {
+            $service->prerenderPath('specijalnost/' . $specialtySlug);
+        }
+
+        $path = $this->buildServicePath($specialtySlug, $serviceSlug);
+        if (!empty($path)) {
+            $service->deletePath($path);
         }
     }
 
