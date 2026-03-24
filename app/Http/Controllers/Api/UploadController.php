@@ -111,20 +111,9 @@ class UploadController extends Controller
                     'ratio' => $originalRatio
                 ]);
 
-                // PROFESSIONAL LOGO RESIZE STRATEGY
-                // Fixed height: 70px (desktop navbar height)
-                // Width: Automatically calculated to maintain aspect ratio
-                // This prevents ANY distortion regardless of original logo dimensions
-
-                // Calculate target dimensions
+                // Fixed max height: 70px, proportional width (Intervention v3 compatible)
                 $targetHeight = 70;
-                $targetWidth = round(($originalWidth / $originalHeight) * $targetHeight);
-
-                // Apply resize with explicit dimensions (more reliable than null parameter)
-                $img->resize($targetWidth, $targetHeight, function ($constraint) {
-                    $constraint->aspectRatio();  // Maintain aspect ratio
-                    $constraint->upsize();       // Don't upscale small images
-                });
+                $img->scaleDown(null, $targetHeight);
 
                 // Get new dimensions for verification
                 $newWidth = $img->width();
@@ -132,7 +121,6 @@ class UploadController extends Controller
                 $newRatio = $newWidth / $newHeight;
 
                 \Log::info('Logo resize - AFTER', [
-                    'target_width' => $targetWidth,
                     'target_height' => $targetHeight,
                     'actual_width' => $newWidth,
                     'actual_height' => $newHeight,
@@ -142,16 +130,10 @@ class UploadController extends Controller
                 ]);
             } elseif ($folder === 'blog') {
                 // Blog / service editor images: keep quality, but cap max size to prevent memory crashes
-                $img->resize(2400, 2400, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                });
+                $img->scaleDown(2400, 2400);
             } else {
                 // Standard images: max 800x800
-                $img->resize(800, 800, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                });
+                $img->scaleDown(800, 800);
             }
 
             $publicPath = '';
