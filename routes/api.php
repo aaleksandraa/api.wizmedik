@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
 use App\Http\Controllers\Api\{
     AuthController,
     DoctorController,
@@ -25,6 +26,7 @@ use App\Http\Controllers\Api\{
     SpecialtyServicePageController
 };
 use App\Http\Controllers\HealthCheckController;
+use App\Http\Controllers\SeoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,6 +37,31 @@ use App\Http\Controllers\HealthCheckController;
 // Health check endpoints (no authentication required)
 Route::get('/health', [HealthCheckController::class, 'check']);
 Route::get('/ping', [HealthCheckController::class, 'ping']);
+Route::get('/seo/render', function (Request $request, SeoController $seoController) {
+    $path = trim((string) $request->query('path', '/'));
+    if ($path === '') {
+        $path = '/';
+    }
+
+    if (!str_starts_with($path, '/')) {
+        $path = '/' . $path;
+    }
+
+    if (strlen($path) > 2048) {
+        return response()->json([
+            'message' => 'Path is too long.',
+        ], 422);
+    }
+
+    $query = $request->query();
+    unset($query['path']);
+
+    $renderRequest = Request::create($path, 'GET', $query);
+    $rendered = $seoController->index($renderRequest);
+
+    return response((string) $rendered->getContent(), $rendered->getStatusCode())
+        ->header('Content-Type', 'text/html; charset=UTF-8');
+})->middleware('throttle:120,1');
 
 // Public routes with rate limiting
 Route::post('/register', [AuthController::class, 'register'])
