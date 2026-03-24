@@ -1256,6 +1256,14 @@ class SeoController extends Controller
             );
         }
 
+        if ($path === 'mkb10') {
+            return $this->simplePageMeta(
+                'MKB-10 sifarnik dijagnoza | wizMedik',
+                'Pretrazite MKB-10 sifarnik i pronadjite dijagnoze po kategorijama sa jasnim opisima.',
+                'mkb10'
+            );
+        }
+
         if ($path === 'faq') {
             return $this->simplePageMeta(
                 'Cesta pitanja | wizMedik',

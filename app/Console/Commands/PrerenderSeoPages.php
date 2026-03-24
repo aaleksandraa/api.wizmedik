@@ -51,6 +51,10 @@ class PrerenderSeoPages extends Command
             ? $pathsFromOptions
             : $this->collectPathsFromSitemaps();
 
+        if (empty($pathsFromOptions)) {
+            $paths = array_values(array_unique(array_merge($paths, $this->additionalStaticPaths())));
+        }
+
         if (!$this->option('include-root')) {
             $paths = array_values(array_filter($paths, fn (string $path) => $path !== ''));
         }
@@ -206,6 +210,50 @@ class PrerenderSeoPages extends Command
             . str_replace('/', DIRECTORY_SEPARATOR, $path)
             . DIRECTORY_SEPARATOR
             . 'index.html';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function additionalStaticPaths(): array
+    {
+        return [
+            '',
+            'about',
+            'contact',
+            'o-nama',
+            'kontakt',
+            'specijalnosti',
+            'kalkulatori',
+            'faq',
+            'mkb10',
+            'politika-privatnosti',
+            'privacy-policy',
+            'uslovi-koristenja',
+            'terms-of-service',
+            'cookie-policy',
+            'registration-options',
+            'register/doctor',
+            'register/clinic',
+            'register/laboratory',
+            'register/pharmacy',
+            'register/spa',
+            'register/care-home',
+            'postavi-pitanje',
+            'medicinski-kalendar',
+            'blog',
+            'pitanja',
+            'doktori',
+            'klinike',
+            'laboratorije',
+            'apoteke',
+            'banje',
+            'banje/indikacije-terapije',
+            'domovi-njega',
+            'domovi-njega/vodic',
+            'gradovi',
+            'lijekovi',
+        ];
     }
 
     /**
