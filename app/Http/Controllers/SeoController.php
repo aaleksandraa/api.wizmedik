@@ -224,6 +224,12 @@ class SeoController extends Controller
 
         $title = "{$specialtyPart}doktori{$locationPart} | wizMedik";
         $description = "Pronadite {$specialtyPart}doktore{$locationPart}. Dostupno {$count}+ profila sa online zakazivanjem termina i kontakt informacijama.";
+        $listingImage = (clone $query)
+            ->whereNotNull('slika_profila')
+            ->where('slika_profila', '!=', '')
+            ->orderByDesc('id')
+            ->value('slika_profila');
+        $image = $this->resolveImageCandidates([$listingImage]);
 
         $path = 'doktori';
         if ($citySlug && $specialtySlug) {
@@ -239,7 +245,7 @@ class SeoController extends Controller
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -262,6 +268,13 @@ class SeoController extends Controller
 
         $title = "Klinike{$specialtyPart}{$locationPart} | wizMedik";
         $description = "Pregledajte privatne i specijalisticke klinike{$locationPart}{$specialtyPart}. Ukupno {$count}+ klinika sa detaljnim profilima i kontakt podacima.";
+        $listingImage = (clone $query)
+            ->whereNotNull('slike')
+            ->orderByDesc('id')
+            ->value('slike');
+        $image = $this->resolveImageCandidates([
+            $this->firstImageFromJson($listingImage),
+        ]);
 
         $path = 'klinike';
         if ($specialtySlug) {
@@ -275,7 +288,7 @@ class SeoController extends Controller
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -295,6 +308,21 @@ class SeoController extends Controller
         $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
         $title = "Laboratorije{$locationPart} | wizMedik";
         $description = "Pronadite medicinske laboratorije{$locationPart}. Uporedite analize, cijene, radno vrijeme i kontakt podatke za {$count}+ laboratorija.";
+        $listingLab = (clone $query)
+            ->where(function ($inner) {
+                $inner->whereNotNull('featured_slika')
+                    ->where('featured_slika', '!=', '')
+                    ->orWhere(function ($nested) {
+                        $nested->whereNotNull('profilna_slika')
+                            ->where('profilna_slika', '!=', '');
+                    });
+            })
+            ->orderByDesc('id')
+            ->first(['featured_slika', 'profilna_slika']);
+        $image = $this->resolveImageCandidates([
+            $listingLab->featured_slika ?? null,
+            $listingLab->profilna_slika ?? null,
+        ]);
 
         $path = $citySlug ? "laboratorije/{$citySlug}" : 'laboratorije';
         $url = $this->buildUrl($path);
@@ -302,7 +330,7 @@ class SeoController extends Controller
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -327,6 +355,12 @@ class SeoController extends Controller
         $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
         $title = "Apoteke{$locationPart} | wizMedik";
         $description = "Pronadjite dezurne i otvorene apoteke{$locationPart}. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom.";
+        $listingImage = (clone $query)
+            ->whereNotNull('apoteke_poslovnice.profilna_slika_url')
+            ->where('apoteke_poslovnice.profilna_slika_url', '!=', '')
+            ->orderByDesc('apoteke_poslovnice.id')
+            ->value('apoteke_poslovnice.profilna_slika_url');
+        $image = $this->resolveImageCandidates([$listingImage]);
 
         $path = $citySlug ? "apoteke/{$citySlug}" : 'apoteke';
         $url = $this->buildUrl($path);
@@ -334,7 +368,7 @@ class SeoController extends Controller
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -354,6 +388,18 @@ class SeoController extends Controller
         $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
         $title = "Banje{$locationPart} | wizMedik";
         $description = "Pregledajte banje i rehabilitacione centre{$locationPart}. Dostupno {$count}+ profila sa terapijama, smjestajem i kontakt informacijama.";
+        $listingSpa = (clone $query)
+            ->where(function ($inner) {
+                $inner->whereNotNull('featured_slika')
+                    ->where('featured_slika', '!=', '')
+                    ->orWhereNotNull('galerija');
+            })
+            ->orderByDesc('id')
+            ->first(['featured_slika', 'galerija']);
+        $image = $this->resolveImageCandidates([
+            $listingSpa->featured_slika ?? null,
+            $this->firstImageFromJson($listingSpa->galerija ?? null),
+        ]);
 
         $path = $citySlug ? "banje/{$citySlug}" : 'banje';
         $url = $this->buildUrl($path);
@@ -361,7 +407,7 @@ class SeoController extends Controller
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -381,6 +427,18 @@ class SeoController extends Controller
         $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
         $title = "Domovi za njegu{$locationPart} | wizMedik";
         $description = "Uporedite domove za njegu i staracke domove{$locationPart}. Pregled {$count}+ verifikovanih profila sa uslugama i kontakt podacima.";
+        $listingHome = (clone $query)
+            ->where(function ($inner) {
+                $inner->whereNotNull('featured_slika')
+                    ->where('featured_slika', '!=', '')
+                    ->orWhereNotNull('galerija');
+            })
+            ->orderByDesc('id')
+            ->first(['featured_slika', 'galerija']);
+        $image = $this->resolveImageCandidates([
+            $listingHome->featured_slika ?? null,
+            $this->firstImageFromJson($listingHome->galerija ?? null),
+        ]);
 
         $path = $citySlug ? "domovi-njega/{$citySlug}" : 'domovi-njega';
         $url = $this->buildUrl($path);
@@ -388,7 +446,7 @@ class SeoController extends Controller
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -434,12 +492,21 @@ class SeoController extends Controller
 
         $title = 'Zdravstveni savjeti i blog | wizMedik';
         $description = "Procitajte {$count}+ strucnih blog postova i zdravstvenih savjeta od doktora na wizMedik platformi.";
+        $listingImage = DB::table('blog_posts')
+            ->where('status', 'published')
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->whereNotNull('thumbnail')
+            ->where('thumbnail', '!=', '')
+            ->orderByDesc('published_at')
+            ->value('thumbnail');
+        $image = $this->resolveImageCandidates([$listingImage]);
         $url = $this->buildUrl('blog');
         $schema = $this->buildCollectionSchema($title, $description, $url, $count);
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -451,12 +518,18 @@ class SeoController extends Controller
 
         $title = 'Medicinska pitanja i odgovori | wizMedik';
         $description = "Procitajte {$count}+ javnih medicinskih pitanja i odgovora verifikovanih doktora na wizMedik platformi.";
+        $listingImage = DB::table('specijalnosti')
+            ->whereNotNull('og_image')
+            ->where('og_image', '!=', '')
+            ->orderBy('id')
+            ->value('og_image');
+        $image = $this->resolveImageCandidates([$listingImage]);
         $url = $this->buildUrl('pitanja');
         $schema = $this->buildCollectionSchema($title, $description, $url, $count);
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
         ];
     }
 
@@ -525,8 +598,13 @@ class SeoController extends Controller
         }
 
         $title = "Dr. {$doctor->ime} {$doctor->prezime} - {$doctor->specijalnost} | wizMedik";
-        $description = "Zakažite pregled kod Dr. {$doctor->ime} {$doctor->prezime}, {$doctor->specijalnost} u {$doctor->grad}. Online zakazivanje termina.";
-        $image = $this->absoluteImage($doctor->slika_profila ?? null);
+        $description = $this->cleanDescription(
+            $doctor->opis ?? null,
+            "Zakazite pregled kod Dr. {$doctor->ime} {$doctor->prezime}, {$doctor->specijalnost} u {$doctor->grad}. Online zakazivanje termina."
+        );
+        $image = $this->resolveImageCandidates([
+            $doctor->slika_profila ?? null,
+        ]);
         $url = $this->buildUrl("doktor/{$slug}");
 
         return [
@@ -598,7 +676,9 @@ class SeoController extends Controller
             $clinic->opis ?? null,
             "Zakažite pregled u {$clinic->naziv}, {$clinic->grad}. Online zakazivanje termina."
         );
-        $image = $this->defaultImage();
+        $image = $this->resolveImageCandidates([
+            $this->firstImageFromJson($clinic->slike ?? null),
+        ]);
         $url = $this->buildUrl("klinika/{$slug}");
 
         return [
@@ -624,10 +704,16 @@ class SeoController extends Controller
             ->where('verifikovan', true)
             ->count();
 
-        $title = "{$specialty->naziv} - Pronadite doktora | wizMedik";
-        $description = $specialty->seo_opis
-            ?? "Pronadite najboljeg doktora za {$specialty->naziv} u BiH. Dostupno {$doctorCount}+ doktora za online zakazivanje.";
-        $image = $this->absoluteImage($specialty->slika_url ?? null);
+        $title = $specialty->meta_title
+            ?: "{$specialty->naziv} - Pronadite doktora | wizMedik";
+        $description = $this->cleanDescription(
+            $specialty->meta_description ?? $specialty->opis ?? null,
+            "Pronadite najboljeg doktora za {$specialty->naziv} u BiH. Dostupno {$doctorCount}+ doktora za online zakazivanje."
+        );
+        $image = $this->resolveImageCandidates([
+            $specialty->og_image ?? null,
+            $specialty->icon_url ?? null,
+        ]);
         $url = $this->buildUrl("specijalnost/{$slug}");
 
         return [
@@ -652,6 +738,7 @@ class SeoController extends Controller
             ->select([
                 'specialty_service_pages.naziv',
                 'specialty_service_pages.kratki_opis',
+                'specialty_service_pages.sadrzaj',
                 'specialty_service_pages.meta_title',
                 'specialty_service_pages.meta_description',
                 'specialty_service_pages.meta_keywords',
@@ -659,6 +746,8 @@ class SeoController extends Controller
                 'specialty_service_pages.og_image',
                 'specialty_service_pages.is_indexable',
                 'specijalnosti.naziv as specialty_naziv',
+                'specijalnosti.og_image as specialty_og_image',
+                'specijalnosti.icon_url as specialty_icon_url',
             ])
             ->first();
 
@@ -669,13 +758,17 @@ class SeoController extends Controller
         $title = $service->meta_title
             ?: "{$service->naziv} | {$service->specialty_naziv} | wizMedik";
 
-        $description = $service->meta_description
-            ?: $this->cleanDescription(
-                $service->kratki_opis ?? null,
-                "Detaljan pregled usluge {$service->naziv} iz oblasti {$service->specialty_naziv}."
-            );
+        $description = $this->cleanDescription(
+            $service->meta_description ?? $service->kratki_opis ?? null,
+            "Detaljan pregled usluge {$service->naziv} iz oblasti {$service->specialty_naziv}."
+        );
 
-        $image = $this->absoluteImage($service->og_image ?? null);
+        $image = $this->resolveImageCandidates([
+            $service->og_image ?? null,
+            $this->firstImageFromHtml($service->sadrzaj ?? null),
+            $service->specialty_og_image ?? null,
+            $service->specialty_icon_url ?? null,
+        ]);
 
         $defaultUrl = $this->buildUrl("specijalnost/{$specialtySlug}/{$serviceSlug}");
         $url = !empty($service->canonical_url) ? (string) $service->canonical_url : $defaultUrl;
@@ -784,12 +877,16 @@ class SeoController extends Controller
             return $this->getNotFoundMeta("laboratorija/{$slug}");
         }
 
-        $title = "{$lab->naziv} - Laboratorija u {$lab->grad} | wizMedik";
+        $title = $lab->meta_title ?: "{$lab->naziv} - Laboratorija u {$lab->grad} | wizMedik";
         $description = $this->cleanDescription(
-            $lab->opis ?? null,
+            $lab->meta_description ?? $lab->kratak_opis ?? $lab->opis ?? null,
             "Laboratorijske analize u {$lab->grad}. Provjerite cijene i kontakt podatke."
         );
-        $image = $this->defaultImage();
+        $image = $this->resolveImageCandidates([
+            $lab->featured_slika ?? null,
+            $lab->profilna_slika ?? null,
+            $this->firstImageFromJson($lab->galerija ?? null),
+        ]);
         $url = $this->buildUrl("laboratorija/{$slug}");
 
         return [
@@ -809,6 +906,7 @@ class SeoController extends Controller
                 'apoteke_poslovnice.adresa',
                 'apoteke_poslovnice.kratki_opis',
                 'apoteke_poslovnice.profilna_slika_url',
+                'apoteke_poslovnice.galerija_slike',
                 'apoteke_poslovnice.is_24h',
                 'apoteke_firme.naziv_brenda'
             )
@@ -831,7 +929,10 @@ class SeoController extends Controller
             $pharmacy->kratki_opis ?? null,
             "Kontakt i radno vrijeme apoteke {$pharmacy->naziv} u {$city}. Provjerite lokaciju i dostupnost."
         );
-        $image = $this->absoluteImage($pharmacy->profilna_slika_url ?? null);
+        $image = $this->resolveImageCandidates([
+            $pharmacy->profilna_slika_url ?? null,
+            $this->firstImageFromJson($pharmacy->galerija_slike ?? null),
+        ]);
         $url = $this->buildUrl("apoteka/{$slug}");
 
         $schema = [
@@ -867,12 +968,15 @@ class SeoController extends Controller
             return $this->getNotFoundMeta("banja/{$slug}");
         }
 
-        $title = "{$spa->naziv} - Banja u {$spa->grad} | wizMedik";
+        $title = $spa->meta_title ?: "{$spa->naziv} - Banja u {$spa->grad} | wizMedik";
         $description = $this->cleanDescription(
-            $spa->opis ?? null,
+            $spa->meta_description ?? $spa->opis ?? null,
             "Banjsko lijeciliste {$spa->naziv} u {$spa->grad}. Provjerite ponudu i kontakt."
         );
-        $image = $this->defaultImage();
+        $image = $this->resolveImageCandidates([
+            $spa->featured_slika ?? null,
+            $this->firstImageFromJson($spa->galerija ?? null),
+        ]);
         $url = $this->buildUrl("banja/{$slug}");
 
         return [
@@ -894,12 +998,15 @@ class SeoController extends Controller
             return $this->getNotFoundMeta("dom-njega/{$slug}");
         }
 
-        $title = "{$home->naziv} - Dom njege u {$home->grad} | wizMedik";
+        $title = $home->meta_title ?: "{$home->naziv} - Dom njege u {$home->grad} | wizMedik";
         $description = $this->cleanDescription(
-            $home->opis ?? null,
+            $home->meta_description ?? $home->opis ?? null,
             "Dom za njegu starih i nemocnih osoba {$home->naziv} u {$home->grad}."
         );
-        $image = $this->defaultImage();
+        $image = $this->resolveImageCandidates([
+            $home->featured_slika ?? null,
+            $this->firstImageFromJson($home->galerija ?? null),
+        ]);
         $url = $this->buildUrl("dom-njega/{$slug}");
 
         return [
@@ -921,12 +1028,15 @@ class SeoController extends Controller
             return $this->getNotFoundMeta("blog/{$slug}");
         }
 
-        $title = "{$post->naslov} | wizMedik Blog";
+        $title = $post->meta_title ?: "{$post->naslov} | wizMedik Blog";
         $description = $this->cleanDescription(
-            $post->excerpt ?? strip_tags($post->sadrzaj ?? ''),
+            $post->meta_description ?? $post->excerpt ?? strip_tags($post->sadrzaj ?? ''),
             'Strucni zdravstveni savjeti na wizMedik blogu.'
         );
-        $image = $this->absoluteImage($post->thumbnail ?? null);
+        $image = $this->resolveImageCandidates([
+            $post->thumbnail ?? null,
+            $this->firstImageFromHtml($post->sadrzaj ?? null),
+        ]);
         $url = $this->buildUrl("blog/{$slug}");
 
         return [
@@ -948,7 +1058,8 @@ class SeoController extends Controller
                 'pitanja.updated_at',
                 'pitanja.created_at',
                 'pitanja.je_javno',
-                'specijalnosti.naziv as specijalnost_naziv'
+                'specijalnosti.naziv as specijalnost_naziv',
+                'specijalnosti.og_image as specijalnost_og_image'
             )
             ->where('pitanja.slug', $slug)
             ->where('pitanja.je_javno', true)
@@ -968,6 +1079,9 @@ class SeoController extends Controller
             $question->sadrzaj ?? null,
             'Javno medicinsko pitanje i odgovori doktora na wizMedik platformi.'
         );
+        $image = $this->resolveImageCandidates([
+            $question->specijalnost_og_image ?? null,
+        ]);
 
         $answers = DB::table('odgovori_na_pitanja')
             ->leftJoin('doktori', 'doktori.id', '=', 'odgovori_na_pitanja.doktor_id')
@@ -1056,7 +1170,7 @@ class SeoController extends Controller
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $this->defaultImage(), $url, 'article', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'article', $schema),
         ];
     }
 
@@ -1357,7 +1471,7 @@ HTML;
 
     private function defaultImage(): string
     {
-        return $this->buildUrl('/wizmedik-logo.png');
+        return $this->buildUrl('/og-image.jpg');
     }
 
     private function absoluteImage(?string $image): string
@@ -1366,11 +1480,97 @@ HTML;
             return $this->defaultImage();
         }
 
-        if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://')) {
-            return $image;
+        $normalized = trim($image);
+        if ($normalized === '') {
+            return $this->defaultImage();
         }
 
-        return $this->buildUrl($image);
+        if (str_starts_with($normalized, 'http://') || str_starts_with($normalized, 'https://')) {
+            return $normalized;
+        }
+
+        if (str_starts_with($normalized, '//')) {
+            return 'https:' . $normalized;
+        }
+
+        if (str_starts_with($normalized, '/storage/')) {
+            return $this->buildUrl($normalized);
+        }
+
+        if (str_starts_with($normalized, 'storage/')) {
+            return $this->buildUrl('/' . $normalized);
+        }
+
+        // Most uploaded files are stored as relative disk paths (e.g. "domovi/featured/x.jpg").
+        if (!str_starts_with($normalized, '/') && str_contains($normalized, '/')) {
+            return $this->buildUrl('/storage/' . ltrim($normalized, '/'));
+        }
+
+        return $this->buildUrl($normalized);
+    }
+
+    private function resolveImageCandidates(array $candidates): string
+    {
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $normalized = trim($candidate);
+            if ($normalized === '') {
+                continue;
+            }
+
+            return $this->absoluteImage($normalized);
+        }
+
+        return $this->defaultImage();
+    }
+
+    private function firstImageFromJson($raw): ?string
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        foreach ($decoded as $item) {
+            if (is_string($item) && trim($item) !== '') {
+                return trim($item);
+            }
+
+            if (!is_array($item)) {
+                continue;
+            }
+
+            foreach (['url', 'src', 'image', 'slika'] as $key) {
+                if (isset($item[$key]) && is_string($item[$key]) && trim($item[$key]) !== '') {
+                    return trim($item[$key]);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function firstImageFromHtml(?string $html): ?string
+    {
+        if (!$html) {
+            return null;
+        }
+
+        if (!preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $html, $matches)) {
+            return null;
+        }
+
+        $src = html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $src = trim($src);
+
+        return $src !== '' ? $src : null;
     }
 
     private function cleanDescription(?string $description, string $fallback): string
