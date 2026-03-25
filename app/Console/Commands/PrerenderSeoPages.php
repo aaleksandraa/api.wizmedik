@@ -33,18 +33,25 @@ class PrerenderSeoPages extends Command
      */
     public function handle(): int
     {
-        $outputDir = $this->resolveOutputDir();
-        if (!is_dir($outputDir)) {
-            $this->error("Output directory not found: {$outputDir}");
-            return self::FAILURE;
+        $primaryOutputDir = $this->resolveOutputDir();
+        $outputDirs = $this->resolveOutputDirs($primaryOutputDir);
+
+        foreach ($outputDirs as $outputDir) {
+            if (!is_dir($outputDir)) {
+                $this->error("Output directory not found: {$outputDir}");
+                return self::FAILURE;
+            }
+
+            if (!is_writable($outputDir)) {
+                $this->error("Output directory is not writable: {$outputDir}");
+                return self::FAILURE;
+            }
         }
 
-        if (!is_writable($outputDir)) {
-            $this->error("Output directory is not writable: {$outputDir}");
-            return self::FAILURE;
+        $this->info('Output directories:');
+        foreach ($outputDirs as $outputDir) {
+            $this->info(" - {$outputDir}");
         }
-
-        $this->info("Output directory: {$outputDir}");
 
         $pathsFromOptions = $this->normalizeSpecificPathsOption();
         $paths = !empty($pathsFromOptions)
@@ -88,13 +95,15 @@ class PrerenderSeoPages extends Command
                     continue;
                 }
 
-                $targetFile = $this->targetFilePath($outputDir, $path);
-                $targetDir = dirname($targetFile);
-                if (!is_dir($targetDir)) {
-                    mkdir($targetDir, 0755, true);
-                }
+                foreach ($outputDirs as $outputDir) {
+                    $targetFile = $this->targetFilePath($outputDir, $path);
+                    $targetDir = dirname($targetFile);
+                    if (!is_dir($targetDir)) {
+                        mkdir($targetDir, 0755, true);
+                    }
 
-                file_put_contents($targetFile, (string) $response->getContent());
+                    file_put_contents($targetFile, (string) $response->getContent());
+                }
                 $rendered++;
             } catch (\Throwable $e) {
                 $errors++;
@@ -123,6 +132,27 @@ class PrerenderSeoPages extends Command
 
         $default = config('app.sitemap_output_path', base_path('../frontend/dist'));
         return rtrim((string) $default, DIRECTORY_SEPARATOR);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveOutputDirs(string $primaryOutputDir): array
+    {
+        $dirs = [rtrim($primaryOutputDir, DIRECTORY_SEPARATOR)];
+
+        $mirrorRaw = trim((string) config('app.sitemap_output_mirror_paths', ''));
+        if ($mirrorRaw !== '') {
+            $mirrorDirs = preg_split('/[,;]+/', $mirrorRaw) ?: [];
+            foreach ($mirrorDirs as $mirrorDir) {
+                $normalized = rtrim(trim((string) $mirrorDir), DIRECTORY_SEPARATOR);
+                if ($normalized !== '') {
+                    $dirs[] = $normalized;
+                }
+            }
+        }
+
+        return array_values(array_unique($dirs));
     }
 
     /**
