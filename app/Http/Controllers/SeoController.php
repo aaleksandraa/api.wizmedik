@@ -53,11 +53,33 @@ class SeoController extends Controller
     {
         $sitemapOutputPath = trim((string) config('app.sitemap_output_path', ''));
         $seoTemplatePath = trim((string) env('SEO_INDEX_TEMPLATE_PATH', ''));
+        $mirrorRaw = trim((string) config('app.sitemap_output_mirror_paths', ''));
+
+        $outputDirs = [];
+        if ($sitemapOutputPath !== '') {
+            $outputDirs[] = rtrim($sitemapOutputPath, DIRECTORY_SEPARATOR);
+        }
+
+        if ($mirrorRaw !== '') {
+            $mirrorDirs = preg_split('/[,;]+/', $mirrorRaw) ?: [];
+            foreach ($mirrorDirs as $mirrorDir) {
+                $normalized = rtrim(trim((string) $mirrorDir), DIRECTORY_SEPARATOR);
+                if ($normalized !== '') {
+                    $outputDirs[] = $normalized;
+                }
+            }
+        }
+
+        $outputDirs = array_values(array_unique($outputDirs));
+        $outputCandidates = [];
+        foreach ($outputDirs as $dir) {
+            // If output base is httpdocs, prefer the actual frontend docroot template (httpdocs/dist/index.html)
+            $outputCandidates[] = $dir . DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR . 'index.html';
+            $outputCandidates[] = $dir . DIRECTORY_SEPARATOR . 'index.html';
+        }
 
         $candidates = [
-            $sitemapOutputPath !== ''
-                ? rtrim($sitemapOutputPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'index.html'
-                : null,
+            ...$outputCandidates,
             $seoTemplatePath !== '' ? $seoTemplatePath : null,
             base_path('../frontend/dist/index.html'),
             base_path('frontend/dist/index.html'),

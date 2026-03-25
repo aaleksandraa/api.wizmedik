@@ -99,10 +99,15 @@ class PrerenderSeoPages extends Command
                     $targetFile = $this->targetFilePath($outputDir, $path);
                     $targetDir = dirname($targetFile);
                     if (!is_dir($targetDir)) {
-                        mkdir($targetDir, 0755, true);
+                        if (!mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
+                            throw new \RuntimeException("Failed to create directory: {$targetDir}");
+                        }
                     }
 
-                    file_put_contents($targetFile, (string) $response->getContent());
+                    $bytes = @file_put_contents($targetFile, (string) $response->getContent());
+                    if ($bytes === false) {
+                        throw new \RuntimeException("Failed to write file: {$targetFile}");
+                    }
                 }
                 $rendered++;
             } catch (\Throwable $e) {
