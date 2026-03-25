@@ -24,21 +24,31 @@ Route::get('/sitemap-lijekovi.xml', [SitemapController::class, 'medicines']);
 
 // Serve storage files
 Route::get('/storage/{folder}/{filename}', function ($folder, $filename) {
-    $path = "public/{$folder}/{$filename}";
+    $folder = trim((string) $folder);
+    $filename = ltrim((string) $filename, '/');
 
-    if (!Storage::exists($path)) {
+    // Prevent path traversal attempts.
+    if ($filename === '' || str_contains($filename, '..')) {
         abort(404);
     }
 
-    $file = Storage::get($path);
-    $mimeType = Storage::mimeType($path);
+    $path = "{$folder}/{$filename}";
+    $disk = Storage::disk('public');
+
+    if (!$disk->exists($path)) {
+        abort(404);
+    }
+
+    $file = $disk->get($path);
+    $mimeType = $disk->mimeType($path);
 
     return response($file, 200)->header('Content-Type', $mimeType);
-})->where('folder', 'doctors|clinics|cities')->where('filename', '.*');
+})->where('folder', 'doctors|clinics|cities|covers|blog|laboratories|spas|logos|backgrounds')
+    ->where('filename', '.*');
 
 // SEO-friendly catch-all route (must be last)
 // Serves index.html with dynamic meta tags for all SPA routes
 // IMPORTANT: Exclude API and sitemap routes so backend APIs never hit SPA fallback
 Route::get('/{any}', [SeoController::class, 'index'])
-    ->where('any', '^(?!(api|sitemap)(/|$)).*')
+    ->where('any', '^(?!(api|sitemap|storage)(/|$)).*')
     ->middleware('web');
