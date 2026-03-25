@@ -11,11 +11,9 @@ class SeoStaticPageService
     public function prerenderPath(string $path): bool
     {
         $normalizedPath = trim($path, '/');
-        $outputDir = $this->outputDirectory();
-
-        if (!is_dir($outputDir) || !is_writable($outputDir)) {
-            Log::warning('SEO prerender skipped: output dir unavailable', [
-                'output_dir' => $outputDir,
+        $outputDirs = $this->outputDirectories();
+        if (empty($outputDirs)) {
+            Log::warning('SEO prerender skipped: no output directories configured', [
                 'path' => $normalizedPath,
             ]);
             return false;
@@ -32,19 +30,42 @@ class SeoStaticPageService
                 return false;
             }
 
-            $targetFile = $this->targetFilePath($outputDir, $normalizedPath);
-            $targetDir = dirname($targetFile);
+            $html = (string) $response->getContent();
+            $hasSuccess = false;
 
-            if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
-                Log::warning('SEO prerender failed: cannot create target directory', [
-                    'target_dir' => $targetDir,
-                    'path' => $normalizedPath,
-                ]);
-                return false;
+            foreach ($outputDirs as $outputDir) {
+                if (!is_dir($outputDir) || !is_writable($outputDir)) {
+                    Log::warning('SEO prerender skipped: output dir unavailable', [
+                        'output_dir' => $outputDir,
+                        'path' => $normalizedPath,
+                    ]);
+                    continue;
+                }
+
+                $targetFile = $this->targetFilePath($outputDir, $normalizedPath);
+                $targetDir = dirname($targetFile);
+
+                if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
+                    Log::warning('SEO prerender failed: cannot create target directory', [
+                        'target_dir' => $targetDir,
+                        'path' => $normalizedPath,
+                    ]);
+                    continue;
+                }
+
+                $bytes = @file_put_contents($targetFile, $html);
+                if ($bytes === false) {
+                    Log::warning('SEO prerender failed: cannot write target file', [
+                        'target_file' => $targetFile,
+                        'path' => $normalizedPath,
+                    ]);
+                    continue;
+                }
+
+                $hasSuccess = true;
             }
 
-            file_put_contents($targetFile, (string) $response->getContent());
-            return true;
+            return $hasSuccess;
         } catch (\Throwable $e) {
             Log::warning('SEO prerender failed', [
                 'path' => $normalizedPath,
@@ -80,21 +101,43 @@ class SeoStaticPageService
             return;
         }
 
-        $outputDir = $this->outputDirectory();
-        $filePath = $this->targetFilePath($outputDir, $normalizedPath);
+        foreach ($this->outputDirectories() as $outputDir) {
+            $filePath = $this->targetFilePath($outputDir, $normalizedPath);
 
-        if (is_file($filePath)) {
-            @unlink($filePath);
+            if (is_file($filePath)) {
+                @unlink($filePath);
+            }
+
+            $directory = dirname($filePath);
+            $this->removeEmptyDirectoriesUpward($directory, $outputDir);
         }
-
-        $directory = dirname($filePath);
-        $this->removeEmptyDirectoriesUpward($directory, $outputDir);
     }
 
-    private function outputDirectory(): string
+    /**
+     * @return array<int, string>
+     */
+    private function outputDirectories(): array
     {
         $configured = (string) config('app.sitemap_output_path', base_path('../frontend/dist'));
-        return rtrim($configured, DIRECTORY_SEPARATOR);
+        $dirs = [];
+
+        $primary = rtrim($configured, DIRECTORY_SEPARATOR);
+        if ($primary !== '') {
+            $dirs[] = $primary;
+        }
+
+        $mirrorRaw = trim((string) config('app.sitemap_output_mirror_paths', ''));
+        if ($mirrorRaw !== '') {
+            $mirrorDirs = preg_split('/[,;]+/', $mirrorRaw) ?: [];
+            foreach ($mirrorDirs as $mirrorDir) {
+                $normalized = rtrim(trim((string) $mirrorDir), DIRECTORY_SEPARATOR);
+                if ($normalized !== '') {
+                    $dirs[] = $normalized;
+                }
+            }
+        }
+
+        return array_values(array_unique($dirs));
     }
 
     private function targetFilePath(string $outputDir, string $path): string
@@ -139,4 +182,3 @@ class SeoStaticPageService
         }
     }
 }
-
