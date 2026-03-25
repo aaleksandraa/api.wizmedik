@@ -24,20 +24,9 @@ class SeoController extends Controller
         $metaTags = $this->getMetaTagsForPath($path);
         $statusCode = $metaTags['status'] ?? 200;
 
-        // Try multiple paths for index.html
-        $indexPath = base_path('../frontend/dist/index.html');
-        if (!file_exists($indexPath)) {
-            $indexPath = base_path('frontend/dist/index.html');
-        }
-        if (!file_exists($indexPath)) {
-            $indexPath = base_path('../dist/index.html');
-        }
-        if (!file_exists($indexPath)) {
-            $indexPath = public_path('index.html');
-        }
-
-        if (!file_exists($indexPath)) {
-            return response('Index file not found at: ' . $indexPath, 404);
+        [$indexPath, $checkedPaths] = $this->resolveIndexTemplatePath();
+        if ($indexPath === null) {
+            return response('Index file not found. Checked: ' . implode(' | ', $checkedPaths), 404);
         }
 
         $html = file_get_contents($indexPath);
@@ -58,6 +47,43 @@ class SeoController extends Controller
         );
 
         return response($html, $statusCode)->header('Content-Type', 'text/html');
+    }
+
+    private function resolveIndexTemplatePath(): array
+    {
+        $sitemapOutputPath = trim((string) config('app.sitemap_output_path', ''));
+        $seoTemplatePath = trim((string) env('SEO_INDEX_TEMPLATE_PATH', ''));
+
+        $candidates = [
+            $sitemapOutputPath !== ''
+                ? rtrim($sitemapOutputPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'index.html'
+                : null,
+            $seoTemplatePath !== '' ? $seoTemplatePath : null,
+            base_path('../frontend/dist/index.html'),
+            base_path('frontend/dist/index.html'),
+            base_path('../dist/index.html'),
+            public_path('index.html'),
+        ];
+
+        $checkedPaths = [];
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $normalized = trim($candidate);
+            if ($normalized === '') {
+                continue;
+            }
+
+            $checkedPaths[] = $normalized;
+
+            if (is_file($normalized) && is_readable($normalized)) {
+                return [$normalized, $checkedPaths];
+            }
+        }
+
+        return [null, $checkedPaths];
     }
 
     private function getMetaTagsForPath(string $path): array
