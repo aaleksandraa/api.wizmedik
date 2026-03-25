@@ -5,6 +5,10 @@
 
     RewriteEngine On
 
+    # Always route sitemap XML requests through Laravel routes.
+    # This prevents stale static sitemap files in public/ from being served.
+    RewriteRule ^sitemap(?:-[A-Za-z0-9-]+)?\.xml$ index.php [L,NC]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

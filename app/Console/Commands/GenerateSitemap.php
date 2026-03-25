@@ -51,7 +51,7 @@ class GenerateSitemap extends Command
 
         $controller = new SitemapController();
 
-        $sitemaps = [
+        $sitemaps = config('sitemaps.generators', [
             'sitemap.xml' => 'index',
             'sitemap-pages.xml' => 'pages',
             'sitemap-doctors.xml' => 'doctors',
@@ -63,10 +63,11 @@ class GenerateSitemap extends Command
             'sitemap-care-homes.xml' => 'careHomes',
             'sitemap-doctor-city-specialties.xml' => 'doctorCitySpecialties',
             'sitemap-specialties.xml' => 'specialties',
+            'sitemap-service-pages.xml' => 'servicePages',
             'sitemap-cities.xml' => 'cities',
             'sitemap-blog.xml' => 'blog',
             'sitemap-pitanja.xml' => 'questions',
-        ];
+        ]);
 
         $successCount = 0;
         $errorCount = 0;

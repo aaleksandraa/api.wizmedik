@@ -133,7 +133,7 @@ class PrerenderSeoPages extends Command
         $controller = app(SitemapController::class);
         $baseUrl = rtrim(config('app.frontend_url', 'https://wizmedik.com'), '/');
 
-        $methods = [
+        $methods = config('sitemaps.prerender_methods', [
             'pages',
             'doctors',
             'clinics',
@@ -148,7 +148,7 @@ class PrerenderSeoPages extends Command
             'doctorCitySpecialties',
             'blog',
             'questions',
-        ];
+        ]);
 
         $paths = [];
 

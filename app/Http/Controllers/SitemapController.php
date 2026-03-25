@@ -129,7 +129,7 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
-        $sitemaps = [
+        $sitemaps = config('sitemaps.index_files', [
             'sitemap-pages.xml',
             'sitemap-doctors.xml',
             'sitemap-clinics.xml',
@@ -144,7 +144,7 @@ class SitemapController extends Controller
             'sitemap-doctor-city-specialties.xml',
             'sitemap-blog.xml',
             'sitemap-pitanja.xml',
-        ];
+        ]);
 
         foreach ($sitemaps as $sitemap) {
             $xml .= '<sitemap>';
