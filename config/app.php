@@ -60,6 +60,8 @@ return [
 
     'sitemap_output_path' => env('SITEMAP_OUTPUT_PATH', base_path('../frontend/dist')),
 
+    'sitemap_output_mirror_paths' => env('SITEMAP_OUTPUT_MIRROR_PATHS', ''),
+
     'sitemap_schedule_time' => env('SITEMAP_SCHEDULE_TIME', '02:10'),
 
     'sitemap_schedule_timezone' => env('SITEMAP_SCHEDULE_TIMEZONE', 'Europe/Sarajevo'),
