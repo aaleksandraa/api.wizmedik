@@ -66,4 +66,17 @@ Allow: /
 
 # Sitemap location
 Sitemap: https://wizmedik.com/sitemap.xml
+Sitemap: https://wizmedik.com/sitemap-pages.xml
+Sitemap: https://wizmedik.com/sitemap-doctors.xml
+Sitemap: https://wizmedik.com/sitemap-clinics.xml
+Sitemap: https://wizmedik.com/sitemap-specialties.xml
+Sitemap: https://wizmedik.com/sitemap-service-pages.xml
+Sitemap: https://wizmedik.com/sitemap-cities.xml
+Sitemap: https://wizmedik.com/sitemap-laboratories.xml
 Sitemap: https://wizmedik.com/sitemap-lijekovi.xml
+Sitemap: https://wizmedik.com/sitemap-pharmacies.xml
+Sitemap: https://wizmedik.com/sitemap-spas.xml
+Sitemap: https://wizmedik.com/sitemap-care-homes.xml
+Sitemap: https://wizmedik.com/sitemap-doctor-city-specialties.xml
+Sitemap: https://wizmedik.com/sitemap-blog.xml
+Sitemap: https://wizmedik.com/sitemap-pitanja.xml

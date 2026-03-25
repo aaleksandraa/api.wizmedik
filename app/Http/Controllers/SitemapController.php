@@ -11,7 +11,20 @@ class SitemapController extends Controller
 {
     private function getBaseUrl(): string
     {
-        return rtrim(config('app.frontend_url', 'https://wizmedik.com'), '/');
+        $frontendUrl = trim((string) config('app.frontend_url', ''));
+        $fallbackUrl = 'https://wizmedik.com';
+
+        $baseUrl = $frontendUrl !== '' ? $frontendUrl : $fallbackUrl;
+        $host = strtolower((string) parse_url($baseUrl, PHP_URL_HOST));
+
+        $isLocalhostHost = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+
+        // Production safety: never emit localhost URLs inside sitemap files.
+        if (app()->environment('production') && $isLocalhostHost) {
+            $baseUrl = $fallbackUrl;
+        }
+
+        return rtrim($baseUrl, '/');
     }
 
     private function xmlEscape(?string $value): string
@@ -316,13 +329,24 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
+        // Keep category listing discoverable even when there are no detail pages yet.
+        $this->appendUrl(
+            $xml,
+            $baseUrl . '/specijalnosti',
+            now(),
+            'weekly',
+            '0.9'
+        );
+
         $pages = DB::table('specialty_service_pages')
             ->join('specijalnosti', 'specijalnosti.id', '=', 'specialty_service_pages.specialty_id')
             ->whereNull('specialty_service_pages.deleted_at')
             ->where('specialty_service_pages.status', 'published')
             ->where('specialty_service_pages.is_indexable', true)
             ->whereNotNull('specialty_service_pages.slug')
+            ->where('specialty_service_pages.slug', '!=', '')
             ->whereNotNull('specijalnosti.slug')
+            ->where('specijalnosti.slug', '!=', '')
             ->where('specijalnosti.aktivan', true)
             ->where(function ($query) {
                 $query->whereNull('specialty_service_pages.published_at')
@@ -450,8 +474,18 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
+        // Listing page itself should also exist in this vertical sitemap.
+        $this->appendUrl(
+            $xml,
+            $baseUrl . '/lijekovi',
+            now(),
+            'daily',
+            '0.9'
+        );
+
         $medicines = DB::table('lijekovi')
             ->whereNotNull('slug')
+            ->where('slug', '!=', '')
             ->select('slug', 'updated_at')
             ->get();
 
@@ -477,6 +511,15 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
+        // Listing page itself should also exist in this vertical sitemap.
+        $this->appendUrl(
+            $xml,
+            $baseUrl . '/apoteke',
+            now(),
+            'daily',
+            '0.8'
+        );
+
         $pharmacies = DB::table('apoteke_poslovnice')
             ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
             ->whereNull('apoteke_poslovnice.deleted_at')
@@ -485,6 +528,8 @@ class SitemapController extends Controller
             ->where('apoteke_poslovnice.is_verified', true)
             ->where('apoteke_firme.is_active', true)
             ->where('apoteke_firme.status', 'verified')
+            ->whereNotNull('apoteke_poslovnice.slug')
+            ->where('apoteke_poslovnice.slug', '!=', '')
             ->select('apoteke_poslovnice.slug', 'apoteke_poslovnice.updated_at')
             ->get();
 
@@ -665,8 +710,19 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
+        // Listing page itself should also exist in this vertical sitemap.
+        $this->appendUrl(
+            $xml,
+            $baseUrl . '/pitanja',
+            now(),
+            'daily',
+            '0.7'
+        );
+
         $questions = DB::table('pitanja')
             ->where('je_javno', true)
+            ->whereNotNull('slug')
+            ->where('slug', '!=', '')
             ->select('slug', 'updated_at', 'created_at', 'je_odgovoreno')
             ->orderBy('updated_at', 'desc')
             ->get();
@@ -690,16 +746,17 @@ class SitemapController extends Controller
     {
         return DB::table('apoteke_poslovnice')
             ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->leftJoin('gradovi', 'gradovi.id', '=', 'apoteke_poslovnice.grad_id')
             ->whereNull('apoteke_poslovnice.deleted_at')
             ->whereNull('apoteke_firme.deleted_at')
             ->where('apoteke_poslovnice.is_active', true)
             ->where('apoteke_poslovnice.is_verified', true)
             ->where('apoteke_firme.is_active', true)
             ->where('apoteke_firme.status', 'verified')
-            ->whereNotNull('apoteke_poslovnice.grad_naziv')
-            ->where('apoteke_poslovnice.grad_naziv', '!=', '')
-            ->selectRaw('apoteke_poslovnice.grad_naziv as grad, MAX(apoteke_poslovnice.updated_at) AS updated_at')
-            ->groupBy('apoteke_poslovnice.grad_naziv')
+            ->whereRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) IS NOT NULL")
+            ->whereRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) != ''")
+            ->selectRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) as grad, MAX(apoteke_poslovnice.updated_at) AS updated_at")
+            ->groupByRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv)")
             ->get();
     }
 }
