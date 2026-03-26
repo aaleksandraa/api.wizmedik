@@ -1344,6 +1344,14 @@ class SeoController extends Controller
             );
         }
 
+        if ($path === 'impressum') {
+            return $this->simplePageMeta(
+                'Impressum | wizMedik',
+                'Osnovni pravni i kontakt podaci o WizMedik platformi, odgovornosti, autorskim pravima i zastiti podataka.',
+                'impressum'
+            );
+        }
+
         if ($path === 'registration-options') {
             return $this->simplePageMeta(
                 'Registracija na platformu | wizMedik',

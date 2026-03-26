@@ -201,6 +201,7 @@ class SitemapController extends Controller
             ['url' => '/mkb10', 'priority' => '0.6', 'changefreq' => 'monthly'],
             ['url' => '/uslovi-koristenja', 'priority' => '0.5', 'changefreq' => 'yearly'],
             ['url' => '/politika-privatnosti', 'priority' => '0.5', 'changefreq' => 'yearly'],
+            ['url' => '/impressum', 'priority' => '0.5', 'changefreq' => 'yearly'],
         ];
 
         $lastmod = now()->format('c');

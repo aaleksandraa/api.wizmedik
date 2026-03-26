@@ -267,6 +267,7 @@ class PrerenderSeoPages extends Command
             'uslovi-koristenja',
             'terms-of-service',
             'cookie-policy',
+            'impressum',
             'registration-options',
             'register/doctor',
             'register/clinic',
