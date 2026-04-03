@@ -17,12 +17,8 @@ class AdminDoctorController extends Controller
         $perPage = min($request->get('per_page', 15), 1000);
 
         $query = Doktor::query()
-            ->select([
-                'id', 'ime', 'prezime', 'slug', 'specijalnost', 'grad',
-                'ocjena', 'broj_ocjena', 'slika_profila', 'klinika_id',
-                'prihvata_online', 'aktivan', 'verifikovan', 'verifikovan_at', 'verifikovan_by'
-            ])
             ->with([
+                'user:id,name,ime,prezime,email,role',
                 'specijalnostModel:id,naziv,slug',
                 'klinika:id,naziv,grad,slug',
                 'specijalnosti:id,naziv,slug',

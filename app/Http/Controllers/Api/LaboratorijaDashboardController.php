@@ -150,7 +150,10 @@ class LaboratorijaDashboardController extends Controller
     {
         $request->validate([
             'current_password' => 'required|string',
-            'new_password' => 'required|string|min:8|confirmed',
+            'new_password' => 'required|string|min:12|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
+        ], [
+            'new_password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
+            'new_password.regex' => 'Lozinka mora sadrzati velika i mala slova, broj i specijalni karakter.',
         ]);
 
         $user = auth()->user();

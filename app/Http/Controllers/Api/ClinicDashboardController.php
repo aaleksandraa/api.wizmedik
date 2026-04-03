@@ -96,7 +96,10 @@ class ClinicDashboardController extends Controller
 
         $validated = $request->validate([
             'current_password' => 'required|string',
-            'new_password' => 'required|string|min:8|confirmed',
+            'new_password' => 'required|string|min:12|confirmed|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
+        ], [
+            'new_password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
+            'new_password.regex' => 'Lozinka mora sadrzati velika i mala slova, broj i specijalni karakter.',
         ]);
 
         // Verify current password
@@ -438,12 +441,15 @@ class ClinicDashboardController extends Controller
             'ime' => 'required|string|max:100',
             'prezime' => 'required|string|max:100',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
+            'password' => 'required|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
             'telefon' => 'required|string|max:50',
             'specijalnost' => 'required|string|max:100',
             'specijalnost_id' => 'nullable|exists:specijalnosti,id',
             'opis' => 'nullable|string',
             'slika_profila' => 'nullable|string',
+        ], [
+            'password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
+            'password.regex' => 'Lozinka mora sadrzati velika i mala slova, broj i specijalni karakter.',
         ]);
 
         // Create user account for doctor
@@ -498,12 +504,15 @@ class ClinicDashboardController extends Controller
             'ime' => 'sometimes|string|max:100',
             'prezime' => 'sometimes|string|max:100',
             'email' => 'sometimes|email',
-            'password' => 'nullable|string|min:8',
+            'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
             'telefon' => 'sometimes|string|max:50',
             'specijalnost' => 'sometimes|string|max:100',
             'specijalnost_id' => 'nullable|exists:specijalnosti,id',
             'opis' => 'nullable|string',
             'slika_profila' => 'nullable|string',
+        ], [
+            'password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
+            'password.regex' => 'Lozinka mora sadrzati velika i mala slova, broj i specijalni karakter.',
         ]);
 
         // Check email uniqueness if changed

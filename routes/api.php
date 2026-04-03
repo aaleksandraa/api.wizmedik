@@ -578,10 +578,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/doctors', [AdminController::class, 'createDoctor']);
         Route::put('/doctors/{id}', [AdminController::class, 'updateDoktor']);
         Route::delete('/doctors/{id}', [AdminController::class, 'deleteDoktor']);
+        Route::post('/doctors/{id}/send-invite', [AdminController::class, 'sendDoctorAccessInvite'])
+            ->middleware('throttle:10,1');
 
         Route::post('/clinics', [AdminController::class, 'createClinic']);
         Route::put('/clinics/{id}', [AdminController::class, 'updateClinic']);
         Route::delete('/clinics/{id}', [AdminController::class, 'deleteClinic']);
+        Route::post('/clinics/{id}/send-invite', [AdminController::class, 'sendClinicAccessInvite'])
+            ->middleware('throttle:10,1');
 
         Route::get('/cities', [CityController::class, 'adminIndex']);
         Route::post('/cities', [AdminController::class, 'createCity']);
@@ -635,6 +639,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/pharmacies/pending', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'pending']);
         Route::put('/pharmacies/{id}', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'update'])->whereNumber('id');
         Route::delete('/pharmacies/{id}', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'destroy'])->whereNumber('id');
+        Route::post('/pharmacies/{id}/send-invite', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'sendAccessInvite'])
+            ->whereNumber('id')
+            ->middleware('throttle:10,1');
         Route::post('/pharmacies/{id}/verify', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'verify']);
         Route::post('/pharmacies/{id}/reject', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'reject']);
         Route::post('/pharmacies/{id}/suspend', [\App\Http\Controllers\Api\AdminPharmacyController::class, 'suspend']);
@@ -723,6 +730,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Admin Clinic Management
     Route::get('/clinics', [\App\Http\Controllers\Api\AdminClinicController::class, 'index']);
+    Route::put('/clinics/{id}/manage', [\App\Http\Controllers\Api\AdminClinicController::class, 'updateManaged']);
     Route::post('/clinics/{id}/verify', [\App\Http\Controllers\Api\AdminClinicController::class, 'verify']);
     Route::post('/clinics/{id}/unverify', [\App\Http\Controllers\Api\AdminClinicController::class, 'unverify']);
     Route::post('/clinics/{id}/activate', [\App\Http\Controllers\Api\AdminClinicController::class, 'activate']);
@@ -731,8 +739,13 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Admin Entities Management
     Route::get('/laboratories', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getLaboratories']);
+    Route::get('/laboratories/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'showLaboratory'])->whereNumber('id');
+    Route::post('/laboratories', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'createLaboratory']);
     Route::put('/laboratories/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateLaboratory']);
     Route::delete('/laboratories/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteLaboratory']);
+    Route::post('/laboratories/{id}/send-invite', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'sendLaboratoryAccessInvite'])
+        ->whereNumber('id')
+        ->middleware('throttle:10,1');
 
     // Spa management (canonical /admin/spas)
     Route::get('/spas/statistika/dashboard', [\App\Http\Controllers\Api\AdminBanjaController::class, 'statistics']);
@@ -743,10 +756,14 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/spas/audit-log/{id}', [\App\Http\Controllers\Api\AdminBanjaController::class, 'auditLog']);
     Route::post('/spas/{id}/verify', [\App\Http\Controllers\Api\AdminBanjaController::class, 'verify']);
     Route::post('/spas/{id}/toggle-active', [\App\Http\Controllers\Api\AdminBanjaController::class, 'toggleStatus']);
-    Route::post('/spas', [\App\Http\Controllers\Api\AdminBanjaController::class, 'store']);
+    Route::post('/spas', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'createSpa']);
     Route::get('/spas', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getSpas']);
+    Route::get('/spas/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'showSpa'])->whereNumber('id');
     Route::put('/spas/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateSpa']);
     Route::delete('/spas/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteSpa']);
+    Route::post('/spas/{id}/send-invite', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'sendSpaAccessInvite'])
+        ->whereNumber('id')
+        ->middleware('throttle:10,1');
 
     // Legacy spa admin aliases (/admin/banje/*)
     Route::get('/banje/statistika/dashboard', [\App\Http\Controllers\Api\AdminBanjaController::class, 'statistics']);
@@ -763,8 +780,13 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::delete('/banje/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteSpa']);
 
     Route::get('/care-homes', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getCareHomes']);
+    Route::get('/care-homes/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'showCareHome'])->whereNumber('id');
+    Route::post('/care-homes', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'createCareHome']);
     Route::put('/care-homes/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateCareHome']);
     Route::delete('/care-homes/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'deleteCareHome']);
+    Route::post('/care-homes/{id}/send-invite', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'sendCareHomeAccessInvite'])
+        ->whereNumber('id')
+        ->middleware('throttle:10,1');
 
     Route::get('/pitanja', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'getQuestions']);
     Route::put('/pitanja/{id}', [\App\Http\Controllers\Api\AdminEntitiesController::class, 'updateQuestion']);

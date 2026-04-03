@@ -4,11 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\{User, Doktor, Klinika, Grad, Specijalnost};
+use App\Services\AdminProfileAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
+    public function __construct(private AdminProfileAccessService $profileAccessService)
+    {
+    }
+
     // Users Management
     public function getUsers(Request $request)
     {
@@ -32,7 +38,7 @@ class AdminController extends Controller
         $validated = $request->validate([
             'ime' => 'required|string',
             'prezime' => 'required|string',
-            'email' => 'required|email|unique:doktori,email',
+            'email' => 'nullable|email|unique:doktori,email',
             'telefon' => 'required|string',
             'specijalnost' => 'required|string',
             'specijalnost_id' => 'required|exists:specijalnosti,id',
@@ -45,21 +51,35 @@ class AdminController extends Controller
             'opis' => 'nullable|string',
             'prihvata_online' => 'boolean',
             'slot_trajanje_minuti' => 'integer|min:5',
+            'aktivan' => 'sometimes|boolean',
+            'verifikovan' => 'sometimes|boolean',
+            'account_email' => 'nullable|email',
+            'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
         ]);
 
-        $doktor = Doktor::create($validated);
+        $doktor = DB::transaction(function () use ($validated, $request) {
+            $profileData = collect($validated)
+                ->except(['account_email', 'password'])
+                ->all();
 
-        // Create user account
-        $user = User::create([
-            'name' => $validated['ime'] . ' ' . $validated['prezime'],
-            'ime' => $validated['ime'],
-            'prezime' => $validated['prezime'],
-            'email' => $validated['email'],
-            'password' => Hash::make('password123'), // Default password
-        ]);
-        $user->assignRole('doctor');
+            $profileData['aktivan'] = $request->boolean('aktivan', true);
+            $profileData['verifikovan'] = $request->boolean('verifikovan', true);
+            $profileData['verifikovan_at'] = $profileData['verifikovan'] ? now() : null;
+            $profileData['verifikovan_by'] = $profileData['verifikovan'] ? $request->user()->id : null;
 
-        $doktor->update(['user_id' => $user->id]);
+            $doktor = Doktor::create($profileData);
+
+            $this->profileAccessService->sync($doktor, $validated, [
+                'role' => 'doctor',
+                'model_class' => Doktor::class,
+                'entity_label' => 'doktor',
+                'name' => fn (Doktor $doctor) => trim("{$doctor->ime} {$doctor->prezime}"),
+                'ime' => fn (Doktor $doctor) => $doctor->ime,
+                'prezime' => fn (Doktor $doctor) => $doctor->prezime,
+            ]);
+
+            return $doktor->fresh()->load('user');
+        });
 
         return response()->json(['message' => 'Doctor created successfully', 'doktor' => $doktor], 201);
     }
@@ -67,22 +87,70 @@ class AdminController extends Controller
     public function updateDoktor(Request $request, $id)
     {
         $doktor = Doktor::findOrFail($id);
+        $validated = $request->validate([
+            'ime' => 'sometimes|required|string',
+            'prezime' => 'sometimes|required|string',
+            'email' => 'nullable|email|unique:doktori,email,' . $doktor->id,
+            'telefon' => 'sometimes|required|string',
+            'specijalnost' => 'sometimes|required|string',
+            'specijalnost_id' => 'sometimes|required|exists:specijalnosti,id',
+            'grad' => 'sometimes|required|string',
+            'lokacija' => 'sometimes|required|string',
+            'postanski_broj' => 'nullable|string',
+            'mjesto' => 'nullable|string',
+            'opstina' => 'nullable|string',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'google_maps_link' => 'nullable|url',
+            'slika_profila' => 'nullable|string',
+            'klinika_id' => 'nullable|exists:klinike,id',
+            'opis' => 'nullable|string',
+            'prihvata_online' => 'sometimes|boolean',
+            'slot_trajanje_minuti' => 'sometimes|integer|min:5',
+            'radno_vrijeme' => 'nullable|array',
+            'aktivan' => 'sometimes|boolean',
+            'verifikovan' => 'sometimes|boolean',
+            'account_email' => 'nullable|email',
+            'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
+        ]);
 
         // Handle specialty_ids separately for sync
         $specialtyIds = $request->input('specialty_ids');
 
-        $doktor->update($request->only([
+        $doktor->update(collect($validated)->only([
             'ime', 'prezime', 'email', 'telefon', 'specijalnost', 'specijalnost_id',
             'grad', 'lokacija', 'postanski_broj', 'mjesto', 'opstina', 'latitude', 'longitude', 'google_maps_link',
-            'slika_profila', 'klinika_id', 'opis', 'prihvata_online', 'slot_trajanje_minuti', 'radno_vrijeme'
-        ]));
+            'slika_profila', 'klinika_id', 'opis', 'prihvata_online', 'slot_trajanje_minuti', 'radno_vrijeme',
+            'aktivan', 'verifikovan'
+        ])->all());
 
         // Sync specialties if provided
         if ($specialtyIds !== null) {
             $doktor->specijalnosti()->sync($specialtyIds);
         }
 
-        return response()->json(['message' => 'Doctor updated', 'doktor' => $doktor->fresh()->load('specijalnosti')]);
+        $this->profileAccessService->sync($doktor, $validated, [
+            'role' => 'doctor',
+            'model_class' => Doktor::class,
+            'entity_label' => 'doktor',
+            'name' => fn (Doktor $doctor) => trim("{$doctor->ime} {$doctor->prezime}"),
+            'ime' => fn (Doktor $doctor) => $doctor->ime,
+            'prezime' => fn (Doktor $doctor) => $doctor->prezime,
+        ]);
+
+        if ($request->boolean('verifikovan')) {
+            $doktor->forceFill([
+                'verifikovan_at' => $doktor->verifikovan_at ?? now(),
+                'verifikovan_by' => $doktor->verifikovan_by ?? $request->user()->id,
+            ])->save();
+        } elseif ($request->has('verifikovan') && !$request->boolean('verifikovan')) {
+            $doktor->forceFill([
+                'verifikovan_at' => null,
+                'verifikovan_by' => null,
+            ])->save();
+        }
+
+        return response()->json(['message' => 'Doctor updated', 'doktor' => $doktor->fresh()->load(['specijalnosti', 'user'])]);
     }
 
     public function deleteDoktor($id)
@@ -90,6 +158,33 @@ class AdminController extends Controller
         $doktor = Doktor::findOrFail($id);
         $doktor->delete();
         return response()->json(['message' => 'Doctor deleted successfully']);
+    }
+
+    public function sendDoctorAccessInvite(Request $request, $id)
+    {
+        $doktor = Doktor::findOrFail($id);
+        $validated = $request->validate([
+            'account_email' => 'nullable|email',
+        ]);
+
+        $result = $this->profileAccessService->sendInvitation($doktor, $validated, [
+            'role' => 'doctor',
+            'model_class' => Doktor::class,
+            'entity_label' => 'doktor',
+            'invitation_label' => 'doktorski profil',
+            'name' => fn (Doktor $doctor) => trim("{$doctor->ime} {$doctor->prezime}"),
+            'ime' => fn (Doktor $doctor) => $doctor->ime,
+            'prezime' => fn (Doktor $doctor) => $doctor->prezime,
+        ]);
+
+        return response()->json([
+            'message' => 'Pozivnica za pristup je uspjesno poslana.',
+            'doktor' => $doktor->fresh()->load(['specijalnosti', 'user']),
+            'invitation' => [
+                'sent_to' => $result['sent_to'],
+                'sent_at' => $result['invitation_sent_at'],
+            ],
+        ]);
     }
 
     // Clinics Management
@@ -101,58 +196,9 @@ class AdminController extends Controller
             'adresa' => 'required|string',
             'grad' => 'required|string',
             'telefon' => 'required|string',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
-            'contact_email' => 'nullable|email',
-            'website' => 'nullable|url',
-            'latitude' => 'nullable|numeric',
-            'longitude' => 'nullable|numeric',
-            'google_maps_link' => 'nullable|url',
-            'slike' => 'nullable|array',
-            'radno_vrijeme' => 'nullable|array',
-            'aktivan' => 'boolean',
-        ]);
-
-        // Create user account for clinic
-        $user = \App\Models\User::create([
-            'name' => $validated['naziv'],
-            'email' => $validated['email'],
-            'password' => bcrypt($validated['password']),
-        ]);
-
-        $user->assignRole('clinic');
-
-        // Create clinic profile
-        $clinicData = $validated;
-        $clinicData['user_id'] = $user->id;
-        unset($clinicData['password']);
-
-        $klinika = Klinika::create($clinicData);
-
-        return response()->json(['message' => 'Clinic created', 'klinika' => $klinika], 201);
-    }
-
-    public function updateClinic(Request $request, $id)
-    {
-        $klinika = Klinika::findOrFail($id);
-
-        // Check if email is unique (excluding current clinic's user)
-        $emailRule = 'sometimes|email';
-        if ($request->has('email') && $request->email) {
-            $existingUser = \App\Models\User::where('email', $request->email)->first();
-            if ($existingUser && (!$klinika->user_id || $existingUser->id !== $klinika->user_id)) {
-                return response()->json(['message' => 'Email je već u upotrebi'], 422);
-            }
-        }
-
-        $validated = $request->validate([
-            'naziv' => 'sometimes|string',
-            'opis' => 'nullable|string',
-            'adresa' => 'sometimes|string',
-            'grad' => 'sometimes|string',
-            'telefon' => 'sometimes|string',
-            'email' => $emailRule,
-            'password' => 'nullable|string|min:8',
+            'email' => 'nullable|email',
+            'account_email' => 'nullable|email',
+            'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
             'contact_email' => 'nullable|email',
             'website' => 'nullable|url',
             'latitude' => 'nullable|numeric',
@@ -161,50 +207,120 @@ class AdminController extends Controller
             'slike' => 'nullable|array',
             'radno_vrijeme' => 'nullable|array',
             'aktivan' => 'sometimes|boolean',
+            'verifikovan' => 'sometimes|boolean',
         ]);
 
-        $email = $validated['email'] ?? null;
-        $password = $validated['password'] ?? null;
+        $klinika = DB::transaction(function () use ($validated, $request) {
+            $clinicData = collect($validated)
+                ->except(['account_email', 'password'])
+                ->all();
 
-        // If clinic has user_id, update existing user
-        if ($klinika->user_id) {
-            $user = \App\Models\User::find($klinika->user_id);
-            if ($user) {
-                if ($email) {
-                    $user->email = $email;
-                }
-                if ($password) {
-                    $user->password = bcrypt($password);
-                }
-                if ($request->has('naziv')) {
-                    $user->name = $validated['naziv'];
-                }
-                $user->save();
-            }
-        }
-        // If no user_id but email and password provided, create new user
-        elseif ($email && $password) {
-            $user = \App\Models\User::create([
-                'name' => $validated['naziv'] ?? $klinika->naziv,
-                'email' => $email,
-                'password' => bcrypt($password),
+            $clinicData['aktivan'] = $request->boolean('aktivan', true);
+            $clinicData['verifikovan'] = $request->boolean('verifikovan', true);
+            $clinicData['verifikovan_at'] = $clinicData['verifikovan'] ? now() : null;
+            $clinicData['verifikovan_by'] = $clinicData['verifikovan'] ? $request->user()->id : null;
+
+            $klinika = Klinika::create($clinicData);
+
+            $this->profileAccessService->sync($klinika, $validated, [
+                'role' => 'clinic',
+                'model_class' => Klinika::class,
+                'entity_label' => 'klinika',
+                'name' => fn (Klinika $clinic) => $clinic->naziv,
             ]);
-            $user->assignRole('clinic');
-            $validated['user_id'] = $user->id;
-        }
 
-        // Remove password from validated data (not stored in klinike table)
-        unset($validated['password']);
+            return $klinika->fresh()->load('user');
+        });
 
-        $klinika->update($validated);
+        return response()->json(['message' => 'Clinic created', 'klinika' => $klinika], 201);
+    }
 
-        // Load user relationship for response
-        $klinika->load('user');
+    public function updateClinic(Request $request, $id)
+    {
+        $klinika = Klinika::findOrFail($id);
+
+        $validated = $request->validate([
+            'naziv' => 'sometimes|string',
+            'opis' => 'nullable|string',
+            'adresa' => 'sometimes|string',
+            'grad' => 'sometimes|string',
+            'telefon' => 'sometimes|string',
+            'email' => 'nullable|email',
+            'account_email' => 'nullable|email',
+            'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
+            'contact_email' => 'nullable|email',
+            'website' => 'nullable|url',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'google_maps_link' => 'nullable|url',
+            'slike' => 'nullable|array',
+            'radno_vrijeme' => 'nullable|array',
+            'aktivan' => 'sometimes|boolean',
+            'verifikovan' => 'sometimes|boolean',
+        ]);
+
+        $result = DB::transaction(function () use ($klinika, $validated, $request) {
+            $klinika->update(collect($validated)->only([
+                'naziv',
+                'opis',
+                'adresa',
+                'grad',
+                'telefon',
+                'email',
+                'contact_email',
+                'website',
+                'latitude',
+                'longitude',
+                'google_maps_link',
+                'slike',
+                'radno_vrijeme',
+                'aktivan',
+                'verifikovan',
+            ])->all());
+
+            $accessPayload = $validated;
+
+            // Legacy compatibility for older admin clients that used this route to
+            // provision the first clinic login via public email + password.
+            if (
+                !array_key_exists('account_email', $accessPayload)
+                && !$klinika->user_id
+                && !empty($accessPayload['password'])
+                && !empty($accessPayload['email'])
+            ) {
+                $accessPayload['account_email'] = $accessPayload['email'];
+            }
+
+            $accessResult = $this->profileAccessService->sync($klinika, $accessPayload, [
+                'role' => 'clinic',
+                'model_class' => Klinika::class,
+                'entity_label' => 'klinika',
+                'name' => fn (Klinika $clinic) => $clinic->naziv,
+            ]);
+
+            if ($request->boolean('verifikovan')) {
+                $klinika->forceFill([
+                    'verifikovan_at' => $klinika->verifikovan_at ?? now(),
+                    'verifikovan_by' => $klinika->verifikovan_by ?? $request->user()->id,
+                ])->save();
+            } elseif ($request->has('verifikovan') && !$request->boolean('verifikovan')) {
+                $klinika->forceFill([
+                    'verifikovan_at' => null,
+                    'verifikovan_by' => null,
+                ])->save();
+            }
+
+            return [
+                'klinika' => $klinika->fresh()->load('user'),
+                'access_action' => $accessResult['action'],
+            ];
+        });
 
         return response()->json([
             'message' => 'Clinic updated',
-            'klinika' => $klinika,
-            'user_created' => isset($user) && !$klinika->wasChanged('user_id') ? false : (isset($user) ? true : false)
+            'klinika' => $result['klinika'],
+            'user_created' => $result['access_action'] === 'created',
+            'access_action' => $result['access_action'],
         ]);
     }
 
@@ -212,6 +328,31 @@ class AdminController extends Controller
     {
         Klinika::findOrFail($id)->delete();
         return response()->json(['message' => 'Clinic deleted']);
+    }
+
+    public function sendClinicAccessInvite(Request $request, $id)
+    {
+        $klinika = Klinika::findOrFail($id);
+        $validated = $request->validate([
+            'account_email' => 'nullable|email',
+        ]);
+
+        $result = $this->profileAccessService->sendInvitation($klinika, $validated, [
+            'role' => 'clinic',
+            'model_class' => Klinika::class,
+            'entity_label' => 'klinika',
+            'invitation_label' => 'klinicki profil',
+            'name' => fn (Klinika $clinic) => $clinic->naziv,
+        ]);
+
+        return response()->json([
+            'message' => 'Pozivnica za pristup je uspjesno poslana.',
+            'klinika' => $klinika->fresh()->load('user'),
+            'invitation' => [
+                'sent_to' => $result['sent_to'],
+                'sent_at' => $result['invitation_sent_at'],
+            ],
+        ]);
     }
 
     // Cities Management

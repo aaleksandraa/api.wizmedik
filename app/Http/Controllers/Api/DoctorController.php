@@ -304,7 +304,15 @@ class DoctorController extends Controller
             'public_email' => 'sometimes|nullable|email:rfc|max:255',
             'account_email' => 'sometimes|required|email:rfc|max:255|unique:users,email,' . $user->id,
             'current_password' => 'sometimes|required_with:new_password|string|max:255',
-            'new_password' => 'sometimes|string|min:8|max:255|confirmed|different:current_password',
+            'new_password' => [
+                'sometimes',
+                'string',
+                'min:12',
+                'max:255',
+                'confirmed',
+                'different:current_password',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
+            ],
             // klinika_id removed - doctors can only join/leave clinics through requests
             'specialty_ids' => 'sometimes|array',
             'specialty_ids.*' => 'exists:specijalnosti,id',

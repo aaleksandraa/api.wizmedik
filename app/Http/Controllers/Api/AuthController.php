@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
@@ -27,9 +28,21 @@ class AuthController extends Controller
             'ime' => 'required|string|max:255',
             'prezime' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                PasswordRule::min(12)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
             'telefon' => 'nullable|string|max:20',
             'grad' => 'nullable|string|max:255',
+        ], [
+            'password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
+            'password.uncompromised' => 'Ova lozinka je pronadjena u poznatim sigurnosnim probojima. Molimo koristite sigurniju lozinku.',
         ]);
 
         $user = User::create([
@@ -346,7 +359,15 @@ class AuthController extends Controller
         $request->validate([
             'token' => 'required',
             'email' => 'required|email',
-            'password' => 'required|min:8|confirmed',
+            'password' => [
+                'required',
+                'confirmed',
+                'min:12',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
+            ],
+        ], [
+            'password.min' => 'Lozinka mora imati najmanje 12 karaktera.',
+            'password.regex' => 'Lozinka mora sadržati velika i mala slova, broj i specijalni karakter.',
         ]);
 
         $status = Password::reset(

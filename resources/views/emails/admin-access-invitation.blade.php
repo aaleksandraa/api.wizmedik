@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="bs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pozivnica za pristup panelu</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #0891b2, #06b6d4); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f8fafc; padding: 20px; border: 1px solid #e2e8f0; }
+        .info-box { background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #0891b2; text-align: center; }
+        .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; }
+        .btn { display: inline-block; background: #0891b2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>WizMedik</h1>
+        <p>Pozivnica za pristup panelu</p>
+    </div>
+
+    <div class="content">
+        <p>Poštovani,</p>
+        <p>
+            Administracija vam je pripremila pristup za {{ $profileType }}
+            @if(!empty($profileName))
+                <strong>{{ $profileName }}</strong>
+            @endif
+            na platformi WizMedik.
+        </p>
+
+        <div class="info-box">
+            <p>Kliknite na dugme ispod kako biste postavili svoju lozinku i prvi put pristupili panelu:</p>
+            <a href="{{ $url }}" class="btn">Postavi lozinku i aktiviraj pristup</a>
+        </div>
+
+        <p>Ovaj link ističe za 60 minuta.</p>
+        <p>Ako niste očekivali ovu pozivnicu, slobodno ignorišite email.</p>
+    </div>
+
+    <div class="footer">
+        <p>WizMedik - Vaše zdravlje na prvom mjestu</p>
+        <p>Ovo je automatska poruka, molimo ne odgovarajte na ovaj email.</p>
+    </div>
+</body>
+</html>

@@ -7,17 +7,19 @@ use App\Models\ApotekaFirma;
 use App\Models\ApotekaPoslovnica;
 use App\Models\ApotekaRadnoVrijeme;
 use App\Models\Grad;
-use App\Models\User;
+use App\Services\AdminProfileAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AdminPharmacyController extends Controller
 {
+    public function __construct(private AdminProfileAccessService $profileAccessService)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $perPage = min((int) $request->input('per_page', 20), 1000);
@@ -96,8 +98,8 @@ class AdminPharmacyController extends Controller
             'google_maps_link' => 'nullable|url|max:500',
             'is_24h' => 'nullable|boolean',
 
-            'account_email' => 'required|email|max:255|unique:users,email',
-            'password' => 'required|string|min:12',
+            'account_email' => 'nullable|email|max:255',
+            'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
         ]);
 
         $status = $validated['status'] ?? 'verified';
@@ -105,17 +107,7 @@ class AdminPharmacyController extends Controller
         $isVerified = $status === 'verified';
 
         $firm = DB::transaction(function () use ($validated, $status, $isActive, $isVerified) {
-            $owner = User::create([
-                'name' => $validated['naziv_brenda'],
-                'email' => $this->normalizeEmail($validated['account_email']),
-                'password' => Hash::make($validated['password']),
-                'role' => 'pharmacy_owner',
-                'email_verified_at' => now(),
-            ]);
-            $owner->assignRole('pharmacy_owner');
-
             $firm = ApotekaFirma::create([
-                'owner_user_id' => $owner->id,
                 'naziv_brenda' => $validated['naziv_brenda'],
                 'pravni_naziv' => $validated['pravni_naziv'] ?? null,
                 'broj_licence' => $validated['broj_licence'] ?? null,
@@ -156,6 +148,15 @@ class AdminPharmacyController extends Controller
             ]);
 
             $this->createDefaultWorkingHours($branch->id);
+
+            $this->profileAccessService->sync($firm, $validated, [
+                'relation_column' => 'owner_user_id',
+                'role' => 'pharmacy_owner',
+                'model_class' => ApotekaFirma::class,
+                'entity_label' => 'apoteka',
+                'invitation_label' => 'profil apoteke',
+                'name' => fn (ApotekaFirma $entity) => $entity->naziv_brenda,
+            ]);
 
             return $firm;
         });
@@ -199,39 +200,11 @@ class AdminPharmacyController extends Controller
             'is_24h' => 'sometimes|boolean',
             'is_verified' => 'sometimes|boolean',
 
-            'account_email' => 'sometimes|required|email|max:255',
-            'password' => 'nullable|string|min:12',
+            'account_email' => 'nullable|email|max:255',
+            'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
         ]);
 
         DB::transaction(function () use ($request, $validated, $firm) {
-            $owner = $firm->owner;
-            $providedEmail = $request->has('account_email');
-            $targetEmail = $providedEmail ? $this->normalizeEmail((string) $validated['account_email']) : null;
-            $providedPassword = !empty($validated['password']);
-
-            if ($providedEmail) {
-                $owner = $this->resolveAndAssignOwner($firm, $owner, $targetEmail, $validated['password'] ?? null);
-            } elseif ($providedPassword) {
-                if (!$owner) {
-                    throw ValidationException::withMessages([
-                        'password' => ['Lozinku nije moguce postaviti bez aktivnog vlasnickog naloga.'],
-                    ]);
-                }
-                $owner->password = Hash::make($validated['password']);
-                $owner->save();
-            }
-
-            if ($owner) {
-                if (!empty($validated['naziv_brenda'])) {
-                    $owner->name = $validated['naziv_brenda'];
-                }
-                $owner->role = 'pharmacy_owner';
-                $owner->save();
-                if (!$owner->hasRole('pharmacy_owner')) {
-                    $owner->assignRole('pharmacy_owner');
-                }
-            }
-
             $firmData = [];
             foreach (['naziv_brenda', 'pravni_naziv', 'broj_licence', 'telefon', 'website', 'opis'] as $field) {
                 if ($request->has($field)) {
@@ -254,6 +227,15 @@ class AdminPharmacyController extends Controller
             if (!empty($firmData)) {
                 $firm->update($firmData);
             }
+
+            $this->profileAccessService->sync($firm, $validated, [
+                'relation_column' => 'owner_user_id',
+                'role' => 'pharmacy_owner',
+                'model_class' => ApotekaFirma::class,
+                'entity_label' => 'apoteka',
+                'invitation_label' => 'profil apoteke',
+                'name' => fn (ApotekaFirma $entity) => $entity->naziv_brenda,
+            ]);
 
             $branch = $firm->poslovnice->first();
             if ($branch) {
@@ -315,6 +297,41 @@ class AdminPharmacyController extends Controller
         return response()->json([
             'message' => 'Apoteka je uspjesno azurirana.',
             'data' => $this->transformFirm($fresh),
+        ]);
+    }
+
+    public function sendAccessInvite(Request $request, int $id): JsonResponse
+    {
+        $firm = ApotekaFirma::with([
+            'owner:id,name,ime,prezime,email,role',
+            'poslovnice' => fn ($query) => $query->orderBy('id'),
+        ])->findOrFail($id);
+
+        $validated = $request->validate([
+            'account_email' => 'nullable|email|max:255',
+        ]);
+
+        $result = $this->profileAccessService->sendInvitation($firm, $validated, [
+            'relation_column' => 'owner_user_id',
+            'role' => 'pharmacy_owner',
+            'model_class' => ApotekaFirma::class,
+            'entity_label' => 'apoteka',
+            'invitation_label' => 'profil apoteke',
+            'name' => fn (ApotekaFirma $entity) => $entity->naziv_brenda,
+        ]);
+
+        $fresh = ApotekaFirma::with([
+            'owner:id,name,ime,prezime,email,role',
+            'poslovnice' => fn ($query) => $query->orderBy('id'),
+        ])->findOrFail($id);
+
+        return response()->json([
+            'message' => 'Pozivnica za pristup je uspjesno poslana.',
+            'data' => $this->transformFirm($fresh),
+            'invitation' => [
+                'sent_to' => $result['sent_to'],
+                'sent_at' => $result['invitation_sent_at'],
+            ],
         ]);
     }
 
@@ -480,83 +497,6 @@ class AdminPharmacyController extends Controller
 
         $normalized = mb_strtolower(trim($email));
         return $normalized === '' ? null : $normalized;
-    }
-
-    private function resolveAndAssignOwner(
-        ApotekaFirma $firm,
-        ?User $currentOwner,
-        string $targetEmail,
-        ?string $newPassword = null
-    ): User {
-        $existingByEmail = User::whereRaw('LOWER(email) = ?', [$targetEmail])->first();
-
-        if ($existingByEmail) {
-            if ($currentOwner && $existingByEmail->id === $currentOwner->id) {
-                if ($newPassword) {
-                    $currentOwner->password = Hash::make($newPassword);
-                    $currentOwner->save();
-                }
-
-                return $currentOwner;
-            }
-
-            $occupiedByOtherFirm = ApotekaFirma::query()
-                ->where('owner_user_id', $existingByEmail->id)
-                ->where('id', '!=', $firm->id)
-                ->exists();
-
-            if ($occupiedByOtherFirm) {
-                throw ValidationException::withMessages([
-                    'account_email' => ['Uneseni email je vec vlasnik druge apoteke.'],
-                ]);
-            }
-
-            $firm->owner_user_id = $existingByEmail->id;
-            $firm->save();
-
-            if ($newPassword) {
-                $existingByEmail->password = Hash::make($newPassword);
-            }
-            $existingByEmail->role = 'pharmacy_owner';
-            $existingByEmail->save();
-            if (!$existingByEmail->hasRole('pharmacy_owner')) {
-                $existingByEmail->assignRole('pharmacy_owner');
-            }
-
-            return $existingByEmail;
-        }
-
-        if ($currentOwner) {
-            $currentOwner->email = $targetEmail;
-            if ($newPassword) {
-                $currentOwner->password = Hash::make($newPassword);
-            }
-            $currentOwner->role = 'pharmacy_owner';
-            $currentOwner->email_verified_at = $currentOwner->email_verified_at ?? now();
-            $currentOwner->save();
-
-            return $currentOwner;
-        }
-
-        if (empty($newPassword)) {
-            throw ValidationException::withMessages([
-                'password' => ['Lozinka je obavezna kada se kreira novi vlasnicki nalog.'],
-            ]);
-        }
-
-        $newOwner = User::create([
-            'name' => $firm->naziv_brenda,
-            'email' => $targetEmail,
-            'password' => Hash::make($newPassword),
-            'role' => 'pharmacy_owner',
-            'email_verified_at' => now(),
-        ]);
-        $newOwner->assignRole('pharmacy_owner');
-
-        $firm->owner_user_id = $newOwner->id;
-        $firm->save();
-
-        return $newOwner;
     }
 
     private function transformFirm(ApotekaFirma $firm): array

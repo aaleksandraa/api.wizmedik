@@ -60,6 +60,15 @@ class SitemapController extends Controller
         $xml .= '</url>';
     }
 
+    private function appendQueryParameters(string $url, array $parameters): string
+    {
+        if ($parameters === []) {
+            return $url;
+        }
+
+        return $url . '?' . http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
+    }
+
     private function citySlugMap(): array
     {
         $map = [];
@@ -431,6 +440,22 @@ class SitemapController extends Controller
                     'weekly',
                     '0.8'
                 );
+
+                if ($route['prefix'] === 'apoteke') {
+                    $this->appendUrl(
+                        $xml,
+                        $this->appendQueryParameters(
+                            $baseUrl . '/' . $path,
+                            [
+                                'grad' => $citySlug,
+                                'dezurna_now' => '1',
+                            ]
+                        ),
+                        $row->updated_at,
+                        'daily',
+                        '0.82'
+                    );
+                }
             }
         }
 

@@ -21,7 +21,7 @@ class SeoController extends Controller
         }
 
         $path = trim($request->path(), '/');
-        $metaTags = $this->getMetaTagsForPath($path);
+        $metaTags = $this->getMetaTagsForPath($path, $request);
         $statusCode = $metaTags['status'] ?? 200;
 
         [$indexPath, $checkedPaths] = $this->resolveIndexTemplatePath();
@@ -108,7 +108,7 @@ class SeoController extends Controller
         return [null, $checkedPaths];
     }
 
-    private function getMetaTagsForPath(string $path): array
+    private function getMetaTagsForPath(string $path, ?Request $request = null): array
     {
         if ($path === '' || $path === 'index.php') {
             return $this->getDefaultMeta();
@@ -180,10 +180,10 @@ class SeoController extends Controller
         }
 
         if ($path === 'apoteke') {
-            return $this->getPharmaciesListingMeta();
+            return $this->getPharmaciesListingMeta(null, $request);
         }
         if (preg_match('/^apoteke\/([^\/]+)$/', $path, $matches)) {
-            return $this->getPharmaciesListingMeta($matches[1]);
+            return $this->getPharmaciesListingMeta($matches[1], $request);
         }
 
         if ($path === 'banje') {
@@ -382,12 +382,52 @@ class SeoController extends Controller
         ];
     }
 
-    private function getPharmaciesListingMeta(?string $citySlug = null): array
+    private function getPharmaciesListingMeta(?string $citySlug = null, ?Request $request = null): array
     {
         $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+        $seoCity = $citySlug ? $this->decodeSegment($citySlug) : null;
+        $dutyNow = $request?->boolean('dezurna_now') ?? false;
+        $openNow = $request?->boolean('open_now') ?? false;
+        $is24h = $request?->boolean('is_24h') ?? false;
+        $pensionerDiscount = $request?->boolean('pensioner_discount') ?? false;
+        $hasActions = $request?->boolean('has_actions') ?? false;
+        $search = trim((string) ($request?->query('search', '')));
+        $hasGeo = $request?->filled('lat') || $request?->filled('lng') || $request?->filled('radius_km');
+
+        $isDutySeoPage = $citySlug !== null
+            && $dutyNow
+            && $search === ''
+            && !$openNow
+            && !$is24h
+            && !$pensionerDiscount
+            && !$hasActions
+            && !$hasGeo;
+
+        $isGenericCityPage = $citySlug !== null
+            && $search === ''
+            && !$openNow
+            && !$dutyNow
+            && !$is24h
+            && !$pensionerDiscount
+            && !$hasActions
+            && !$hasGeo;
+
+        $isBaseListingPage = $citySlug === null
+            && $search === ''
+            && !$openNow
+            && !$dutyNow
+            && !$is24h
+            && !$pensionerDiscount
+            && !$hasActions
+            && !$hasGeo;
+
+        $robots = ($isDutySeoPage || $isGenericCityPage || $isBaseListingPage)
+            ? 'index, follow'
+            : 'noindex, follow';
 
         $query = DB::table('apoteke_poslovnice')
             ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->leftJoin('gradovi', 'gradovi.id', '=', 'apoteke_poslovnice.grad_id')
             ->whereNull('apoteke_poslovnice.deleted_at')
             ->whereNull('apoteke_firme.deleted_at')
             ->where('apoteke_poslovnice.is_active', true)
@@ -396,13 +436,14 @@ class SeoController extends Controller
             ->where('apoteke_firme.status', 'verified');
 
         if ($city) {
-            $query->whereRaw('LOWER(COALESCE(apoteke_poslovnice.grad_naziv, \'\')) = ?', [mb_strtolower($city)]);
+            $query->whereRaw(
+                "LOWER(COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv, '')) = ?",
+                [mb_strtolower($city)]
+            );
         }
         $count = (clone $query)->count();
 
-        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
-        $title = "Apoteke{$locationPart} | wizMedik";
-        $description = "Pronadjite dezurne i otvorene apoteke{$locationPart}. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom.";
+        $titleLocationPart = $seoCity ? " - {$seoCity}" : '';
         $listingImage = (clone $query)
             ->whereNotNull('apoteke_poslovnice.profilna_slika_url')
             ->where('apoteke_poslovnice.profilna_slika_url', '!=', '')
@@ -410,13 +451,64 @@ class SeoController extends Controller
             ->value('apoteke_poslovnice.profilna_slika_url');
         $image = $this->resolveImageCandidates([$listingImage]);
 
+        if ($isDutySeoPage) {
+            $dutySeoCity = $seoCity ?? $city;
+            $momentUtc = now('Europe/Sarajevo')->setTimezone('UTC');
+            $dutyCount = DB::table('apoteke_dezurstva')
+                ->join('apoteke_poslovnice', 'apoteke_poslovnice.id', '=', 'apoteke_dezurstva.poslovnica_id')
+                ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+                ->leftJoin('gradovi', 'gradovi.id', '=', 'apoteke_poslovnice.grad_id')
+                ->whereNull('apoteke_poslovnice.deleted_at')
+                ->whereNull('apoteke_firme.deleted_at')
+                ->where('apoteke_poslovnice.is_active', true)
+                ->where('apoteke_poslovnice.is_verified', true)
+                ->where('apoteke_firme.is_active', true)
+                ->where('apoteke_firme.status', 'verified')
+                ->where('apoteke_dezurstva.status', 'confirmed')
+                ->where('apoteke_dezurstva.starts_at', '<=', $momentUtc)
+                ->where('apoteke_dezurstva.ends_at', '>', $momentUtc)
+                ->when(
+                    $city !== null,
+                    fn ($dutyQuery) => $dutyQuery->whereRaw(
+                        "LOWER(COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv, '')) = ?",
+                        [mb_strtolower($city)]
+                    )
+                )
+                ->distinct('apoteke_poslovnice.id')
+                ->count('apoteke_poslovnice.id');
+
+            $title = $dutySeoCity ? "Dezurna apoteka - {$dutySeoCity} | wizMedik" : 'Dezurne apoteke | wizMedik';
+            $description = $dutySeoCity
+                ? ($dutyCount > 0
+                    ? "Pronadjite {$dutyCount}+ dezurnih apoteka za {$dutySeoCity}. Dostupni su kontakt, lokacija, status dezurstva i radno vrijeme."
+                    : "Provjerite koje apoteke su trenutno dezurne za {$dutySeoCity}. Dostupni su kontakt, lokacija, status dezurstva i radno vrijeme na jednom mjestu.")
+                : 'Pronadjite apoteke koje su trenutno dezurne, sa kontakt informacijama i lokacijom.';
+            $url = $this->appendQueryParameters(
+                $this->buildUrl("apoteke/{$citySlug}"),
+                [
+                    'grad' => $citySlug,
+                    'dezurna_now' => '1',
+                ]
+            );
+            $schema = $this->buildCollectionSchema($title, $description, $url, $dutyCount);
+
+            return [
+                'title' => "<title>{$title}</title>",
+                'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema, $robots),
+            ];
+        }
+
+        $title = "Apoteke{$titleLocationPart} | wizMedik";
+        $description = $seoCity
+            ? "Pronadjite dezurne i otvorene apoteke za {$seoCity}. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom."
+            : "Pronadjite dezurne i otvorene apoteke u Bosni i Hercegovini. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom.";
         $path = $citySlug ? "apoteke/{$citySlug}" : 'apoteke';
         $url = $this->buildUrl($path);
         $schema = $this->buildCollectionSchema($title, $description, $url, $count);
 
         return [
             'title' => "<title>{$title}</title>",
-            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema),
+            'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema, $robots),
         ];
     }
 
@@ -1699,7 +1791,42 @@ HTML;
         $path = trim($request->path(), '/');
         $query = $request->query();
 
-        if (!in_array($path, ['doktori', 'klinike', 'laboratorije', 'apoteke', 'banje', 'domovi-njega'], true)) {
+        if ($path === 'apoteke') {
+            $city = $request->query('grad');
+            $citySlug = $city ? $this->queryValueToSlug($city) : null;
+
+            if (!$citySlug) {
+                return null;
+            }
+
+            $normalizedQuery = $this->normalizePharmacyListingQuery($query, $citySlug);
+            $targetUrl = $this->buildUrl("apoteke/{$citySlug}");
+
+            if ($normalizedQuery === []) {
+                return $targetUrl;
+            }
+
+            return $this->appendQueryParameters($targetUrl, $normalizedQuery);
+        }
+
+        if (preg_match('/^apoteke\/([^\/]+)$/', $path, $matches)) {
+            $citySlug = $matches[1];
+            $normalizedQuery = $this->normalizePharmacyListingQuery($query, $citySlug);
+            $targetUrl = $this->buildUrl("apoteke/{$citySlug}");
+
+            if ($normalizedQuery === []) {
+                return count($query) > 0 ? $targetUrl : null;
+            }
+
+            $canonicalizedCurrentQuery = $this->canonicalizeCurrentPharmacyListingQuery($query);
+            if (count($query) === count($canonicalizedCurrentQuery) && $canonicalizedCurrentQuery == $normalizedQuery) {
+                return null;
+            }
+
+            return $this->appendQueryParameters($targetUrl, $normalizedQuery);
+        }
+
+        if (!in_array($path, ['doktori', 'klinike', 'laboratorije', 'banje', 'domovi-njega'], true)) {
             return null;
         }
 
@@ -1758,6 +1885,76 @@ HTML;
         return $slug !== '' ? $slug : rawurlencode(trim($decoded));
     }
 
+    private function normalizePharmacyListingQuery(array $query, string $citySlug): array
+    {
+        $normalized = [];
+        $hasSerializableFilters = false;
+
+        $search = trim((string) ($query['search'] ?? ''));
+        if ($search !== '') {
+            $normalized['search'] = $search;
+            $hasSerializableFilters = true;
+        }
+
+        foreach (['open_now', 'dezurna_now', 'is_24h', 'pensioner_discount', 'has_actions'] as $flag) {
+            if ($this->queryFlagIsEnabled($query[$flag] ?? null)) {
+                $normalized[$flag] = '1';
+                $hasSerializableFilters = true;
+            }
+        }
+
+        if (!$hasSerializableFilters) {
+            return [];
+        }
+
+        return ['grad' => $citySlug] + $normalized;
+    }
+
+    private function canonicalizeCurrentPharmacyListingQuery(array $query): array
+    {
+        $normalized = [];
+        $hasSerializableFilters = false;
+
+        $city = trim((string) ($query['grad'] ?? ''));
+        $citySlug = $city !== '' ? $this->queryValueToSlug($city) : '';
+
+        $search = trim((string) ($query['search'] ?? ''));
+        if ($search !== '') {
+            $normalized['search'] = $search;
+            $hasSerializableFilters = true;
+        }
+
+        foreach (['open_now', 'dezurna_now', 'is_24h', 'pensioner_discount', 'has_actions'] as $flag) {
+            if ($this->queryFlagIsEnabled($query[$flag] ?? null)) {
+                $normalized[$flag] = '1';
+                $hasSerializableFilters = true;
+            }
+        }
+
+        if (!$hasSerializableFilters || $citySlug === '') {
+            return [];
+        }
+
+        return ['grad' => $citySlug] + $normalized;
+    }
+
+    private function queryFlagIsEnabled(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return in_array(mb_strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
+    }
+
     private function normalizeCanonicalRedirect(Request $request): ?string
     {
         $pathInfo = $request->getPathInfo();
@@ -1788,6 +1985,15 @@ HTML;
         }
 
         return $url . '?' . $queryString;
+    }
+
+    private function appendQueryParameters(string $url, array $parameters): string
+    {
+        if ($parameters === []) {
+            return $url;
+        }
+
+        return $url . '?' . http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
     }
 
     private function stripExistingSeoTags(string $html): string
