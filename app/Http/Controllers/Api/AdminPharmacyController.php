@@ -30,7 +30,9 @@ class AdminPharmacyController extends Controller
         $query = ApotekaFirma::query()
             ->with([
                 'owner:id,name,ime,prezime,email,role',
-                'poslovnice' => fn ($query) => $query->orderBy('id'),
+                'poslovnice' => fn ($query) => $query
+                    ->orderBy('id')
+                    ->with(['radnoVrijeme' => fn ($hoursQuery) => $hoursQuery->orderBy('day_of_week')]),
             ])
             ->withCount('poslovnice')
             ->orderByDesc('created_at');
@@ -97,6 +99,11 @@ class AdminPharmacyController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
             'google_maps_link' => 'nullable|url|max:500',
             'is_24h' => 'nullable|boolean',
+            'radno_vrijeme' => 'nullable|array|min:1|max:7',
+            'radno_vrijeme.*.day_of_week' => 'required_with:radno_vrijeme|integer|between:1,7|distinct',
+            'radno_vrijeme.*.open_time' => 'nullable|date_format:H:i',
+            'radno_vrijeme.*.close_time' => 'nullable|date_format:H:i',
+            'radno_vrijeme.*.closed' => 'required_with:radno_vrijeme|boolean',
 
             'account_email' => 'nullable|email|max:255',
             'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
@@ -147,7 +154,11 @@ class AdminPharmacyController extends Controller
                 'verified_by' => $isVerified ? auth()->id() : null,
             ]);
 
-            $this->createDefaultWorkingHours($branch->id);
+            if (!empty($validated['radno_vrijeme'])) {
+                $this->syncWorkingHours($branch, $validated['radno_vrijeme']);
+            } else {
+                $this->createDefaultWorkingHours($branch->id);
+            }
 
             $this->profileAccessService->sync($firm, $validated, [
                 'relation_column' => 'owner_user_id',
@@ -166,7 +177,9 @@ class AdminPharmacyController extends Controller
             'data' => $this->transformFirm(
                 ApotekaFirma::with([
                     'owner:id,name,ime,prezime,email,role',
-                    'poslovnice' => fn ($query) => $query->orderBy('id'),
+                    'poslovnice' => fn ($query) => $query
+                        ->orderBy('id')
+                        ->with(['radnoVrijeme' => fn ($hoursQuery) => $hoursQuery->orderBy('day_of_week')]),
                 ])->findOrFail($firm->id)
             ),
         ], 201);
@@ -199,6 +212,11 @@ class AdminPharmacyController extends Controller
             'google_maps_link' => 'nullable|url|max:500',
             'is_24h' => 'sometimes|boolean',
             'is_verified' => 'sometimes|boolean',
+            'radno_vrijeme' => 'nullable|array|min:1|max:7',
+            'radno_vrijeme.*.day_of_week' => 'required_with:radno_vrijeme|integer|between:1,7|distinct',
+            'radno_vrijeme.*.open_time' => 'nullable|date_format:H:i',
+            'radno_vrijeme.*.close_time' => 'nullable|date_format:H:i',
+            'radno_vrijeme.*.closed' => 'required_with:radno_vrijeme|boolean',
 
             'account_email' => 'nullable|email|max:255',
             'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
@@ -286,12 +304,18 @@ class AdminPharmacyController extends Controller
                 if (!empty($branchData)) {
                     $branch->update($branchData);
                 }
+
+                if ($request->has('radno_vrijeme') && !empty($validated['radno_vrijeme'])) {
+                    $this->syncWorkingHours($branch->fresh(), $validated['radno_vrijeme']);
+                }
             }
         });
 
         $fresh = ApotekaFirma::with([
             'owner:id,name,ime,prezime,email,role',
-            'poslovnice' => fn ($query) => $query->orderBy('id'),
+            'poslovnice' => fn ($query) => $query
+                ->orderBy('id')
+                ->with(['radnoVrijeme' => fn ($hoursQuery) => $hoursQuery->orderBy('day_of_week')]),
         ])->findOrFail($id);
 
         return response()->json([
@@ -304,7 +328,9 @@ class AdminPharmacyController extends Controller
     {
         $firm = ApotekaFirma::with([
             'owner:id,name,ime,prezime,email,role',
-            'poslovnice' => fn ($query) => $query->orderBy('id'),
+            'poslovnice' => fn ($query) => $query
+                ->orderBy('id')
+                ->with(['radnoVrijeme' => fn ($hoursQuery) => $hoursQuery->orderBy('day_of_week')]),
         ])->findOrFail($id);
 
         $validated = $request->validate([
@@ -322,7 +348,9 @@ class AdminPharmacyController extends Controller
 
         $fresh = ApotekaFirma::with([
             'owner:id,name,ime,prezime,email,role',
-            'poslovnice' => fn ($query) => $query->orderBy('id'),
+            'poslovnice' => fn ($query) => $query
+                ->orderBy('id')
+                ->with(['radnoVrijeme' => fn ($hoursQuery) => $hoursQuery->orderBy('day_of_week')]),
         ])->findOrFail($id);
 
         return response()->json([
@@ -486,6 +514,23 @@ class AdminPharmacyController extends Controller
                 'close_time' => in_array($day, [1, 2, 3, 4, 5], true) ? '20:00' : (in_array($day, [6], true) ? '14:00' : null),
                 'closed' => $day === 7,
             ]);
+        }
+    }
+
+    private function syncWorkingHours(ApotekaPoslovnica $branch, array $hours): void
+    {
+        foreach ($hours as $entry) {
+            ApotekaRadnoVrijeme::updateOrCreate(
+                [
+                    'poslovnica_id' => $branch->id,
+                    'day_of_week' => (int) $entry['day_of_week'],
+                ],
+                [
+                    'open_time' => !empty($entry['closed']) ? null : ($entry['open_time'] ?? null),
+                    'close_time' => !empty($entry['closed']) ? null : ($entry['close_time'] ?? null),
+                    'closed' => (bool) ($entry['closed'] ?? false),
+                ]
+            );
         }
     }
 
