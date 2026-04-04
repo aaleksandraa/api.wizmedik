@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BlogPost;
 use App\Models\BlogSettings;
+use App\Models\SiteSetting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -29,6 +30,9 @@ class HomepageController extends Controller
                     'clinic_profile_template' => 'classic',
                     'modern_cover_type' => 'gradient',
                     'modern_cover_value' => 'from-primary via-primary/90 to-primary/80',
+                    'custom3_hero_bg_enabled' => (bool) SiteSetting::get('custom3_hero_bg_enabled', false),
+                    'custom3_hero_bg_image' => SiteSetting::get('custom3_hero_bg_image', null),
+                    'custom3_hero_bg_opacity' => (int) SiteSetting::get('custom3_hero_bg_opacity', 20),
                 ],
                 'doctors' => [],
                 'clinics' => [],
