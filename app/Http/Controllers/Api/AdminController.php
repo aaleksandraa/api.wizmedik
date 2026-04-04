@@ -46,11 +46,13 @@ class AdminController extends Controller
             'lokacija' => 'required|string',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
+            'google_maps_link' => 'nullable|url',
             'slika_profila' => 'nullable|string',
             'klinika_id' => 'nullable|exists:klinike,id',
             'opis' => 'nullable|string',
             'prihvata_online' => 'boolean',
             'slot_trajanje_minuti' => 'integer|min:5',
+            'radno_vrijeme' => 'nullable|array',
             'aktivan' => 'sometimes|boolean',
             'verifikovan' => 'sometimes|boolean',
             'account_email' => 'nullable|email',
@@ -66,6 +68,7 @@ class AdminController extends Controller
             $profileData['verifikovan'] = $request->boolean('verifikovan', true);
             $profileData['verifikovan_at'] = $profileData['verifikovan'] ? now() : null;
             $profileData['verifikovan_by'] = $profileData['verifikovan'] ? $request->user()->id : null;
+            $profileData['radno_vrijeme'] = $this->normalizeNamedWorkingHours($profileData['radno_vrijeme'] ?? null);
 
             $doktor = Doktor::create($profileData);
 
@@ -114,43 +117,52 @@ class AdminController extends Controller
             'password' => 'nullable|string|min:12|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).+$/',
         ]);
 
-        // Handle specialty_ids separately for sync
-        $specialtyIds = $request->input('specialty_ids');
+        $doktor = DB::transaction(function () use ($doktor, $validated, $request) {
+            // Handle specialty_ids separately for sync
+            $specialtyIds = $request->input('specialty_ids');
 
-        $doktor->update(collect($validated)->only([
-            'ime', 'prezime', 'email', 'telefon', 'specijalnost', 'specijalnost_id',
-            'grad', 'lokacija', 'postanski_broj', 'mjesto', 'opstina', 'latitude', 'longitude', 'google_maps_link',
-            'slika_profila', 'klinika_id', 'opis', 'prihvata_online', 'slot_trajanje_minuti', 'radno_vrijeme',
-            'aktivan', 'verifikovan'
-        ])->all());
+            $profileData = collect($validated)->only([
+                'ime', 'prezime', 'email', 'telefon', 'specijalnost', 'specijalnost_id',
+                'grad', 'lokacija', 'postanski_broj', 'mjesto', 'opstina', 'latitude', 'longitude', 'google_maps_link',
+                'slika_profila', 'klinika_id', 'opis', 'prihvata_online', 'slot_trajanje_minuti', 'radno_vrijeme',
+                'aktivan', 'verifikovan'
+            ])->all();
 
-        // Sync specialties if provided
-        if ($specialtyIds !== null) {
-            $doktor->specijalnosti()->sync($specialtyIds);
-        }
+            if (array_key_exists('radno_vrijeme', $profileData)) {
+                $profileData['radno_vrijeme'] = $this->normalizeNamedWorkingHours($profileData['radno_vrijeme']);
+            }
 
-        $this->profileAccessService->sync($doktor, $validated, [
-            'role' => 'doctor',
-            'model_class' => Doktor::class,
-            'entity_label' => 'doktor',
-            'name' => fn (Doktor $doctor) => trim("{$doctor->ime} {$doctor->prezime}"),
-            'ime' => fn (Doktor $doctor) => $doctor->ime,
-            'prezime' => fn (Doktor $doctor) => $doctor->prezime,
-        ]);
+            $doktor->update($profileData);
 
-        if ($request->boolean('verifikovan')) {
-            $doktor->forceFill([
-                'verifikovan_at' => $doktor->verifikovan_at ?? now(),
-                'verifikovan_by' => $doktor->verifikovan_by ?? $request->user()->id,
-            ])->save();
-        } elseif ($request->has('verifikovan') && !$request->boolean('verifikovan')) {
-            $doktor->forceFill([
-                'verifikovan_at' => null,
-                'verifikovan_by' => null,
-            ])->save();
-        }
+            if ($specialtyIds !== null) {
+                $doktor->specijalnosti()->sync($specialtyIds);
+            }
 
-        return response()->json(['message' => 'Doctor updated', 'doktor' => $doktor->fresh()->load(['specijalnosti', 'user'])]);
+            $this->profileAccessService->sync($doktor, $validated, [
+                'role' => 'doctor',
+                'model_class' => Doktor::class,
+                'entity_label' => 'doktor',
+                'name' => fn (Doktor $doctor) => trim("{$doctor->ime} {$doctor->prezime}"),
+                'ime' => fn (Doktor $doctor) => $doctor->ime,
+                'prezime' => fn (Doktor $doctor) => $doctor->prezime,
+            ]);
+
+            if ($request->boolean('verifikovan')) {
+                $doktor->forceFill([
+                    'verifikovan_at' => $doktor->verifikovan_at ?? now(),
+                    'verifikovan_by' => $doktor->verifikovan_by ?? $request->user()->id,
+                ])->save();
+            } elseif ($request->has('verifikovan') && !$request->boolean('verifikovan')) {
+                $doktor->forceFill([
+                    'verifikovan_at' => null,
+                    'verifikovan_by' => null,
+                ])->save();
+            }
+
+            return $doktor->fresh()->load(['specijalnosti', 'user']);
+        });
+
+        return response()->json(['message' => 'Doctor updated', 'doktor' => $doktor]);
     }
 
     public function deleteDoktor($id)
@@ -219,6 +231,7 @@ class AdminController extends Controller
             $clinicData['verifikovan'] = $request->boolean('verifikovan', true);
             $clinicData['verifikovan_at'] = $clinicData['verifikovan'] ? now() : null;
             $clinicData['verifikovan_by'] = $clinicData['verifikovan'] ? $request->user()->id : null;
+            $clinicData['radno_vrijeme'] = $this->normalizeNamedWorkingHours($clinicData['radno_vrijeme'] ?? null);
 
             $klinika = Klinika::create($clinicData);
 
@@ -260,7 +273,7 @@ class AdminController extends Controller
         ]);
 
         $result = DB::transaction(function () use ($klinika, $validated, $request) {
-            $klinika->update(collect($validated)->only([
+            $clinicData = collect($validated)->only([
                 'naziv',
                 'opis',
                 'adresa',
@@ -276,7 +289,13 @@ class AdminController extends Controller
                 'radno_vrijeme',
                 'aktivan',
                 'verifikovan',
-            ])->all());
+            ])->all();
+
+            if (array_key_exists('radno_vrijeme', $clinicData)) {
+                $clinicData['radno_vrijeme'] = $this->normalizeNamedWorkingHours($clinicData['radno_vrijeme']);
+            }
+
+            $klinika->update($clinicData);
 
             $accessPayload = $validated;
 
@@ -533,6 +552,51 @@ class AdminController extends Controller
             ->filter()
             ->values()
             ->all();
+    }
+
+    private function normalizeNamedWorkingHours(?array $hours): ?array
+    {
+        if ($hours === null) {
+            return null;
+        }
+
+        $canonicalDays = ['ponedeljak', 'utorak', 'srijeda', 'cetvrtak', 'petak', 'subota', 'nedjelja'];
+        $aliases = [
+            'ponedjeljak' => 'ponedeljak',
+            'ponedeljak' => 'ponedeljak',
+            'utorak' => 'utorak',
+            'sreda' => 'srijeda',
+            'srijeda' => 'srijeda',
+            'cetvrtak' => 'cetvrtak',
+            'četvrtak' => 'cetvrtak',
+            'petak' => 'petak',
+            'subota' => 'subota',
+            'nedelja' => 'nedjelja',
+            'nedjelja' => 'nedjelja',
+        ];
+
+        $normalized = [];
+
+        foreach ($canonicalDays as $day) {
+            $incoming = null;
+
+            foreach ($aliases as $alias => $canonicalDay) {
+                if ($canonicalDay !== $day || !array_key_exists($alias, $hours)) {
+                    continue;
+                }
+
+                $incoming = is_array($hours[$alias]) ? $hours[$alias] : null;
+                break;
+            }
+
+            $normalized[$day] = [
+                'open' => is_string($incoming['open'] ?? null) && $incoming['open'] !== '' ? substr($incoming['open'], 0, 5) : '08:00',
+                'close' => is_string($incoming['close'] ?? null) && $incoming['close'] !== '' ? substr($incoming['close'], 0, 5) : ($day === 'subota' ? '14:00' : '20:00'),
+                'closed' => isset($incoming['closed']) ? (bool) $incoming['closed'] : $day === 'nedjelja',
+            ];
+        }
+
+        return $normalized;
     }
 
     // Specialties Management

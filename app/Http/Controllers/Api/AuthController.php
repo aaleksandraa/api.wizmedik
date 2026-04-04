@@ -378,6 +378,7 @@ class AuthController extends Controller
                 ])->setRememberToken(Str::random(60));
 
                 $user->save();
+                $user->tokens()->delete();
 
                 event(new PasswordReset($user));
             }

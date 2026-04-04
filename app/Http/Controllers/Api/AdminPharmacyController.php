@@ -83,11 +83,13 @@ class AdminPharmacyController extends Controller
         $validated = $request->validate([
             'naziv_brenda' => 'required|string|max:255',
             'pravni_naziv' => 'nullable|string|max:255',
+            'jib' => 'nullable|string|max:32',
             'broj_licence' => 'nullable|string|max:64',
             'telefon' => 'required|string|max:64',
             'email' => 'nullable|email|max:255',
             'website' => 'nullable|url|max:255',
             'opis' => 'nullable|string|max:5000',
+            'logo_url' => 'nullable|string|max:500',
             'status' => 'nullable|in:pending,verified,rejected,suspended',
             'is_active' => 'nullable|boolean',
 
@@ -97,7 +99,14 @@ class AdminPharmacyController extends Controller
             'postanski_broj' => 'nullable|string|max:20',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'kratki_opis' => 'nullable|string|max:2000',
+            'profilna_slika_url' => 'nullable|string|max:500',
+            'galerija_slike' => 'nullable|array|max:5',
+            'galerija_slike.*' => 'string|max:500',
             'google_maps_link' => 'nullable|url|max:500',
+            'ima_dostavu' => 'nullable|boolean',
+            'ima_parking' => 'nullable|boolean',
+            'pristup_invalidima' => 'nullable|boolean',
             'is_24h' => 'nullable|boolean',
             'radno_vrijeme' => 'nullable|array|min:1|max:7',
             'radno_vrijeme.*.day_of_week' => 'required_with:radno_vrijeme|integer|between:1,7|distinct',
@@ -117,11 +126,13 @@ class AdminPharmacyController extends Controller
             $firm = ApotekaFirma::create([
                 'naziv_brenda' => $validated['naziv_brenda'],
                 'pravni_naziv' => $validated['pravni_naziv'] ?? null,
+                'jib' => $validated['jib'] ?? null,
                 'broj_licence' => $validated['broj_licence'] ?? null,
                 'telefon' => $validated['telefon'],
                 'email' => isset($validated['email']) ? $this->normalizeEmail($validated['email']) : null,
                 'website' => $validated['website'] ?? null,
                 'opis' => $validated['opis'] ?? null,
+                'logo_url' => $validated['logo_url'] ?? null,
                 'status' => $status,
                 'is_active' => $isActive,
                 'verified_at' => $isVerified ? now() : null,
@@ -146,7 +157,13 @@ class AdminPharmacyController extends Controller
                 'longitude' => $validated['longitude'] ?? null,
                 'telefon' => $validated['telefon'],
                 'email' => isset($validated['email']) ? $this->normalizeEmail($validated['email']) : null,
+                'kratki_opis' => $validated['kratki_opis'] ?? null,
+                'profilna_slika_url' => $validated['profilna_slika_url'] ?? null,
+                'galerija_slike' => $validated['galerija_slike'] ?? [],
                 'google_maps_link' => $validated['google_maps_link'] ?? null,
+                'ima_dostavu' => (bool) ($validated['ima_dostavu'] ?? false),
+                'ima_parking' => (bool) ($validated['ima_parking'] ?? false),
+                'pristup_invalidima' => (bool) ($validated['pristup_invalidima'] ?? false),
                 'is_24h' => (bool) ($validated['is_24h'] ?? false),
                 'is_active' => $isActive,
                 'is_verified' => $isVerified,
@@ -195,11 +212,13 @@ class AdminPharmacyController extends Controller
         $validated = $request->validate([
             'naziv_brenda' => 'sometimes|required|string|max:255',
             'pravni_naziv' => 'nullable|string|max:255',
+            'jib' => 'nullable|string|max:32',
             'broj_licence' => 'nullable|string|max:64',
             'telefon' => 'sometimes|required|string|max:64',
             'email' => 'nullable|email|max:255',
             'website' => 'nullable|url|max:255',
             'opis' => 'nullable|string|max:5000',
+            'logo_url' => 'nullable|string|max:500',
             'status' => 'sometimes|in:pending,verified,rejected,suspended',
             'is_active' => 'sometimes|boolean',
 
@@ -209,7 +228,14 @@ class AdminPharmacyController extends Controller
             'postanski_broj' => 'nullable|string|max:20',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'kratki_opis' => 'nullable|string|max:2000',
+            'profilna_slika_url' => 'nullable|string|max:500',
+            'galerija_slike' => 'nullable|array|max:5',
+            'galerija_slike.*' => 'string|max:500',
             'google_maps_link' => 'nullable|url|max:500',
+            'ima_dostavu' => 'nullable|boolean',
+            'ima_parking' => 'nullable|boolean',
+            'pristup_invalidima' => 'nullable|boolean',
             'is_24h' => 'sometimes|boolean',
             'is_verified' => 'sometimes|boolean',
             'radno_vrijeme' => 'nullable|array|min:1|max:7',
@@ -224,7 +250,7 @@ class AdminPharmacyController extends Controller
 
         DB::transaction(function () use ($request, $validated, $firm) {
             $firmData = [];
-            foreach (['naziv_brenda', 'pravni_naziv', 'broj_licence', 'telefon', 'website', 'opis'] as $field) {
+            foreach (['naziv_brenda', 'pravni_naziv', 'jib', 'broj_licence', 'telefon', 'website', 'opis', 'logo_url'] as $field) {
                 if ($request->has($field)) {
                     $firmData[$field] = $validated[$field] ?? null;
                 }
@@ -270,7 +296,16 @@ class AdminPharmacyController extends Controller
                     $branchData['grad_id'] = $city?->id;
                     $branchData['grad_naziv'] = $city?->naziv ?? $validated['grad'];
                 }
-                foreach (['adresa', 'postanski_broj', 'latitude', 'longitude', 'google_maps_link'] as $field) {
+                foreach ([
+                    'adresa',
+                    'postanski_broj',
+                    'latitude',
+                    'longitude',
+                    'kratki_opis',
+                    'profilna_slika_url',
+                    'galerija_slike',
+                    'google_maps_link',
+                ] as $field) {
                     if ($request->has($field)) {
                         $branchData[$field] = $validated[$field] ?? null;
                     }
@@ -283,6 +318,11 @@ class AdminPharmacyController extends Controller
                 }
                 if ($request->has('is_24h')) {
                     $branchData['is_24h'] = (bool) $validated['is_24h'];
+                }
+                foreach (['ima_dostavu', 'ima_parking', 'pristup_invalidima'] as $field) {
+                    if ($request->has($field)) {
+                        $branchData[$field] = (bool) ($validated[$field] ?? false);
+                    }
                 }
                 if ($request->has('is_active')) {
                     $branchData['is_active'] = (bool) $validated['is_active'];
@@ -555,11 +595,13 @@ class AdminPharmacyController extends Controller
             'owner_user_id' => $firm->owner_user_id,
             'naziv_brenda' => $firm->naziv_brenda,
             'pravni_naziv' => $firm->pravni_naziv,
+            'jib' => $firm->jib,
             'broj_licence' => $firm->broj_licence,
             'telefon' => $firm->telefon,
             'email' => $firm->email,
             'website' => $firm->website,
             'opis' => $firm->opis,
+            'logo_url' => $firm->logo_url,
             'status' => $firm->status,
             'is_active' => (bool) $firm->is_active,
             'verified_at' => $firm->verified_at,

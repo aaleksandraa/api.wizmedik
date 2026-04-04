@@ -21,6 +21,14 @@ use Illuminate\Validation\ValidationException;
 class AdminProfileAccessService
 {
     /**
+     * @return string[]
+     */
+    private function managedRoles(): array
+    {
+        return ['doctor', 'clinic', 'laboratory', 'spa_manager', 'dom_manager', 'pharmacy_owner'];
+    }
+
+    /**
      * Sync or create an access account for an admin-managed profile.
      *
      * @param  array{
@@ -95,7 +103,8 @@ class AdminProfileAccessService
                 $profile,
                 $config,
                 $relationColumn,
-                $entityLabel
+                $entityLabel,
+                $role
             );
 
             if ($currentUser && $existingUser->id === $currentUser->id) {
@@ -104,7 +113,7 @@ class AdminProfileAccessService
                     $currentUser->password = Hash::make($password);
                 }
                 $currentUser->save();
-                $this->ensureRole($currentUser, $role);
+                $this->syncManagedRole($currentUser, $role);
 
                 return [
                     'user' => $currentUser->fresh(),
@@ -117,9 +126,10 @@ class AdminProfileAccessService
                 $existingUser->password = Hash::make($password);
             }
             $existingUser->save();
-            $this->ensureRole($existingUser, $role);
+            $this->syncManagedRole($existingUser, $role);
 
             $profile->forceFill([$relationColumn => $existingUser->id])->save();
+            $this->releaseDetachedUser($currentUser, $existingUser, $role);
 
             return [
                 'user' => $existingUser->fresh(),
@@ -128,21 +138,23 @@ class AdminProfileAccessService
         }
 
         if ($currentUser) {
-            $currentUser->email = $targetEmail;
-            $this->hydrateUser($currentUser, $profile, $config, $role);
-            if ($password !== '') {
-                $currentUser->password = Hash::make($password);
-            }
-            $currentUser->save();
-            $this->ensureRole($currentUser, $role);
+            $newUser = new User([
+                'email' => $targetEmail,
+                'password' => Hash::make($password !== '' ? $password : $this->generateProvisioningPassword()),
+            ]);
 
-            if ((int) $profile->getAttribute($relationColumn) !== (int) $currentUser->id) {
-                $profile->forceFill([$relationColumn => $currentUser->id])->save();
+            $this->hydrateUser($newUser, $profile, $config, $role);
+            if ($password !== '') {
+                $newUser->password = Hash::make($password);
             }
+            $newUser->save();
+            $this->syncManagedRole($newUser, $role);
+            $profile->forceFill([$relationColumn => $newUser->id])->save();
+            $this->releaseDetachedUser($currentUser, $newUser, $role);
 
             return [
-                'user' => $currentUser->fresh(),
-                'action' => 'updated',
+                'user' => $newUser->fresh(),
+                'action' => 'created',
             ];
         }
 
@@ -153,7 +165,7 @@ class AdminProfileAccessService
 
         $this->hydrateUser($newUser, $profile, $config, $role);
         $newUser->save();
-        $this->ensureRole($newUser, $role);
+        $this->syncManagedRole($newUser, $role);
 
         $profile->forceFill([$relationColumn => $newUser->id])->save();
 
@@ -247,11 +259,9 @@ class AdminProfileAccessService
         $user->email_verified_at = $user->email_verified_at ?? now();
     }
 
-    private function ensureRole(User $user, string $role): void
+    private function syncManagedRole(User $user, string $role): void
     {
-        if (!$user->hasRole($role)) {
-            $user->assignRole($role);
-        }
+        $user->syncRoles([$role]);
     }
 
     private function assertUserCanBeAttached(
@@ -260,7 +270,8 @@ class AdminProfileAccessService
         Model $profile,
         array $config,
         string $relationColumn,
-        string $entityLabel
+        string $entityLabel,
+        string $role
     ): void {
         if ($currentUser && $candidate->id === $currentUser->id) {
             return;
@@ -274,12 +285,43 @@ class AdminProfileAccessService
             ]);
         }
 
+        $candidateManagedRoles = $this->managedRolesForUser($candidate);
+        $conflictingManagedRoles = array_values(array_diff($candidateManagedRoles, [$role]));
+        if ($conflictingManagedRoles !== []) {
+            throw ValidationException::withMessages([
+                'account_email' => ["Uneseni email je vec poslovni nalog drugog tipa profila i ne moze se preuzeti za {$entityLabel} pristup."],
+            ]);
+        }
+
         $existingLink = $this->findExistingManagedProfileLink($candidate, $profile, $config, $relationColumn);
         if ($existingLink !== null) {
             throw ValidationException::withMessages([
                 'account_email' => ["Uneseni email je vec povezan sa drugim {$existingLink} profilom."],
             ]);
         }
+    }
+
+    private function releaseDetachedUser(?User $detachedUser, User $newOwner, string $oldRole): void
+    {
+        if (!$detachedUser || $detachedUser->is($newOwner)) {
+            return;
+        }
+
+        $detachedUser->tokens()->delete();
+        $detachedUser->setRememberToken(Str::random(60));
+
+        $remainingRoles = array_values(array_diff($detachedUser->getRoleNames()->all(), $this->managedRoles()));
+        if ($remainingRoles === []) {
+            $remainingRoles = ['patient'];
+        }
+
+        $detachedUser->syncRoles($remainingRoles);
+
+        if ($this->normalizeLegacyRole((string) ($detachedUser->role ?? '')) === $oldRole || $detachedUser->role === null) {
+            $detachedUser->role = $remainingRoles[0];
+        }
+
+        $detachedUser->save();
     }
 
     private function findExistingManagedProfileLink(
@@ -356,6 +398,26 @@ class AdminProfileAccessService
     private function generateProvisioningPassword(): string
     {
         return Str::password(32);
+    }
+
+    /**
+     * @return string[]
+     */
+    private function managedRolesForUser(User $user): array
+    {
+        $roleNames = collect($user->getRoleNames()->all())
+            ->map(fn (string $roleName) => $this->normalizeLegacyRole($roleName));
+
+        $legacyRole = $this->normalizeLegacyRole((string) ($user->role ?? ''));
+        if ($legacyRole !== '') {
+            $roleNames->push($legacyRole);
+        }
+
+        return $roleNames
+            ->filter(fn (string $roleName) => in_array($roleName, $this->managedRoles(), true))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function normalizeLegacyRole(string $role): string
