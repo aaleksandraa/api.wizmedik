@@ -76,6 +76,8 @@ class PrerenderSeoPages extends Command
             return self::SUCCESS;
         }
 
+        $this->deleteStalePrerenderedPaths($outputDirs, $paths);
+
         $seoController = app(SeoController::class);
         $rendered = 0;
         $skipped = 0;
@@ -245,6 +247,115 @@ class PrerenderSeoPages extends Command
             . str_replace('/', DIRECTORY_SEPARATOR, $path)
             . DIRECTORY_SEPARATOR
             . 'index.html';
+    }
+
+    /**
+     * @param array<int, string> $outputDirs
+     * @param array<int, string> $paths
+     */
+    private function deleteStalePrerenderedPaths(array $outputDirs, array $paths): void
+    {
+        $currentPaths = array_values(array_filter($paths, fn (string $path) => $path !== ''));
+        $currentPathMap = array_fill_keys($currentPaths, true);
+
+        foreach ($outputDirs as $outputDir) {
+            $generatedPaths = $this->collectGeneratedRouteDirectories($outputDir);
+            $stalePaths = array_values(array_filter(
+                $generatedPaths,
+                fn (string $path) => !isset($currentPathMap[$path])
+            ));
+
+            if (empty($stalePaths)) {
+                continue;
+            }
+
+            $this->warn("Removing " . count($stalePaths) . " stale prerendered route(s) from {$outputDir}...");
+
+            foreach ($stalePaths as $stalePath) {
+                $targetFile = $this->targetFilePath($outputDir, $stalePath);
+
+                if (is_file($targetFile)) {
+                    @unlink($targetFile);
+                }
+
+                $this->removeEmptyDirectoriesUpward(dirname($targetFile), $outputDir);
+            }
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function collectGeneratedRouteDirectories(string $baseDir, string $relativeDir = ''): array
+    {
+        if (!is_dir($baseDir)) {
+            return [];
+        }
+
+        $entries = @scandir($baseDir);
+        if (!is_array($entries)) {
+            return [];
+        }
+
+        $results = [];
+        $hasIndexHtml = in_array('index.html', $entries, true);
+
+        if ($relativeDir !== '' && $hasIndexHtml) {
+            $results[] = str_replace(DIRECTORY_SEPARATOR, '/', $relativeDir);
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $absolutePath = $baseDir . DIRECTORY_SEPARATOR . $entry;
+            if (!is_dir($absolutePath)) {
+                continue;
+            }
+
+            $nextRelativeDir = $relativeDir === ''
+                ? $entry
+                : $relativeDir . DIRECTORY_SEPARATOR . $entry;
+
+            $results = array_merge(
+                $results,
+                $this->collectGeneratedRouteDirectories($absolutePath, $nextRelativeDir)
+            );
+        }
+
+        return array_values(array_unique($results));
+    }
+
+    private function removeEmptyDirectoriesUpward(string $directory, string $stopAt): void
+    {
+        $current = rtrim($directory, DIRECTORY_SEPARATOR);
+        $stop = rtrim($stopAt, DIRECTORY_SEPARATOR);
+
+        while ($current !== '' && $current !== $stop) {
+            if (!is_dir($current)) {
+                break;
+            }
+
+            $entries = @scandir($current);
+            if (!is_array($entries)) {
+                break;
+            }
+
+            $nonDotEntries = array_values(array_diff($entries, ['.', '..']));
+            if (!empty($nonDotEntries)) {
+                break;
+            }
+
+            @rmdir($current);
+            $parent = dirname($current);
+
+            if ($parent === $current) {
+                break;
+            }
+
+            $current = $parent;
+        }
     }
 
     /**
