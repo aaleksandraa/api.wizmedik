@@ -101,6 +101,15 @@ class ClinicRegistrationRequest extends FormRequest
                 'url',
                 'max:255',
             ],
+            'specialty_ids' => [
+                'required',
+                'array',
+                'min:1',
+            ],
+            'specialty_ids.*' => [
+                'integer',
+                'exists:specijalnosti,id',
+            ],
             'message' => [
                 'nullable',
                 'string',
@@ -152,6 +161,9 @@ class ClinicRegistrationRequest extends FormRequest
             'adresa.required' => 'Adresa je obavezna.',
             'grad.required' => 'Grad je obavezan.',
             'website.url' => 'Website mora biti validna URL adresa.',
+            'specialty_ids.required' => 'Morate odabrati najmanje jednu specijalnost.',
+            'specialty_ids.min' => 'Morate odabrati najmanje jednu specijalnost.',
+            'specialty_ids.*.exists' => 'Odabrana specijalnost nije validna.',
             'documents.*.mimes' => 'Dokumenti moraju biti PDF, JPG ili PNG format.',
             'documents.*.max' => 'Dokument ne smije biti veći od 5MB.',
             'terms_accepted.accepted' => 'Morate prihvatiti uslove korištenja.',

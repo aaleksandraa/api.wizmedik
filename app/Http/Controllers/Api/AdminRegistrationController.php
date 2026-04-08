@@ -580,6 +580,40 @@ class AdminRegistrationController extends Controller
             }
 
             return ['user' => $user, 'pharmacy_firm' => $pharmacyFirm, 'pharmacy_branch' => $pharmacyBranch];
+        } elseif ($registrationRequest->type === 'clinic') {
+            $specialtyIds = collect($messageData['specialty_ids'] ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            if (empty($specialtyIds) && $registrationRequest->specijalnost_id) {
+                $specialtyIds = [(int) $registrationRequest->specijalnost_id];
+            }
+
+            $clinic = Klinika::create([
+                'user_id' => $user->id,
+                'naziv' => $registrationRequest->naziv,
+                'slug' => Str::slug($registrationRequest->naziv . '-' . $user->id),
+                'email' => $publicEmail,
+                'telefon' => $registrationRequest->telefon,
+                'adresa' => $registrationRequest->adresa,
+                'grad' => $registrationRequest->grad,
+                'opis' => $textMessage,
+                'website' => $messageData['website'] ?? null,
+                'ocjena' => 0,
+                'broj_ocjena' => 0,
+                'aktivan' => true,
+                'verifikovan' => true,
+                'verifikovan_at' => now(),
+                'verifikovan_by' => $approver?->id,
+            ]);
+
+            if (!empty($specialtyIds)) {
+                $clinic->specijalnosti()->sync($specialtyIds);
+            }
+
+            return ['user' => $user, 'clinic' => $clinic->load('specijalnosti')];
         } else {
             // Create clinic profile
             $clinic = Klinika::create([

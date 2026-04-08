@@ -109,6 +109,40 @@ class SitemapController extends Controller
         return $map;
     }
 
+    private function specialtyMetadata(): array
+    {
+        $byId = [];
+        $byName = [];
+
+        $specialties = DB::table('specijalnosti')
+            ->select('id', 'naziv', 'slug', 'parent_id')
+            ->whereNotNull('naziv')
+            ->whereNotNull('slug')
+            ->where('aktivan', true)
+            ->get();
+
+        foreach ($specialties as $specialty) {
+            $entry = [
+                'id' => (int) $specialty->id,
+                'naziv' => (string) $specialty->naziv,
+                'slug' => (string) $specialty->slug,
+                'parent_id' => $specialty->parent_id !== null ? (int) $specialty->parent_id : null,
+            ];
+
+            $byId[$entry['id']] = $entry;
+
+            $nameKey = mb_strtolower(trim($entry['naziv']));
+            if ($nameKey !== '' && !isset($byName[$nameKey])) {
+                $byName[$nameKey] = $entry;
+            }
+        }
+
+        return [
+            'by_id' => $byId,
+            'by_name' => $byName,
+        ];
+    }
+
     private function resolveCitySlug(string $cityName, array $citySlugMap): string
     {
         $key = mb_strtolower(trim($cityName));
@@ -164,6 +198,7 @@ class SitemapController extends Controller
             'sitemap-spas.xml',
             'sitemap-care-homes.xml',
             'sitemap-doctor-city-specialties.xml',
+            'sitemap-clinic-city-specialties.xml',
             'sitemap-blog.xml',
             'sitemap-pitanja.xml',
         ]);
@@ -641,6 +676,7 @@ class SitemapController extends Controller
 
         $citySlugMap = $this->citySlugMap();
         $specialtySlugMap = $this->specialtySlugMap();
+        $specialtyMetadata = $this->specialtyMetadata();
         $seen = [];
 
         $pairs = DB::table('doktori')
@@ -657,25 +693,128 @@ class SitemapController extends Controller
 
         foreach ($pairs as $pair) {
             $citySlug = $this->resolveCitySlug((string) $pair->grad, $citySlugMap);
-            $specialtySlug = $this->resolveSpecialtySlug((string) $pair->specijalnost, $specialtySlugMap);
+            $specialtyName = trim((string) $pair->specijalnost);
+            $specialtyEntry = $specialtyMetadata['by_name'][mb_strtolower($specialtyName)] ?? null;
+            $specialtySlugs = [];
 
-            if ($citySlug === '' || $specialtySlug === '') {
+            $primarySlug = $specialtyEntry['slug'] ?? $this->resolveSpecialtySlug($specialtyName, $specialtySlugMap);
+            if ($primarySlug !== '') {
+                $specialtySlugs[] = $primarySlug;
+            }
+
+            if ($specialtyEntry && $specialtyEntry['parent_id']) {
+                $parentEntry = $specialtyMetadata['by_id'][$specialtyEntry['parent_id']] ?? null;
+                if ($parentEntry && $parentEntry['slug'] !== '') {
+                    $specialtySlugs[] = $parentEntry['slug'];
+                }
+            }
+
+            if ($citySlug === '' || $specialtySlugs === []) {
                 continue;
             }
 
-            $path = '/doktori/' . $citySlug . '/' . $specialtySlug;
-            if (isset($seen[$path])) {
+            foreach (array_values(array_unique($specialtySlugs)) as $specialtySlug) {
+                $path = '/doktori/' . $citySlug . '/' . $specialtySlug;
+                if (isset($seen[$path])) {
+                    continue;
+                }
+                $seen[$path] = true;
+
+                $this->appendUrl(
+                    $xml,
+                    $baseUrl . $path,
+                    $pair->updated_at,
+                    'weekly',
+                    '0.88'
+                );
+            }
+        }
+
+        $xml .= '</urlset>';
+
+        return response($xml, 200)->header('Content-Type', 'application/xml');
+    }
+
+    public function clinicCitySpecialties()
+    {
+        $baseUrl = $this->getBaseUrl();
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+        $citySlugMap = $this->citySlugMap();
+        $specialtySlugMap = $this->specialtySlugMap();
+        $specialtyMetadata = $this->specialtyMetadata();
+        $seen = [];
+
+        $directPairs = DB::table('klinike')
+            ->join('klinika_specijalnost', 'klinika_specijalnost.klinika_id', '=', 'klinike.id')
+            ->join('specijalnosti', 'specijalnosti.id', '=', 'klinika_specijalnost.specijalnost_id')
+            ->whereNull('klinike.deleted_at')
+            ->where('klinike.aktivan', true)
+            ->where('klinike.verifikovan', true)
+            ->whereNotNull('klinike.grad')
+            ->where('klinike.grad', '!=', '')
+            ->where('specijalnosti.aktivan', true)
+            ->whereNotNull('specijalnosti.naziv')
+            ->where('specijalnosti.naziv', '!=', '')
+            ->selectRaw('klinike.grad as grad, specijalnosti.naziv as specijalnost, MAX(COALESCE(klinike.updated_at, specijalnosti.updated_at)) AS updated_at')
+            ->groupBy('klinike.grad', 'specijalnosti.naziv')
+            ->get();
+
+        $doctorPairs = DB::table('klinike')
+            ->join('doktori', 'doktori.klinika_id', '=', 'klinike.id')
+            ->whereNull('klinike.deleted_at')
+            ->whereNull('doktori.deleted_at')
+            ->where('klinike.aktivan', true)
+            ->where('klinike.verifikovan', true)
+            ->where('doktori.aktivan', true)
+            ->where('doktori.verifikovan', true)
+            ->whereNotNull('klinike.grad')
+            ->where('klinike.grad', '!=', '')
+            ->whereNotNull('doktori.specijalnost')
+            ->where('doktori.specijalnost', '!=', '')
+            ->selectRaw('klinike.grad as grad, doktori.specijalnost as specijalnost, MAX(COALESCE(doktori.updated_at, klinike.updated_at)) AS updated_at')
+            ->groupBy('klinike.grad', 'doktori.specijalnost')
+            ->get();
+
+        foreach ($directPairs->concat($doctorPairs) as $pair) {
+            $citySlug = $this->resolveCitySlug((string) $pair->grad, $citySlugMap);
+            $specialtyName = trim((string) $pair->specijalnost);
+            $specialtyEntry = $specialtyMetadata['by_name'][mb_strtolower($specialtyName)] ?? null;
+            $specialtySlugs = [];
+
+            $primarySlug = $specialtyEntry['slug'] ?? $this->resolveSpecialtySlug($specialtyName, $specialtySlugMap);
+            if ($primarySlug !== '') {
+                $specialtySlugs[] = $primarySlug;
+            }
+
+            if ($specialtyEntry && $specialtyEntry['parent_id']) {
+                $parentEntry = $specialtyMetadata['by_id'][$specialtyEntry['parent_id']] ?? null;
+                if ($parentEntry && $parentEntry['slug'] !== '') {
+                    $specialtySlugs[] = $parentEntry['slug'];
+                }
+            }
+
+            if ($citySlug === '' || $specialtySlugs === []) {
                 continue;
             }
-            $seen[$path] = true;
 
-            $this->appendUrl(
-                $xml,
-                $baseUrl . $path,
-                $pair->updated_at,
-                'weekly',
-                '0.88'
-            );
+            foreach (array_values(array_unique($specialtySlugs)) as $specialtySlug) {
+                $path = '/klinike/' . $citySlug . '/' . $specialtySlug;
+                if (isset($seen[$path])) {
+                    continue;
+                }
+                $seen[$path] = true;
+
+                $this->appendUrl(
+                    $xml,
+                    $baseUrl . $path,
+                    $pair->updated_at,
+                    'weekly',
+                    '0.82'
+                );
+            }
         }
 
         $xml .= '</urlset>';

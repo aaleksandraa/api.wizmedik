@@ -218,13 +218,21 @@ class AdminController extends Controller
             'google_maps_link' => 'nullable|url',
             'slike' => 'nullable|array',
             'radno_vrijeme' => 'nullable|array',
+            'specijalnosti' => 'required|array|min:1',
+            'specijalnosti.*' => 'exists:specijalnosti,id',
             'aktivan' => 'sometimes|boolean',
             'verifikovan' => 'sometimes|boolean',
         ]);
 
         $klinika = DB::transaction(function () use ($validated, $request) {
+            $specialtyIds = collect($validated['specijalnosti'] ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
             $clinicData = collect($validated)
-                ->except(['account_email', 'password'])
+                ->except(['account_email', 'password', 'specijalnosti'])
                 ->all();
 
             $clinicData['aktivan'] = $request->boolean('aktivan', true);
@@ -235,6 +243,10 @@ class AdminController extends Controller
 
             $klinika = Klinika::create($clinicData);
 
+            if ($specialtyIds !== []) {
+                $klinika->specijalnosti()->sync($specialtyIds);
+            }
+
             $this->profileAccessService->sync($klinika, $validated, [
                 'role' => 'clinic',
                 'model_class' => Klinika::class,
@@ -242,7 +254,7 @@ class AdminController extends Controller
                 'name' => fn (Klinika $clinic) => $clinic->naziv,
             ]);
 
-            return $klinika->fresh()->load('user');
+            return $klinika->fresh()->load(['user', 'specijalnosti']);
         });
 
         return response()->json(['message' => 'Clinic created', 'klinika' => $klinika], 201);
@@ -268,11 +280,19 @@ class AdminController extends Controller
             'google_maps_link' => 'nullable|url',
             'slike' => 'nullable|array',
             'radno_vrijeme' => 'nullable|array',
+            'specijalnosti' => 'nullable|array',
+            'specijalnosti.*' => 'exists:specijalnosti,id',
             'aktivan' => 'sometimes|boolean',
             'verifikovan' => 'sometimes|boolean',
         ]);
 
         $result = DB::transaction(function () use ($klinika, $validated, $request) {
+            $specialtyIds = collect($validated['specijalnosti'] ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
             $clinicData = collect($validated)->only([
                 'naziv',
                 'opis',
@@ -296,6 +316,10 @@ class AdminController extends Controller
             }
 
             $klinika->update($clinicData);
+
+            if (array_key_exists('specijalnosti', $validated)) {
+                $klinika->specijalnosti()->sync($specialtyIds);
+            }
 
             $accessPayload = $validated;
 
@@ -330,7 +354,7 @@ class AdminController extends Controller
             }
 
             return [
-                'klinika' => $klinika->fresh()->load('user'),
+                'klinika' => $klinika->fresh()->load(['user', 'specijalnosti']),
                 'access_action' => $accessResult['action'],
             ];
         });

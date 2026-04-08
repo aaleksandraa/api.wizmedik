@@ -168,6 +168,9 @@ class SeoController extends Controller
         if (preg_match('/^klinike\/specijalnost\/([^\/]+)$/', $path, $matches)) {
             return $this->getClinicsListingMeta(null, $matches[1]);
         }
+        if (preg_match('/^klinike\/([^\/]+)\/([^\/]+)$/', $path, $matches)) {
+            return $this->getClinicsListingMeta($matches[1], $matches[2]);
+        }
         if (preg_match('/^klinike\/([^\/]+)$/', $path, $matches)) {
             return $this->getClinicsListingMeta($matches[1]);
         }
@@ -300,22 +303,39 @@ class SeoController extends Controller
     private function getClinicsListingMeta(?string $citySlug = null, ?string $specialtySlug = null): array
     {
         $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
-        $specialty = $specialtySlug ? $this->resolveSpecialtyNameBySlug($specialtySlug) : null;
+        $specialtyContext = $specialtySlug ? $this->resolveSpecialtyContextBySlug($specialtySlug) : null;
+        $specialty = $specialtyContext['name'] ?? null;
+        $specialtyIds = $specialtyContext['ids'] ?? [];
 
         $query = DB::table('klinike')
             ->whereNull('deleted_at')
             ->where('aktivan', true)
             ->where('verifikovan', true);
+
         if ($city) {
             $query->whereRaw('LOWER(grad) = ?', [mb_strtolower($city)]);
         }
+
+        if ($specialty) {
+            $this->applyClinicSpecialtyFilter($query, $specialtyIds, $specialty);
+        }
+
         $count = (clone $query)->count();
 
-        $locationPart = $city ? " u {$city}" : ' u Bosni i Hercegovini';
-        $specialtyPart = $specialty ? " za {$specialty}" : '';
+        if ($city && $specialty) {
+            $title = "Klinike za {$specialty} - {$city} | wizMedik";
+            $description = "Pronadjite klinike za {$specialty} u {$city}. Dostupno {$count}+ klinika sa profilima, uslugama, doktorima i kontakt podacima.";
+        } elseif ($specialty) {
+            $title = "Klinike za {$specialty} | wizMedik";
+            $description = "Pronadjite klinike za {$specialty} u Bosni i Hercegovini. Dostupno {$count}+ klinika sa profilima, uslugama i kontakt informacijama.";
+        } elseif ($city) {
+            $title = "Klinike - {$city} | wizMedik";
+            $description = "Pregledajte privatne i specijalisticke klinike u {$city}. Dostupno {$count}+ klinika sa detaljnim profilima, uslugama i kontakt podacima.";
+        } else {
+            $title = "Klinike | wizMedik";
+            $description = "Pregledajte privatne i specijalisticke klinike u Bosni i Hercegovini. Dostupno {$count}+ klinika sa detaljnim profilima i kontakt podacima.";
+        }
 
-        $title = "Klinike{$specialtyPart}{$locationPart} | wizMedik";
-        $description = "Pregledajte privatne i specijalisticke klinike{$locationPart}{$specialtyPart}. Ukupno {$count}+ klinika sa detaljnim profilima i kontakt podacima.";
         $listingImage = (clone $query)
             ->whereNotNull('slike')
             ->orderByDesc('id')
@@ -325,7 +345,9 @@ class SeoController extends Controller
         ]);
 
         $path = 'klinike';
-        if ($specialtySlug) {
+        if ($citySlug && $specialtySlug) {
+            $path .= "/{$citySlug}/{$specialtySlug}";
+        } elseif ($specialtySlug) {
             $path .= "/specijalnost/{$specialtySlug}";
         } elseif ($citySlug) {
             $path .= "/{$citySlug}";
@@ -1773,6 +1795,37 @@ HTML;
         return $this->decodeSegment($slug);
     }
 
+    private function resolveSpecialtyContextBySlug(string $slug): array
+    {
+        $decodedName = $this->decodeSegment($slug);
+
+        $specialty = DB::table('specijalnosti')
+            ->select('id', 'naziv')
+            ->where(function ($query) use ($slug, $decodedName) {
+                $query->where('slug', $slug)
+                    ->orWhereRaw('LOWER(naziv) = ?', [mb_strtolower($decodedName)]);
+            })
+            ->first();
+
+        if (!$specialty) {
+            return [
+                'name' => $decodedName,
+                'ids' => [],
+            ];
+        }
+
+        $childIds = DB::table('specijalnosti')
+            ->where('parent_id', $specialty->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return [
+            'name' => $specialty->naziv,
+            'ids' => array_values(array_unique(array_merge([(int) $specialty->id], $childIds))),
+        ];
+    }
+
     private function resolveCityNameBySlug(string $slug): string
     {
         $city = DB::table('gradovi')
@@ -1784,6 +1837,51 @@ HTML;
         }
 
         return $this->decodeSegment($slug);
+    }
+
+    private function applyClinicSpecialtyFilter($query, array $specialtyIds, string $specialtyName): void
+    {
+        $specialtyNames = collect([$specialtyName])
+            ->merge(
+                DB::table('specijalnosti')
+                    ->whereIn('id', $specialtyIds)
+                    ->pluck('naziv')
+            )
+            ->filter()
+            ->map(fn ($name) => mb_strtolower((string) $name))
+            ->unique()
+            ->values()
+            ->all();
+
+        $query->where(function ($builder) use ($specialtyIds, $specialtyNames) {
+            if ($specialtyIds !== []) {
+                $builder->whereExists(function ($specialtyQuery) use ($specialtyIds) {
+                    $specialtyQuery->select(DB::raw(1))
+                        ->from('klinika_specijalnost')
+                        ->whereColumn('klinika_specijalnost.klinika_id', 'klinike.id')
+                        ->whereIn('klinika_specijalnost.specijalnost_id', $specialtyIds);
+                });
+            }
+
+            $builder->orWhereExists(function ($doctorQuery) use ($specialtyIds, $specialtyNames) {
+                $doctorQuery->select(DB::raw(1))
+                    ->from('doktori')
+                    ->whereColumn('doktori.klinika_id', 'klinike.id')
+                    ->whereNull('doktori.deleted_at')
+                    ->where('doktori.aktivan', true)
+                    ->where('doktori.verifikovan', true)
+                    ->where(function ($matchQuery) use ($specialtyIds, $specialtyNames) {
+                        if ($specialtyIds !== []) {
+                            $matchQuery->whereIn('doktori.specijalnost_id', $specialtyIds);
+                        }
+
+                        if ($specialtyNames !== []) {
+                            $method = $specialtyIds !== [] ? 'orWhereIn' : 'whereIn';
+                            $matchQuery->{$method}(DB::raw('LOWER(doktori.specijalnost)'), $specialtyNames);
+                        }
+                    });
+            });
+        });
     }
 
     private function normalizeListingQueryUrl(Request $request): ?string
@@ -1858,6 +1956,9 @@ HTML;
             $citySlug = $city ? $this->queryValueToSlug($city) : null;
             $specialtySlug = $specialty ? $this->queryValueToSlug($specialty) : null;
 
+            if ($citySlug && $specialtySlug && count($query) === 2) {
+                return $this->buildUrl("klinike/{$citySlug}/{$specialtySlug}");
+            }
             if ($specialtySlug && count($query) === 1) {
                 return $this->buildUrl("klinike/specijalnost/{$specialtySlug}");
             }
@@ -1865,6 +1966,22 @@ HTML;
                 return $this->buildUrl("klinike/{$citySlug}");
             }
             return null;
+        }
+
+        if (preg_match('/^klinike\/specijalnost\/([^\/]+)$/', $path, $matches)) {
+            $citySlug = $city ? $this->queryValueToSlug($city) : null;
+            if ($citySlug && count($query) === 1) {
+                return $this->buildUrl("klinike/{$citySlug}/{$matches[1]}");
+            }
+
+            return null;
+        }
+
+        if (preg_match('/^klinike\/([^\/]+)$/', $path, $matches)) {
+            $specialtySlug = $specialty ? $this->queryValueToSlug($specialty) : null;
+            if ($specialtySlug && count($query) === 1) {
+                return $this->buildUrl("klinike/{$matches[1]}/{$specialtySlug}");
+            }
         }
 
         if (in_array($path, ['laboratorije', 'apoteke', 'banje', 'domovi-njega'], true)) {

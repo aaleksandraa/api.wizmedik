@@ -532,6 +532,22 @@ class RegistrationController extends Controller
             } else {
                 $data['specijalnost_id'] = $request->specijalnost_id;
             }
+        } elseif ($type === 'clinic') {
+            $specialtyIds = collect($request->specialty_ids ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            $data['naziv'] = $request->naziv;
+            $data['ime'] = $request->ime;
+            $data['specijalnost_id'] = $specialtyIds[0] ?? null;
+            $data['message'] = json_encode([
+                'public_email' => $request->email,
+                'website' => $request->website,
+                'specialty_ids' => $specialtyIds,
+                'message' => $request->message,
+            ]);
         } elseif ($type === 'laboratory') {
             $data['naziv'] = $request->naziv;
             $data['ime'] = $request->ime; // Contact person

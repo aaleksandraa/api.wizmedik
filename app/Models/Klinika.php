@@ -208,27 +208,43 @@ class Klinika extends Model
 
         static::creating(function ($klinika) {
             if (empty($klinika->slug)) {
-                $klinika->slug = Str::slug($klinika->naziv);
-
-                $count = static::whereRaw("slug RLIKE '^{$klinika->slug}(-[0-9]+)?$'")
-                    ->count();
-
-                if ($count > 0) {
-                    $klinika->slug = "{$klinika->slug}-{$count}";
-                }
+                $klinika->slug = static::generateUniqueSlug($klinika->naziv);
             }
         });
 
         static::updating(function ($klinika) {
             if ($klinika->isDirty('naziv')) {
-                $baseSlug = Str::slug($klinika->naziv);
-
-                $count = static::whereRaw("slug RLIKE '^{$baseSlug}(-[0-9]+)?$'")
-                    ->where('id', '!=', $klinika->id)
-                    ->count();
-
-                $klinika->slug = $count > 0 ? "{$baseSlug}-{$count}" : $baseSlug;
+                $klinika->slug = static::generateUniqueSlug($klinika->naziv, $klinika->id);
             }
         });
+    }
+
+    private static function generateUniqueSlug(string $name, ?int $ignoreId = null): string
+    {
+        $baseSlug = Str::slug($name);
+        if ($baseSlug === '') {
+            $baseSlug = 'klinika';
+        }
+
+        $slug = $baseSlug;
+        $suffix = 1;
+
+        while (static::slugExists($slug, $ignoreId)) {
+            $slug = "{$baseSlug}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
+    private static function slugExists(string $slug, ?int $ignoreId = null): bool
+    {
+        $query = static::query()->where('slug', $slug);
+
+        if ($ignoreId !== null) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        return $query->exists();
     }
 }

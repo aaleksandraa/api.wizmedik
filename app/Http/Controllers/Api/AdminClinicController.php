@@ -29,6 +29,7 @@ class AdminClinicController extends Controller
                     $q->select('id', 'ime', 'prezime', 'slug', 'specijalnost', 'ocjena',
                               'slika_profila', 'klinika_id', 'aktivan', 'verifikovan');
                 },
+                'specijalnosti:id,naziv,slug,parent_id',
                 'verifikovaoAdmin:id,ime,prezime,email'
             ]);
 
@@ -84,6 +85,8 @@ class AdminClinicController extends Controller
             'google_maps_link' => 'nullable|url',
             'slike' => 'nullable|array',
             'radno_vrijeme' => 'nullable|array',
+            'specijalnosti' => 'nullable|array',
+            'specijalnosti.*' => 'exists:specijalnosti,id',
             'aktivan' => 'sometimes|boolean',
             'verifikovan' => 'sometimes|boolean',
         ]);
@@ -94,6 +97,16 @@ class AdminClinicController extends Controller
                 'website', 'latitude', 'longitude', 'google_maps_link', 'slike',
                 'radno_vrijeme', 'aktivan', 'verifikovan',
             ])->all());
+
+            if (array_key_exists('specijalnosti', $validated)) {
+                $klinika->specijalnosti()->sync(
+                    collect($validated['specijalnosti'] ?? [])
+                        ->filter(fn ($id) => is_numeric($id))
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->all()
+                );
+            }
 
             $this->profileAccessService->sync($klinika, $validated, [
                 'role' => 'clinic',
@@ -117,6 +130,7 @@ class AdminClinicController extends Controller
             return $klinika->fresh()->load([
                 'user:id,name,ime,prezime,email,role',
                 'doktori:id,ime,prezime,slug,specijalnost,ocjena,slika_profila,klinika_id,aktivan,verifikovan',
+                'specijalnosti:id,naziv,slug,parent_id',
                 'verifikovaoAdmin:id,ime,prezime,email',
             ]);
         });
