@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Intervention\Image\Laravel\Facades\Image;
 use RuntimeException;
 
@@ -15,28 +16,53 @@ class UploadController extends Controller
     {
         try {
             $request->validate([
-                'image'  => 'required|image|mimes:jpeg,png,jpg,webp,svg|max:5120', // 5MB max
+                // Use file-based validation instead of Laravel's image rule because
+                // modern mobile formats like HEIC/HEIF/AVIF can fail the generic image
+                // validator even though they are legitimate user uploads.
+                'image'  => 'required|file|max:5120', // 5MB max
                 'folder' => 'required|in:doctors,clinics,cities,covers,blog,laboratories,spas,logos,backgrounds,pharmacies,care-homes',
             ]);
 
             $folder = $request->folder;
             $imageFile = $request->file('image');
+            $extension = strtolower((string) $imageFile->getClientOriginalExtension());
+            $baseFilename = time() . '_' . uniqid();
 
             // Security: Verify it's actually an image
             $mimeType = $imageFile->getMimeType();
-            $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/pjpeg', 'image/x-png', 'image/webp', 'image/svg+xml'];
+            $allowedMimes = [
+                'image/jpeg',
+                'image/png',
+                'image/jpg',
+                'image/pjpeg',
+                'image/x-png',
+                'image/webp',
+                'image/svg+xml',
+                'image/heic',
+                'image/heif',
+                'image/avif',
+                'image/avif-sequence',
+            ];
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'svg', 'heic', 'heif', 'avif'];
 
-            if (!in_array($mimeType, $allowedMimes)) {
-                return response()->json(['error' => 'Invalid file type'], 400);
+            if (!in_array($mimeType, $allowedMimes, true) && !in_array($extension, $allowedExtensions, true)) {
+                return response()->json([
+                    'message' => 'Odabrani fajl nije podržana slika.',
+                    'errors' => [
+                        'image' => ['Podržani formati su JPG, PNG, WEBP, SVG, HEIC, HEIF i AVIF.'],
+                    ],
+                ], 422);
             }
 
             // Security: Check file size again (double check)
             if ($imageFile->getSize() > 5242880) { // 5MB in bytes
-                return response()->json(['error' => 'File too large'], 400);
+                return response()->json([
+                    'message' => 'Slika je prevelika.',
+                    'errors' => [
+                        'image' => ['Maksimalna veličina slike je 5 MB.'],
+                    ],
+                ], 422);
             }
-
-            $extension = strtolower((string) $imageFile->getClientOriginalExtension());
-            $baseFilename = time() . '_' . uniqid();
 
             // SVG: save directly without raster processing
             if ($extension === 'svg') {
@@ -57,18 +83,38 @@ class UploadController extends Controller
             }
 
             // Security: Verify image dimensions (prevent decompression bombs)
-            try {
-                $imageInfo = getimagesize($imageFile->getRealPath());
-                if ($imageInfo === false) {
-                    return response()->json(['error' => 'Invalid image file'], 400);
-                }
+            $shouldValidateDimensions = in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)
+                || in_array($mimeType, ['image/jpeg', 'image/png', 'image/jpg', 'image/pjpeg', 'image/x-png', 'image/webp'], true);
 
-                // Prevent extremely large images (max 10000x10000)
-                if ($imageInfo[0] > 10000 || $imageInfo[1] > 10000) {
-                    return response()->json(['error' => 'Image dimensions too large'], 400);
+            if ($shouldValidateDimensions) {
+                try {
+                    $imageInfo = getimagesize($imageFile->getRealPath());
+                    if ($imageInfo === false) {
+                        return response()->json([
+                            'message' => 'Odabrani fajl nije validna slika.',
+                            'errors' => [
+                                'image' => ['Sistem nije mogao pročitati dimenzije slike.'],
+                            ],
+                        ], 422);
+                    }
+
+                    // Prevent extremely large images (max 10000x10000)
+                    if ($imageInfo[0] > 10000 || $imageInfo[1] > 10000) {
+                        return response()->json([
+                            'message' => 'Dimenzije slike su prevelike.',
+                            'errors' => [
+                                'image' => ['Maksimalne dozvoljene dimenzije su 10000x10000 px.'],
+                            ],
+                        ], 422);
+                    }
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'message' => 'Odabrani fajl nije validna slika.',
+                        'errors' => [
+                            'image' => ['Sistem nije mogao obraditi odabrani fajl.'],
+                        ],
+                    ], 422);
                 }
-            } catch (\Exception $e) {
-                return response()->json(['error' => 'Invalid image file'], 400);
             }
 
             /*
@@ -161,7 +207,7 @@ class UploadController extends Controller
                         'folder' => $folder,
                     ]);
 
-                    $safeExtension = in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)
+                    $safeExtension = in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'avif'], true)
                         ? $extension
                         : 'jpg';
                     $publicPath = "{$folder}/{$baseFilename}.{$safeExtension}";
@@ -221,6 +267,11 @@ class UploadController extends Controller
                 'path'    => $publicPath,
             ]);
 
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => $e->validator->errors()->first() ?: 'Podaci za upload nisu ispravni.',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
 
             \Log::error('Image upload failed', [
@@ -248,11 +299,11 @@ class UploadController extends Controller
         ?string $preferredExtension = null
     ): array {
         $extension = strtolower((string) ($preferredExtension ?: $imageFile->getClientOriginalExtension()));
-        $safeExtension = in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'svg'], true)
+        $safeExtension = in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'svg', 'heic', 'heif', 'avif'], true)
             ? $extension
             : strtolower((string) ($imageFile->guessExtension() ?: 'jpg'));
 
-        if (!in_array($safeExtension, ['jpg', 'jpeg', 'png', 'webp', 'svg'], true)) {
+        if (!in_array($safeExtension, ['jpg', 'jpeg', 'png', 'webp', 'svg', 'heic', 'heif', 'avif'], true)) {
             $safeExtension = 'jpg';
         }
 
