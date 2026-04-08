@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Laravel\Facades\Image;
+use RuntimeException;
 
 class UploadController extends Controller
 {
@@ -22,7 +24,7 @@ class UploadController extends Controller
 
             // Security: Verify it's actually an image
             $mimeType = $imageFile->getMimeType();
-            $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/svg+xml'];
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'image/pjpeg', 'image/x-png', 'image/webp', 'image/svg+xml'];
 
             if (!in_array($mimeType, $allowedMimes)) {
                 return response()->json(['error' => 'Invalid file type'], 400);
@@ -34,28 +36,23 @@ class UploadController extends Controller
             }
 
             $extension = strtolower((string) $imageFile->getClientOriginalExtension());
+            $baseFilename = time() . '_' . uniqid();
 
             // SVG: save directly without raster processing
             if ($extension === 'svg') {
-                $filename = time() . '_' . uniqid() . '.svg';
-                $publicPath = "{$folder}/{$filename}";
-
-                Storage::disk('public')->put($publicPath, file_get_contents($imageFile->getRealPath()));
-
-                $baseUrl = $request->getSchemeAndHttpHost();
-                $url = $baseUrl . '/storage/' . $publicPath;
+                $stored = $this->storeOriginalUpload($request, $imageFile, $folder, $baseFilename, 'svg');
 
                 \Log::info('SVG uploaded successfully', [
-                    'path' => $publicPath,
-                    'url'  => $url,
+                    'path' => $stored['path'],
+                    'url'  => $stored['url'],
                     'folder' => $folder,
-                    'base_url' => $baseUrl
+                    'base_url' => $request->getSchemeAndHttpHost(),
                 ]);
 
                 return response()->json([
                     'message' => 'Image uploaded successfully',
-                    'url'     => $url,
-                    'path'    => $publicPath,
+                    'url'     => $stored['url'],
+                    'path'    => $stored['path'],
                 ]);
             }
 
@@ -73,7 +70,6 @@ class UploadController extends Controller
             } catch (\Exception $e) {
                 return response()->json(['error' => 'Invalid image file'], 400);
             }
-            $baseFilename = time() . '_' . uniqid();
 
             /*
                 -- Obrada slike:
@@ -91,11 +87,18 @@ class UploadController extends Controller
                 \Log::warning('Image decode failed', [
                     'error' => $decodeException->getMessage(),
                     'folder' => $folder,
+                    'mime_type' => $mimeType,
+                    'extension' => $extension,
                 ]);
 
+                $stored = $this->storeOriginalUpload($request, $imageFile, $folder, $baseFilename, $extension);
+
                 return response()->json([
-                    'error' => 'Unable to process this image format.'
-                ], 400);
+                    'message' => 'Image uploaded successfully',
+                    'url'     => $stored['url'],
+                    'path'    => $stored['path'],
+                    'fallback'=> 'original',
+                ]);
             }
 
             // Resize based on folder type
@@ -170,35 +173,46 @@ class UploadController extends Controller
             \Log::info('Image processed', [
                 'original_size' => $imageFile->getSize(),
                 'encoded_size'  => strlen($encodedBinary),
-                'path'          => $publicPath
+                'path'          => $publicPath,
+                'disk_root'     => config('filesystems.disks.public.root'),
             ]);
 
-            // Snimanje fajla na public disk
-            $saved = Storage::disk('public')->put($publicPath, $encodedBinary);
+            try {
+                $saved = Storage::disk('public')->put($publicPath, $encodedBinary);
 
-            \Log::info('Storage put result', [
-                'saved'       => $saved,
-                'path'        => $publicPath,
-                'exists_after'=> Storage::disk('public')->exists($publicPath)
-            ]);
+                \Log::info('Storage put result', [
+                    'saved'       => $saved,
+                    'path'        => $publicPath,
+                    'exists_after'=> Storage::disk('public')->exists($publicPath),
+                ]);
 
-            if (!Storage::disk('public')->exists($publicPath)) {
+                if (!$saved || !Storage::disk('public')->exists($publicPath)) {
+                    throw new RuntimeException('Processed image write failed on public disk.');
+                }
+            } catch (\Throwable $storageException) {
+                \Log::warning('Processed image write failed, falling back to original upload', [
+                    'error' => $storageException->getMessage(),
+                    'path' => $publicPath,
+                    'folder' => $folder,
+                ]);
+
+                $stored = $this->storeOriginalUpload($request, $imageFile, $folder, $baseFilename, $extension);
+
                 return response()->json([
-                    'message' => 'Failed to save image',
-                    'error'   => 'File not found after upload'
-                ], 500);
+                    'message' => 'Image uploaded successfully',
+                    'url'     => $stored['url'],
+                    'path'    => $stored['path'],
+                    'fallback'=> 'original',
+                ]);
             }
 
-            // Generate full URL
-            // Use request host to generate correct URL for current environment
-            $baseUrl = $request->getSchemeAndHttpHost();
-            $url = $baseUrl . '/storage/' . $publicPath;
+            $url = $this->buildPublicUrl($request, $publicPath);
 
             \Log::info('Image uploaded successfully', [
                 'path' => $publicPath,
                 'url'  => $url,
                 'folder' => $folder,
-                'base_url' => $baseUrl
+                'base_url' => $request->getSchemeAndHttpHost(),
             ]);
 
             return response()->json([
@@ -211,7 +225,9 @@ class UploadController extends Controller
 
             \Log::error('Image upload failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'disk_root' => config('filesystems.disks.public.root'),
+                'request_host' => $request->getSchemeAndHttpHost(),
             ]);
 
             return response()->json([
@@ -219,6 +235,43 @@ class UploadController extends Controller
                 'error'   => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * @return array{path:string,url:string}
+     */
+    private function storeOriginalUpload(
+        Request $request,
+        UploadedFile $imageFile,
+        string $folder,
+        string $baseFilename,
+        ?string $preferredExtension = null
+    ): array {
+        $extension = strtolower((string) ($preferredExtension ?: $imageFile->getClientOriginalExtension()));
+        $safeExtension = in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'svg'], true)
+            ? $extension
+            : strtolower((string) ($imageFile->guessExtension() ?: 'jpg'));
+
+        if (!in_array($safeExtension, ['jpg', 'jpeg', 'png', 'webp', 'svg'], true)) {
+            $safeExtension = 'jpg';
+        }
+
+        $filename = $baseFilename . '.' . $safeExtension;
+        $storedPath = $imageFile->storeAs($folder, $filename, 'public');
+
+        if (!is_string($storedPath) || $storedPath === '' || !Storage::disk('public')->exists($storedPath)) {
+            throw new RuntimeException('Unable to store uploaded image on public disk.');
+        }
+
+        return [
+            'path' => $storedPath,
+            'url' => $this->buildPublicUrl($request, $storedPath),
+        ];
+    }
+
+    private function buildPublicUrl(Request $request, string $publicPath): string
+    {
+        return rtrim($request->getSchemeAndHttpHost(), '/') . Storage::url($publicPath);
     }
 
 
