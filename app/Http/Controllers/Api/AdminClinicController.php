@@ -84,6 +84,7 @@ class AdminClinicController extends Controller
             'longitude' => 'nullable|numeric',
             'google_maps_link' => 'nullable|url',
             'slike' => 'nullable|array',
+            'slike.*' => 'string|max:2048',
             'radno_vrijeme' => 'nullable|array',
             'specijalnosti' => 'nullable|array',
             'specijalnosti.*' => 'exists:specijalnosti,id',
@@ -92,11 +93,19 @@ class AdminClinicController extends Controller
         ]);
 
         $klinika = DB::transaction(function () use ($klinika, $validated, $request) {
-            $klinika->update(collect($validated)->only([
+            $clinicData = collect($validated)->only([
                 'naziv', 'opis', 'adresa', 'grad', 'telefon', 'email', 'contact_email',
                 'website', 'latitude', 'longitude', 'google_maps_link', 'slike',
                 'radno_vrijeme', 'aktivan', 'verifikovan',
-            ])->all());
+            ])->all();
+
+            if (array_key_exists('radno_vrijeme', $clinicData) && is_array($clinicData['radno_vrijeme'])) {
+                $clinicData['radno_vrijeme'] = collect($clinicData['radno_vrijeme'])
+                    ->map(fn ($schedule) => is_array($schedule) ? $schedule : [])
+                    ->all();
+            }
+
+            $klinika->update($clinicData);
 
             if (array_key_exists('specijalnosti', $validated)) {
                 $klinika->specijalnosti()->sync(

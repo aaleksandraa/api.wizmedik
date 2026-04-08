@@ -63,6 +63,7 @@ class ClinicDashboardController extends Controller
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'slike' => 'nullable|array',
+            'slike.*' => 'string|max:2048',
             'radno_vrijeme' => 'nullable|array',
             'pauze' => 'nullable|array',
             'odmori' => 'nullable|array',

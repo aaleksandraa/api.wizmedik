@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Traits\InvalidatesCityCache;
 
@@ -108,22 +109,18 @@ class Klinika extends Model
     // Slike accessor
     public function getSlikeAttribute($value)
     {
-        if (!$value) {
-            return [];
-        }
+        return array_map(
+            fn (string $image) => $this->resolveStoredImageUrl($image),
+            $this->normalizeStoredImages($value)
+        );
+    }
 
-        $images = is_string($value) ? json_decode($value, true) : $value;
-
-        if (!is_array($images)) {
-            return [];
-        }
-
-        return array_map(function($image) {
-            if (filter_var($image, FILTER_VALIDATE_URL)) {
-                return $image;
-            }
-            return url('storage/' . $image);
-        }, $images);
+    public function setSlikeAttribute($value): void
+    {
+        $images = $this->normalizeStoredImages($value);
+        $this->attributes['slike'] = $images === []
+            ? null
+            : json_encode($images, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     /**
@@ -246,5 +243,87 @@ class Klinika extends Model
         }
 
         return $query->exists();
+    }
+
+    /**
+     * @param  mixed  $value
+     * @return array<int, string>
+     */
+    private function normalizeStoredImages($value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            $value = is_array($decoded) ? $decoded : [$value];
+        }
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $image) {
+            $normalizedImage = $this->normalizeStoredImageValue($image);
+
+            if ($normalizedImage === null || in_array($normalizedImage, $normalized, true)) {
+                continue;
+            }
+
+            $normalized[] = $normalizedImage;
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeStoredImageValue($image): ?string
+    {
+        if (!is_string($image)) {
+            return null;
+        }
+
+        $image = trim(str_replace('\\', '/', $image));
+
+        if ($image === '') {
+            return null;
+        }
+
+        if (filter_var($image, FILTER_VALIDATE_URL)) {
+            $path = parse_url($image, PHP_URL_PATH);
+
+            if (!is_string($path) || $path === '') {
+                return $image;
+            }
+
+            if (!str_contains($path, '/storage/')) {
+                return $image;
+            }
+
+            $image = $path;
+        }
+
+        $image = ltrim($image, '/');
+        $image = preg_replace('#^(?:storage/)+#i', '', $image) ?? $image;
+        $image = preg_replace('#/+#', '/', $image) ?? $image;
+
+        return $image !== '' ? $image : null;
+    }
+
+    private function resolveStoredImageUrl(string $image): string
+    {
+        if (filter_var($image, FILTER_VALIDATE_URL)) {
+            return $image;
+        }
+
+        $path = $this->normalizeStoredImageValue($image);
+
+        if ($path === null) {
+            return '';
+        }
+
+        return url(Storage::url($path));
     }
 }
