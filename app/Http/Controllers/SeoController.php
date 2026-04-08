@@ -52,6 +52,7 @@ class SeoController extends Controller
     private function resolveIndexTemplatePath(): array
     {
         $sitemapOutputPath = trim((string) config('app.sitemap_output_path', ''));
+        $runtimeTemplatePath = trim((string) config('app.seo_index_template_path', ''));
         $seoTemplatePath = trim((string) env('SEO_INDEX_TEMPLATE_PATH', ''));
         $mirrorRaw = trim((string) config('app.sitemap_output_mirror_paths', ''));
 
@@ -79,6 +80,7 @@ class SeoController extends Controller
         }
 
         $candidates = [
+            $runtimeTemplatePath !== '' ? $runtimeTemplatePath : null,
             ...$outputCandidates,
             $seoTemplatePath !== '' ? $seoTemplatePath : null,
             base_path('../frontend/dist/index.html'),

@@ -252,9 +252,55 @@ class AdminManagedAccessHardeningTest extends TestCase
         $this->assertTrue($doctor->radno_vrijeme['nedjelja']['closed']);
     }
 
+    public function test_admin_can_update_doctor_access_email_for_legacy_doctor_without_specialty_id(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin-doctor-access@example.com',
+            'password' => Hash::make('AdminPassword123!'),
+        ]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $doctor = Doktor::withoutEvents(fn () => Doktor::create([
+            'ime' => 'Adnan',
+            'prezime' => 'Legacy',
+            'slug' => 'adnan-legacy',
+            'telefon' => '+38761112345',
+            'specijalnost' => 'Doktor opste prakse',
+            'grad' => 'Doboj',
+            'lokacija' => 'Glavna 1',
+            'aktivan' => true,
+            'verifikovan' => true,
+        ]));
+
+        $response = $this->putJson("/api/admin/doctors/{$doctor->id}", [
+            'ime' => 'Adnan',
+            'prezime' => 'Legacy',
+            'telefon' => '+38761112345',
+            'specijalnost' => 'Doktor opste prakse',
+            'specijalnost_id' => null,
+            'grad' => 'Doboj',
+            'lokacija' => 'Glavna 1',
+            'account_email' => 'doctor-access@example.com',
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('doktor.user.email', 'doctor-access@example.com');
+
+        $doctor->refresh();
+
+        $this->assertNull($doctor->specijalnost_id);
+        $this->assertSame('doctor-access@example.com', $doctor->user?->email);
+    }
+
     public function test_self_service_clinic_registration_still_creates_pending_request(): void
     {
         Mail::fake();
+
+        $specialty = Specijalnost::create([
+            'naziv' => 'Pedijatrija',
+        ]);
 
         $response = $this->postJson('/api/register/clinic', [
             'naziv' => 'Kompatibilna Klinika',
@@ -265,6 +311,7 @@ class AdminManagedAccessHardeningTest extends TestCase
             'password_confirmation' => 'ClinicCompat123!',
             'adresa' => 'Glavna 12',
             'grad' => 'Sarajevo',
+            'specialty_ids' => [$specialty->id],
             'terms_accepted' => true,
             'privacy_accepted' => true,
         ]);

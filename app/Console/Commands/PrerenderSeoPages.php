@@ -35,6 +35,7 @@ class PrerenderSeoPages extends Command
     {
         $primaryOutputDir = $this->resolveOutputDir();
         $outputDirs = $this->resolveOutputDirs($primaryOutputDir);
+        $templatePath = $this->resolveTemplatePathForPrerender($primaryOutputDir);
 
         foreach ($outputDirs as $outputDir) {
             if (!is_dir($outputDir)) {
@@ -51,6 +52,13 @@ class PrerenderSeoPages extends Command
         $this->info('Output directories:');
         foreach ($outputDirs as $outputDir) {
             $this->info(" - {$outputDir}");
+        }
+
+        if ($templatePath !== null) {
+            config(['app.seo_index_template_path' => $templatePath]);
+            $this->info("Using SEO template: {$templatePath}");
+        } else {
+            $this->warn("Could not resolve a build template inside {$primaryOutputDir}; falling back to controller template discovery.");
         }
 
         $pathsFromOptions = $this->normalizeSpecificPathsOption();
@@ -118,6 +126,8 @@ class PrerenderSeoPages extends Command
             }
         }
 
+        $this->syncPrimaryBuildArtifactsToMirrorOutputs($primaryOutputDir, $outputDirs);
+
         $this->newLine();
         $this->info("Rendered: {$rendered}");
         $this->info("Skipped: {$skipped}");
@@ -160,6 +170,22 @@ class PrerenderSeoPages extends Command
         }
 
         return array_values(array_unique($dirs));
+    }
+
+    private function resolveTemplatePathForPrerender(string $primaryOutputDir): ?string
+    {
+        $candidates = [
+            rtrim($primaryOutputDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'index.html',
+            rtrim($primaryOutputDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR . 'index.html',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate) && is_readable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -284,6 +310,55 @@ class PrerenderSeoPages extends Command
     }
 
     /**
+     * @param array<int, string> $outputDirs
+     */
+    private function syncPrimaryBuildArtifactsToMirrorOutputs(string $primaryOutputDir, array $outputDirs): void
+    {
+        $sourceAssetsDir = rtrim($primaryOutputDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'assets';
+        $topLevelEntries = @scandir($primaryOutputDir);
+
+        if (!is_array($topLevelEntries)) {
+            return;
+        }
+
+        foreach ($outputDirs as $outputDir) {
+            if ($this->normalizePath($outputDir) === $this->normalizePath($primaryOutputDir)) {
+                continue;
+            }
+
+            if (!is_dir($outputDir) || !is_writable($outputDir)) {
+                $this->warn("Skipping build artifact sync for unavailable mirror output: {$outputDir}");
+                continue;
+            }
+
+            if (is_dir($sourceAssetsDir)) {
+                $targetAssetsDir = $outputDir . DIRECTORY_SEPARATOR . 'assets';
+                $this->deletePathRecursively($targetAssetsDir);
+                $this->copyDirectoryRecursively($sourceAssetsDir, $targetAssetsDir);
+            }
+
+            foreach ($topLevelEntries as $entry) {
+                if ($entry === '.' || $entry === '..' || $entry === 'assets') {
+                    continue;
+                }
+
+                $sourcePath = $primaryOutputDir . DIRECTORY_SEPARATOR . $entry;
+                $targetPath = $outputDir . DIRECTORY_SEPARATOR . $entry;
+
+                if (!is_file($sourcePath)) {
+                    continue;
+                }
+
+                if (!@copy($sourcePath, $targetPath)) {
+                    throw new \RuntimeException("Failed to copy build artifact '{$entry}' to '{$outputDir}'.");
+                }
+            }
+
+            $this->info("Mirrored build artifacts to {$outputDir}");
+        }
+    }
+
+    /**
      * @return array<int, string>
      */
     private function collectGeneratedRouteDirectories(string $baseDir, string $relativeDir = ''): array
@@ -356,6 +431,70 @@ class PrerenderSeoPages extends Command
 
             $current = $parent;
         }
+    }
+
+    private function deletePathRecursively(string $path): void
+    {
+        if (!file_exists($path)) {
+            return;
+        }
+
+        if (is_file($path) || is_link($path)) {
+            @unlink($path);
+            return;
+        }
+
+        $entries = @scandir($path);
+        if (is_array($entries)) {
+            foreach ($entries as $entry) {
+                if ($entry === '.' || $entry === '..') {
+                    continue;
+                }
+
+                $this->deletePathRecursively($path . DIRECTORY_SEPARATOR . $entry);
+            }
+        }
+
+        @rmdir($path);
+    }
+
+    private function copyDirectoryRecursively(string $sourceDir, string $targetDir): void
+    {
+        if (!is_dir($sourceDir)) {
+            return;
+        }
+
+        if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
+            throw new \RuntimeException("Failed to create directory: {$targetDir}");
+        }
+
+        $entries = @scandir($sourceDir);
+        if (!is_array($entries)) {
+            throw new \RuntimeException("Failed to read directory: {$sourceDir}");
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $sourcePath = $sourceDir . DIRECTORY_SEPARATOR . $entry;
+            $targetPath = $targetDir . DIRECTORY_SEPARATOR . $entry;
+
+            if (is_dir($sourcePath)) {
+                $this->copyDirectoryRecursively($sourcePath, $targetPath);
+                continue;
+            }
+
+            if (!@copy($sourcePath, $targetPath)) {
+                throw new \RuntimeException("Failed to copy asset '{$sourcePath}' to '{$targetPath}'.");
+            }
+        }
+    }
+
+    private function normalizePath(string $path): string
+    {
+        return rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path), DIRECTORY_SEPARATOR);
     }
 
     /**

@@ -20,6 +20,11 @@ class SeoStaticPageService
         }
 
         try {
+            $templatePath = $this->resolveTemplatePath($outputDirs[0]);
+            if ($templatePath !== null) {
+                config(['app.seo_index_template_path' => $templatePath]);
+            }
+
             $requestPath = $normalizedPath === '' ? '/' : '/' . $normalizedPath;
             $request = Request::create($requestPath, 'GET');
             $response = app(SeoController::class)->index($request);
@@ -138,6 +143,22 @@ class SeoStaticPageService
         }
 
         return array_values(array_unique($dirs));
+    }
+
+    private function resolveTemplatePath(string $primaryOutputDir): ?string
+    {
+        $candidates = [
+            rtrim($primaryOutputDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'index.html',
+            rtrim($primaryOutputDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR . 'index.html',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate) && is_readable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function targetFilePath(string $outputDir, string $path): string
