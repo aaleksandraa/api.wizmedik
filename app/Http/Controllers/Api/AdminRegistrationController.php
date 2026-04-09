@@ -519,8 +519,15 @@ class AdminRegistrationController extends Controller
             return ['user' => $user, 'care_home' => $careHome];
         } elseif ($registrationRequest->type === 'pharmacy') {
             $cityName = trim((string) $registrationRequest->grad);
-            $city = null;
-            if ($cityName !== '') {
+            $cityId = isset($messageData['grad_id']) && is_numeric($messageData['grad_id'])
+                ? (int) $messageData['grad_id']
+                : null;
+
+            $city = $cityId
+                ? Grad::query()->find($cityId)
+                : null;
+
+            if (!$city && $cityName !== '') {
                 $city = Grad::query()
                     ->whereRaw('LOWER(naziv) = ?', [mb_strtolower($cityName)])
                     ->orWhere('slug', Str::slug($cityName))

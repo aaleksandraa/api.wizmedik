@@ -94,7 +94,8 @@ class AdminPharmacyController extends Controller
             'is_active' => 'nullable|boolean',
 
             'branch_naziv' => 'nullable|string|max:255',
-            'grad' => 'required|string|max:100',
+            'grad_id' => 'nullable|integer|exists:gradovi,id|required_without:grad',
+            'grad' => 'nullable|string|max:100|required_without:grad_id',
             'adresa' => 'required|string|max:255',
             'postanski_broj' => 'nullable|string|max:20',
             'latitude' => 'nullable|numeric|between:-90,90',
@@ -139,7 +140,7 @@ class AdminPharmacyController extends Controller
                 'verified_by' => $isVerified ? auth()->id() : null,
             ]);
 
-            $city = $this->resolveCity($validated['grad']);
+            $city = $this->resolveCityFromPayload($validated);
             $branchName = trim((string) ($validated['branch_naziv'] ?? ''));
             if ($branchName === '') {
                 $branchName = $validated['naziv_brenda'] . ' - Glavna poslovnica';
@@ -150,7 +151,7 @@ class AdminPharmacyController extends Controller
                 'naziv' => $branchName,
                 'slug' => ApotekaPoslovnica::generateUniqueSlug($branchName),
                 'grad_id' => $city?->id,
-                'grad_naziv' => $city?->naziv ?? $validated['grad'],
+                'grad_naziv' => $city?->naziv ?? ($validated['grad'] ?? null),
                 'adresa' => $validated['adresa'],
                 'postanski_broj' => $validated['postanski_broj'] ?? null,
                 'latitude' => $validated['latitude'] ?? null,
@@ -223,7 +224,8 @@ class AdminPharmacyController extends Controller
             'is_active' => 'sometimes|boolean',
 
             'branch_naziv' => 'sometimes|nullable|string|max:255',
-            'grad' => 'sometimes|required|string|max:100',
+            'grad_id' => 'sometimes|nullable|integer|exists:gradovi,id',
+            'grad' => 'sometimes|nullable|string|max:100',
             'adresa' => 'sometimes|required|string|max:255',
             'postanski_broj' => 'nullable|string|max:20',
             'latitude' => 'nullable|numeric|between:-90,90',
@@ -291,10 +293,10 @@ class AdminPharmacyController extends Controller
                         $branchData['slug'] = ApotekaPoslovnica::generateUniqueSlug($branchName, $branch->id);
                     }
                 }
-                if ($request->has('grad')) {
-                    $city = $this->resolveCity($validated['grad']);
+                if ($request->has('grad') || $request->has('grad_id')) {
+                    $city = $this->resolveCityFromPayload($validated);
                     $branchData['grad_id'] = $city?->id;
-                    $branchData['grad_naziv'] = $city?->naziv ?? $validated['grad'];
+                    $branchData['grad_naziv'] = $city?->naziv ?? ($validated['grad'] ?? $branch->grad_naziv);
                 }
                 foreach ([
                     'adresa',
@@ -529,6 +531,24 @@ class AdminPharmacyController extends Controller
         return response()->json([
             'message' => 'CSV/Excel import dezurstava je planiran u narednoj fazi.',
         ], 501);
+    }
+
+    private function resolveCityFromPayload(array $validated): ?Grad
+    {
+        $cityId = $validated['grad_id'] ?? null;
+        if (is_numeric($cityId)) {
+            $city = Grad::query()->find((int) $cityId);
+            if ($city) {
+                return $city;
+            }
+        }
+
+        $cityName = $validated['grad'] ?? null;
+        if (is_string($cityName) && trim($cityName) !== '') {
+            return $this->resolveCity($cityName);
+        }
+
+        return null;
     }
 
     private function resolveCity(string $cityName): ?Grad

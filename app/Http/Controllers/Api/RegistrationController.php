@@ -600,6 +600,7 @@ class RegistrationController extends Controller
                 'website' => $request->website,
                 'opis' => $request->opis,
                 'branch_naziv' => $request->branch_naziv,
+                'grad_id' => $request->filled('grad_id') ? (int) $request->grad_id : null,
                 'postanski_broj' => $request->postanski_broj,
                 'latitude' => $request->latitude,
                 'longitude' => $request->longitude,

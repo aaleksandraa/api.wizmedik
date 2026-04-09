@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Grad;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
@@ -38,7 +39,8 @@ class PharmacyRegistrationRequest extends FormRequest
             // First branch
             'branch_naziv' => ['nullable', 'string', 'max:255'],
             'adresa' => ['required', 'string', 'max:255'],
-            'grad' => ['required', 'string', 'max:100'],
+            'grad_id' => ['nullable', 'integer', 'exists:gradovi,id', 'required_without:grad'],
+            'grad' => ['nullable', 'string', 'max:100', 'required_without:grad_id'],
             'postanski_broj' => ['nullable', 'string', 'max:20'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -72,7 +74,9 @@ class PharmacyRegistrationRequest extends FormRequest
             'telefon.required' => 'Telefon je obavezan.',
             'telefon.regex' => 'Telefon nije u validnom formatu.',
             'adresa.required' => 'Adresa poslovnice je obavezna.',
-            'grad.required' => 'Grad je obavezan.',
+            'grad.required_without' => 'Grad je obavezan.',
+            'grad_id.required_without' => 'Molimo odaberite grad iz ponudjene liste.',
+            'grad_id.exists' => 'Odabrani grad nije validan.',
             'ime.required' => 'Ime kontakt osobe je obavezno.',
             'account_email.required' => 'Email za prijavu je obavezan.',
             'account_email.email' => 'Email za prijavu nije validan.',
@@ -88,6 +92,16 @@ class PharmacyRegistrationRequest extends FormRequest
     {
         if ($this->website && !preg_match('/^https?:\/\//i', $this->website)) {
             $this->merge(['website' => 'https://' . $this->website]);
+        }
+
+        if ($this->filled('grad_id')) {
+            $city = Grad::query()->find((int) $this->input('grad_id'));
+            if ($city) {
+                $this->merge([
+                    'grad_id' => $city->id,
+                    'grad' => $city->naziv,
+                ]);
+            }
         }
     }
 

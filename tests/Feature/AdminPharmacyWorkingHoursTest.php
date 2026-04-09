@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Grad;
 use App\Models\ApotekaPoslovnica;
+use App\Models\RegistrationRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -22,11 +25,12 @@ class AdminPharmacyWorkingHoursTest extends TestCase
     public function test_admin_can_create_pharmacy_with_custom_working_hours(): void
     {
         Sanctum::actingAs($this->adminUser());
+        $city = $this->createCity('Sarajevo');
 
         $response = $this->postJson('/api/admin/pharmacies', [
             'naziv_brenda' => 'Test Apoteka',
             'telefon' => '+38761111111',
-            'grad' => 'Sarajevo',
+            'grad_id' => $city->id,
             'adresa' => 'Ulica 1',
             'status' => 'verified',
             'is_active' => true,
@@ -42,6 +46,8 @@ class AdminPharmacyWorkingHoursTest extends TestCase
         $branch = ApotekaPoslovnica::with('radnoVrijeme')->firstOrFail();
 
         $this->assertCount(7, $branch->radnoVrijeme);
+        $this->assertSame($city->id, $branch->grad_id);
+        $this->assertSame('Sarajevo', $branch->grad_naziv);
         $this->assertSame('07:30', substr((string) $branch->radnoVrijeme->firstWhere('day_of_week', 1)?->open_time, 0, 5));
         $this->assertSame('21:00', substr((string) $branch->radnoVrijeme->firstWhere('day_of_week', 1)?->close_time, 0, 5));
     }
@@ -49,11 +55,12 @@ class AdminPharmacyWorkingHoursTest extends TestCase
     public function test_admin_can_update_existing_pharmacy_working_hours(): void
     {
         Sanctum::actingAs($this->adminUser());
+        $city = $this->createCity('Tuzla');
 
         $createResponse = $this->postJson('/api/admin/pharmacies', [
             'naziv_brenda' => 'Apoteka Update',
             'telefon' => '+38762222222',
-            'grad' => 'Tuzla',
+            'grad_id' => $city->id,
             'adresa' => 'Glavna 2',
             'status' => 'verified',
             'is_active' => true,
@@ -79,6 +86,40 @@ class AdminPharmacyWorkingHoursTest extends TestCase
         $this->assertSame('18:30', substr((string) $branch->radnoVrijeme->firstWhere('day_of_week', 1)?->close_time, 0, 5));
     }
 
+    public function test_self_service_pharmacy_registration_stores_selected_city_id_for_later_approval(): void
+    {
+        Mail::fake();
+        $city = $this->createCity('Doboj');
+
+        $response = $this->postJson('/api/register/pharmacy', [
+            'naziv_brenda' => 'Apoteka Doboj',
+            'pravni_naziv' => 'Apoteka Doboj d.o.o.',
+            'broj_licence' => 'LIC-123',
+            'ime' => 'Kontakt Osoba',
+            'email' => 'apoteka.public@gmail.com',
+            'account_email' => 'apoteka.login@gmail.com',
+            'telefon' => '+38763111222',
+            'adresa' => 'Kralja Petra 1',
+            'grad_id' => $city->id,
+            'website' => 'https://apoteka-doboj.test',
+            'password' => 'PharmacyCompat123!',
+            'password_confirmation' => 'PharmacyCompat123!',
+            'prihvatam_uslove' => true,
+        ]);
+
+        $response
+            ->assertStatus(201)
+            ->assertJsonStructure(['message', 'request_id']);
+
+        /** @var RegistrationRequest $registration */
+        $registration = RegistrationRequest::query()->latest('id')->firstOrFail();
+        $message = json_decode((string) $registration->message, true);
+
+        $this->assertSame('pharmacy', $registration->type);
+        $this->assertSame('Doboj', $registration->grad);
+        $this->assertSame($city->id, $message['grad_id'] ?? null);
+    }
+
     private function adminUser(): User
     {
         $admin = User::factory()->create([
@@ -87,6 +128,17 @@ class AdminPharmacyWorkingHoursTest extends TestCase
         $admin->assignRole('admin');
 
         return $admin;
+    }
+
+    private function createCity(string $name): Grad
+    {
+        return Grad::query()->create([
+            'naziv' => $name,
+            'slug' => \Illuminate\Support\Str::slug($name),
+            'opis' => "Osnovni opis za {$name}.",
+            'detaljni_opis' => "Detaljni opis za {$name} koji je dovoljan za testiranje izbora grada.",
+            'aktivan' => true,
+        ]);
     }
 
     /**
