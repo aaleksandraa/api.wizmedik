@@ -257,7 +257,7 @@ class SeoController extends Controller
 
     private function getDoctorsListingMeta(?string $citySlug = null, ?string $specialtySlug = null): array
     {
-        $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
+        $city = $citySlug ? $this->resolvePharmacyCityNameBySlug($citySlug) : null;
         $specialty = $specialtySlug ? $this->resolveSpecialtyNameBySlug($specialtySlug) : null;
 
         $query = DB::table('doktori')
@@ -410,6 +410,7 @@ class SeoController extends Controller
     {
         $city = $citySlug ? $this->resolveCityNameBySlug($citySlug) : null;
         $seoCity = $citySlug ? $this->decodeSegment($citySlug) : null;
+        $displayCity = $city ?: $seoCity;
         $dutyNow = $request?->boolean('dezurna_now') ?? false;
         $openNow = $request?->boolean('open_now') ?? false;
         $is24h = $request?->boolean('is_24h') ?? false;
@@ -423,6 +424,15 @@ class SeoController extends Controller
             && $search === ''
             && !$openNow
             && !$is24h
+            && !$pensionerDiscount
+            && !$hasActions
+            && !$hasGeo;
+
+        $is24hSeoPage = $citySlug !== null
+            && $is24h
+            && $search === ''
+            && !$openNow
+            && !$dutyNow
             && !$pensionerDiscount
             && !$hasActions
             && !$hasGeo;
@@ -445,7 +455,7 @@ class SeoController extends Controller
             && !$hasActions
             && !$hasGeo;
 
-        $robots = ($isDutySeoPage || $isGenericCityPage || $isBaseListingPage)
+        $robots = ($isDutySeoPage || $is24hSeoPage || $isGenericCityPage || $isBaseListingPage)
             ? 'index, follow'
             : 'noindex, follow';
 
@@ -467,7 +477,7 @@ class SeoController extends Controller
         }
         $count = (clone $query)->count();
 
-        $titleLocationPart = $seoCity ? " - {$seoCity}" : '';
+        $titleLocationPart = $displayCity ? " - {$displayCity}" : '';
         $listingImage = (clone $query)
             ->whereNotNull('apoteke_poslovnice.profilna_slika_url')
             ->where('apoteke_poslovnice.profilna_slika_url', '!=', '')
@@ -476,7 +486,7 @@ class SeoController extends Controller
         $image = $this->resolveImageCandidates([$listingImage]);
 
         if ($isDutySeoPage) {
-            $dutySeoCity = $seoCity ?? $city;
+            $dutySeoCity = $displayCity;
             $momentUtc = now('Europe/Sarajevo')->setTimezone('UTC');
             $dutyCount = DB::table('apoteke_dezurstva')
                 ->join('apoteke_poslovnice', 'apoteke_poslovnice.id', '=', 'apoteke_dezurstva.poslovnica_id')
@@ -501,12 +511,12 @@ class SeoController extends Controller
                 ->distinct('apoteke_poslovnice.id')
                 ->count('apoteke_poslovnice.id');
 
-            $title = $dutySeoCity ? "Dezurna apoteka - {$dutySeoCity} | wizMedik" : 'Dezurne apoteke | wizMedik';
+            $title = $dutySeoCity ? "Dežurna apoteka - {$dutySeoCity} | wizMedik" : 'Dežurne apoteke | wizMedik';
             $description = $dutySeoCity
                 ? ($dutyCount > 0
-                    ? "Pronadjite {$dutyCount}+ dezurnih apoteka za {$dutySeoCity}. Dostupni su kontakt, lokacija, status dezurstva i radno vrijeme."
-                    : "Provjerite koje apoteke su trenutno dezurne za {$dutySeoCity}. Dostupni su kontakt, lokacija, status dezurstva i radno vrijeme na jednom mjestu.")
-                : 'Pronadjite apoteke koje su trenutno dezurne, sa kontakt informacijama i lokacijom.';
+                    ? "Pronađite {$dutyCount}+ dežurnih apoteka za {$dutySeoCity}. Dostupni su kontakt, lokacija, status dežurstva i radno vrijeme."
+                    : "Provjerite koje apoteke su trenutno dežurne za {$dutySeoCity}. Dostupni su kontakt, lokacija, status dežurstva i radno vrijeme na jednom mjestu.")
+                : 'Pronađite apoteke koje su trenutno dežurne, sa kontakt informacijama i lokacijom.';
             $url = $this->appendQueryParameters(
                 $this->buildUrl("apoteke/{$citySlug}"),
                 [
@@ -522,10 +532,37 @@ class SeoController extends Controller
             ];
         }
 
+        if ($is24hSeoPage) {
+            $twentyFourHourCity = $displayCity;
+            $twentyFourHourCount = (clone $query)
+                ->where('apoteke_poslovnice.is_24h', true)
+                ->count();
+
+            $title = $twentyFourHourCity ? "Apoteka 24h - {$twentyFourHourCity} | wizMedik" : 'Apoteke 24h | wizMedik';
+            $description = $twentyFourHourCity
+                ? ($twentyFourHourCount > 0
+                    ? "Pronađite {$twentyFourHourCount}+ apoteka koje rade 24h za {$twentyFourHourCity}. Dostupni su kontakt, lokacija i radno vrijeme na jednom mjestu."
+                    : "Provjerite koje apoteke rade 24h za {$twentyFourHourCity}. Dostupni su kontakt, lokacija i radno vrijeme na jednom mjestu.")
+                : 'Pronađite apoteke koje rade 24h, sa kontakt informacijama i lokacijom.';
+            $url = $this->appendQueryParameters(
+                $this->buildUrl("apoteke/{$citySlug}"),
+                [
+                    'grad' => $citySlug,
+                    'is_24h' => '1',
+                ]
+            );
+            $schema = $this->buildCollectionSchema($title, $description, $url, $twentyFourHourCount);
+
+            return [
+                'title' => "<title>{$title}</title>",
+                'meta' => $this->buildMetaTags($title, $description, $image, $url, 'website', $schema, $robots),
+            ];
+        }
+
         $title = "Apoteke{$titleLocationPart} | wizMedik";
-        $description = $seoCity
-            ? "Pronadjite dezurne i otvorene apoteke za {$seoCity}. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom."
-            : "Pronadjite dezurne i otvorene apoteke u Bosni i Hercegovini. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom.";
+        $description = $displayCity
+            ? "Pronađite dežurne, otvorene i 24h apoteke za {$displayCity}. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom."
+            : "Pronađite dežurne i otvorene apoteke u Bosni i Hercegovini. Dostupno {$count}+ poslovnica sa kontaktima, lokacijom i radnim vremenom.";
         $path = $citySlug ? "apoteke/{$citySlug}" : 'apoteke';
         $url = $this->buildUrl($path);
         $schema = $this->buildCollectionSchema($title, $description, $url, $count);
@@ -1836,6 +1873,37 @@ HTML;
 
         if ($city && !empty($city->naziv)) {
             return $city->naziv;
+        }
+
+        return $this->decodeSegment($slug);
+    }
+
+    private function resolvePharmacyCityNameBySlug(string $slug): string
+    {
+        $city = DB::table('gradovi')
+            ->where('slug', $slug)
+            ->value('naziv');
+
+        if (is_string($city) && trim($city) !== '') {
+            return $city;
+        }
+
+        $pharmacyCity = DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->leftJoin('gradovi', 'gradovi.id', '=', 'apoteke_poslovnice.grad_id')
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->selectRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) as city_name")
+            ->get()
+            ->pluck('city_name')
+            ->first(fn ($cityName) => is_string($cityName) && Str::slug($cityName) === $slug);
+
+        if (is_string($pharmacyCity) && trim($pharmacyCity) !== '') {
+            return $pharmacyCity;
         }
 
         return $this->decodeSegment($slug);

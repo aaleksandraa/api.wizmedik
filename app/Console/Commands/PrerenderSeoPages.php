@@ -92,10 +92,10 @@ class PrerenderSeoPages extends Command
         $errors = 0;
 
         foreach ($paths as $path) {
-            $display = $path === '' ? '/' : '/' . $path;
+            $display = $this->displayPrerenderTarget($path);
 
             try {
-                $request = Request::create($display, 'GET');
+                $request = $this->createPrerenderRequest($path);
                 $response = $seoController->index($request);
                 $status = $response->getStatusCode();
 
@@ -127,6 +127,7 @@ class PrerenderSeoPages extends Command
         }
 
         $this->syncPrimaryBuildArtifactsToMirrorOutputs($primaryOutputDir, $outputDirs);
+        $this->writePrerenderManifest($outputDirs, $paths);
 
         $this->newLine();
         $this->info("Rendered: {$rendered}");
@@ -240,6 +241,7 @@ class PrerenderSeoPages extends Command
                 }
 
                 $parsedPath = parse_url($loc, PHP_URL_PATH);
+                $parsedQuery = parse_url($loc, PHP_URL_QUERY);
                 if (!is_string($parsedPath)) {
                     continue;
                 }
@@ -249,7 +251,10 @@ class PrerenderSeoPages extends Command
                     continue;
                 }
 
-                $paths[] = $normalized;
+                $paths[] = $this->buildPrerenderTarget(
+                    $normalized,
+                    $this->normalizeSeoQueryForPath($normalized, is_string($parsedQuery) ? $parsedQuery : '')
+                );
             }
         }
 
@@ -264,13 +269,15 @@ class PrerenderSeoPages extends Command
 
     private function targetFilePath(string $outputDir, string $path): string
     {
-        if ($path === '') {
+        $relativeOutputPath = $this->relativeOutputPathForTarget($path);
+
+        if ($relativeOutputPath === '') {
             return $outputDir . DIRECTORY_SEPARATOR . 'index.html';
         }
 
         return $outputDir
             . DIRECTORY_SEPARATOR
-            . str_replace('/', DIRECTORY_SEPARATOR, $path)
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativeOutputPath)
             . DIRECTORY_SEPARATOR
             . 'index.html';
     }
@@ -281,7 +288,10 @@ class PrerenderSeoPages extends Command
      */
     private function deleteStalePrerenderedPaths(array $outputDirs, array $paths): void
     {
-        $currentPaths = array_values(array_filter($paths, fn (string $path) => $path !== ''));
+        $currentPaths = array_values(array_filter(
+            array_map(fn (string $path) => $this->relativeOutputPathForTarget($path), $paths),
+            fn (string $path) => $path !== ''
+        ));
         $currentPathMap = array_fill_keys($currentPaths, true);
 
         foreach ($outputDirs as $outputDir) {
@@ -498,6 +508,28 @@ class PrerenderSeoPages extends Command
     }
 
     /**
+     * @param array<int, string> $outputDirs
+     * @param array<int, string> $paths
+     */
+    private function writePrerenderManifest(array $outputDirs, array $paths): void
+    {
+        $manifestJson = json_encode(array_values(array_unique($paths)), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if (!is_string($manifestJson)) {
+            throw new \RuntimeException('Failed to encode prerender manifest.');
+        }
+
+        foreach ($outputDirs as $outputDir) {
+            $manifestPath = $outputDir . DIRECTORY_SEPARATOR . '.seo-prerendered-paths.json';
+            $bytes = @file_put_contents($manifestPath, $manifestJson . PHP_EOL);
+
+            if ($bytes === false) {
+                throw new \RuntimeException("Failed to write prerender manifest: {$manifestPath}");
+            }
+        }
+    }
+
+    /**
      * @return array<int, string>
      */
     private function additionalStaticPaths(): array
@@ -563,17 +595,165 @@ class PrerenderSeoPages extends Command
                 continue;
             }
 
-            if (Str::startsWith($value, ['http://', 'https://'])) {
-                $parsedPath = parse_url($value, PHP_URL_PATH);
-                if (is_string($parsedPath)) {
-                    $value = $parsedPath;
-                }
-            }
-
-            $value = trim($value, '/');
-            $normalized[] = $value;
+            $normalized[] = $this->normalizePrerenderTarget($value);
         }
 
-        return array_values(array_unique($normalized));
+        return array_values(array_unique(array_filter($normalized, fn (string $value) => $value !== '')));
+    }
+
+    private function createPrerenderRequest(string $target): Request
+    {
+        [$path, $query] = $this->splitPrerenderTarget($target);
+
+        $requestPath = $path === '' ? '/' : '/' . $path;
+
+        return Request::create($requestPath, 'GET', $query);
+    }
+
+    private function displayPrerenderTarget(string $target): string
+    {
+        if ($target === '') {
+            return '/';
+        }
+
+        return '/' . ltrim($target, '/');
+    }
+
+    private function normalizePrerenderTarget(string $value): string
+    {
+        $rawValue = $value;
+        $rawQuery = '';
+
+        if (Str::startsWith($value, ['http://', 'https://'])) {
+            $parsedPath = parse_url($value, PHP_URL_PATH);
+            $parsedQuery = parse_url($value, PHP_URL_QUERY);
+
+            $rawValue = is_string($parsedPath) ? $parsedPath : '';
+            $rawQuery = is_string($parsedQuery) ? $parsedQuery : '';
+        } else {
+            [$rawValue, $rawQuery] = array_pad(explode('?', $value, 2), 2, '');
+        }
+
+        $normalizedPath = trim($rawValue, '/');
+        if ($normalizedPath === '') {
+            return '';
+        }
+
+        return $this->buildPrerenderTarget(
+            $normalizedPath,
+            $this->normalizeSeoQueryForPath($normalizedPath, $rawQuery)
+        );
+    }
+
+    /**
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private function splitPrerenderTarget(string $target): array
+    {
+        if ($target === '') {
+            return ['', []];
+        }
+
+        [$path, $queryString] = array_pad(explode('?', $target, 2), 2, '');
+        $normalizedPath = trim($path, '/');
+
+        $query = [];
+        if ($queryString !== '') {
+            parse_str($queryString, $query);
+        }
+
+        return [$normalizedPath, is_array($query) ? $query : []];
+    }
+
+    private function buildPrerenderTarget(string $path, array $query): string
+    {
+        $normalizedPath = trim($path, '/');
+        if ($normalizedPath === '') {
+            return '';
+        }
+
+        if ($query === []) {
+            return $normalizedPath;
+        }
+
+        return $normalizedPath . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    private function relativeOutputPathForTarget(string $target): string
+    {
+        [$path, $query] = $this->splitPrerenderTarget($target);
+
+        if ($path === '') {
+            return '';
+        }
+
+        if (preg_match('/^apoteke\/([^\/]+)$/', $path, $matches)) {
+            $citySlug = $matches[1];
+
+            if ($this->queryFlagIsEnabled($query['dezurna_now'] ?? null) && !$this->queryFlagIsEnabled($query['is_24h'] ?? null)) {
+                return "__query/apoteke/{$citySlug}/dezurna_now";
+            }
+
+            if ($this->queryFlagIsEnabled($query['is_24h'] ?? null) && !$this->queryFlagIsEnabled($query['dezurna_now'] ?? null)) {
+                return "__query/apoteke/{$citySlug}/is_24h";
+            }
+        }
+
+        return $path;
+    }
+
+    private function normalizeSeoQueryForPath(string $path, string $queryString): array
+    {
+        if (!preg_match('/^apoteke\/([^\/]+)$/', $path, $matches)) {
+            return [];
+        }
+
+        $query = [];
+        if ($queryString !== '') {
+            parse_str($queryString, $query);
+        }
+
+        if (!is_array($query)) {
+            return [];
+        }
+
+        return $this->normalizePharmacySeoQuery($query, $matches[1]);
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array<string, string>
+     */
+    private function normalizePharmacySeoQuery(array $query, string $citySlug): array
+    {
+        $hasDuty = $this->queryFlagIsEnabled($query['dezurna_now'] ?? null);
+        $has24Hour = $this->queryFlagIsEnabled($query['is_24h'] ?? null);
+
+        if ($hasDuty === $has24Hour) {
+            return [];
+        }
+
+        $normalized = [
+            'grad' => $citySlug,
+        ];
+
+        if ($hasDuty) {
+            $normalized['dezurna_now'] = '1';
+        }
+
+        if ($has24Hour) {
+            $normalized['is_24h'] = '1';
+        }
+
+        return $normalized;
+    }
+
+    private function queryFlagIsEnabled(mixed $value): bool
+    {
+        return in_array(
+            mb_strtolower(trim((string) $value)),
+            ['1', 'true', 'yes', 'on'],
+            true
+        );
     }
 }

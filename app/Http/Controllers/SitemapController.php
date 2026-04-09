@@ -444,6 +444,17 @@ class SitemapController extends Controller
         }
 
         $citySlugMap = $this->citySlugMap();
+        $pharmacy24HourCityMap = $this->pharmacy24HourCityRows()
+            ->mapWithKeys(function ($row) use ($citySlugMap) {
+                $citySlug = $this->resolveCitySlug((string) $row->grad, $citySlugMap);
+
+                if ($citySlug === '') {
+                    return [];
+                }
+
+                return [$citySlug => $row->updated_at];
+            })
+            ->all();
         $added = [];
 
         $cityVerticalRoutes = [
@@ -490,6 +501,22 @@ class SitemapController extends Controller
                         'daily',
                         '0.82'
                     );
+
+                    if (isset($pharmacy24HourCityMap[$citySlug])) {
+                        $this->appendUrl(
+                            $xml,
+                            $this->appendQueryParameters(
+                                $baseUrl . '/' . $path,
+                                [
+                                    'grad' => $citySlug,
+                                    'is_24h' => '1',
+                                ]
+                            ),
+                            $pharmacy24HourCityMap[$citySlug],
+                            'weekly',
+                            '0.81'
+                        );
+                    }
                 }
             }
         }
@@ -918,6 +945,25 @@ class SitemapController extends Controller
             ->where('apoteke_poslovnice.is_verified', true)
             ->where('apoteke_firme.is_active', true)
             ->where('apoteke_firme.status', 'verified')
+            ->whereRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) IS NOT NULL")
+            ->whereRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) != ''")
+            ->selectRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) as grad, MAX(apoteke_poslovnice.updated_at) AS updated_at")
+            ->groupByRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv)")
+            ->get();
+    }
+
+    private function pharmacy24HourCityRows(): Collection
+    {
+        return DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->leftJoin('gradovi', 'gradovi.id', '=', 'apoteke_poslovnice.grad_id')
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->where('apoteke_poslovnice.is_24h', true)
             ->whereRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) IS NOT NULL")
             ->whereRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) != ''")
             ->selectRaw("COALESCE(NULLIF(apoteke_poslovnice.grad_naziv, ''), gradovi.naziv) as grad, MAX(apoteke_poslovnice.updated_at) AS updated_at")

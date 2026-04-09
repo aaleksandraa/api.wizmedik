@@ -58,6 +58,15 @@ class PharmacyListingSeoTest extends TestCase
         $response->assertRedirect('https://wizmedik.com/apoteke/modrica?grad=modrica&dezurna_now=1');
     }
 
+    public function test_pharmacy_listing_query_redirects_to_city_path_with_24h_filter(): void
+    {
+        $this->seedDutyPharmacyInModrica();
+
+        $response = $this->get('/apoteke?grad=modrica&is_24h=1');
+
+        $response->assertRedirect('https://wizmedik.com/apoteke/modrica?grad=modrica&is_24h=1');
+    }
+
     public function test_pharmacy_city_path_redirects_when_duty_query_city_does_not_match_path(): void
     {
         $this->seedDutyPharmacyInModrica();
@@ -81,11 +90,34 @@ class PharmacyListingSeoTest extends TestCase
         $content = (string) $response->getContent();
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertStringContainsString('<title>Dezurna apoteka - Modrica | wizMedik</title>', $content);
-        $this->assertStringContainsString('Pronadjite 1+ dezurnih apoteka za Modrica.', $content);
+        $this->assertStringContainsString('<title>Dežurna apoteka - Modriča | wizMedik</title>', $content);
+        $this->assertStringContainsString('Pronađite 1+ dežurnih apoteka za Modriča.', $content);
         $this->assertStringContainsString('<meta name="robots" content="index, follow">', $content);
         $this->assertStringContainsString(
             '<link rel="canonical" href="https://wizmedik.com/apoteke/modrica?grad=modrica&amp;dezurna_now=1">',
+            $content
+        );
+    }
+
+    public function test_24h_pharmacy_city_page_has_specific_seo_title_description_and_canonical(): void
+    {
+        $this->seedDutyPharmacyInModrica();
+
+        $response = app(SeoController::class)->index(
+            Request::create('/apoteke/modrica', 'GET', [
+                'grad' => 'modrica',
+                'is_24h' => '1',
+            ])
+        );
+
+        $content = (string) $response->getContent();
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('<title>Apoteka 24h - Modriča | wizMedik</title>', $content);
+        $this->assertStringContainsString('Pronađite 1+ apoteka koje rade 24h za Modriča.', $content);
+        $this->assertStringContainsString('<meta name="robots" content="index, follow">', $content);
+        $this->assertStringContainsString(
+            '<link rel="canonical" href="https://wizmedik.com/apoteke/modrica?grad=modrica&amp;is_24h=1">',
             $content
         );
     }
@@ -100,6 +132,10 @@ class PharmacyListingSeoTest extends TestCase
         $response->assertSee('<loc>https://wizmedik.com/apoteke/modrica</loc>', false);
         $response->assertSee(
             '<loc>https://wizmedik.com/apoteke/modrica?grad=modrica&amp;dezurna_now=1</loc>',
+            false
+        );
+        $response->assertSee(
+            '<loc>https://wizmedik.com/apoteke/modrica?grad=modrica&amp;is_24h=1</loc>',
             false
         );
     }
@@ -132,6 +168,7 @@ class PharmacyListingSeoTest extends TestCase
             'grad_naziv' => "Modri\u{010D}a",
             'adresa' => 'Cara Lazara 10',
             'telefon' => '+38761123111',
+            'is_24h' => true,
             'is_active' => true,
             'is_verified' => true,
         ]);

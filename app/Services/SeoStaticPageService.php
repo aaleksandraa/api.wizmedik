@@ -10,7 +10,7 @@ class SeoStaticPageService
 {
     public function prerenderPath(string $path): bool
     {
-        $normalizedPath = trim($path, '/');
+        $normalizedPath = $this->normalizePrerenderTarget($path);
         $outputDirs = $this->outputDirectories();
         if (empty($outputDirs)) {
             Log::warning('SEO prerender skipped: no output directories configured', [
@@ -25,8 +25,8 @@ class SeoStaticPageService
                 config(['app.seo_index_template_path' => $templatePath]);
             }
 
-            $requestPath = $normalizedPath === '' ? '/' : '/' . $normalizedPath;
-            $request = Request::create($requestPath, 'GET');
+            [$requestPath, $query] = $this->requestComponentsForTarget($normalizedPath);
+            $request = Request::create($requestPath, 'GET', $query);
             $response = app(SeoController::class)->index($request);
             $statusCode = (int) $response->getStatusCode();
 
@@ -101,7 +101,7 @@ class SeoStaticPageService
 
     public function deletePath(string $path): void
     {
-        $normalizedPath = trim($path, '/');
+        $normalizedPath = $this->normalizePrerenderTarget($path);
         if ($normalizedPath === '') {
             return;
         }
@@ -163,15 +163,137 @@ class SeoStaticPageService
 
     private function targetFilePath(string $outputDir, string $path): string
     {
-        if ($path === '') {
+        $relativeOutputPath = $this->relativeOutputPathForTarget($path);
+
+        if ($relativeOutputPath === '') {
             return $outputDir . DIRECTORY_SEPARATOR . 'index.html';
         }
 
         return $outputDir
             . DIRECTORY_SEPARATOR
-            . str_replace('/', DIRECTORY_SEPARATOR, $path)
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativeOutputPath)
             . DIRECTORY_SEPARATOR
             . 'index.html';
+    }
+
+    private function normalizePrerenderTarget(string $target): string
+    {
+        $value = trim($target);
+        if ($value === '') {
+            return '';
+        }
+
+        [$path, $query] = $this->splitTarget($value);
+
+        if (preg_match('/^apoteke\/([^\/]+)$/', $path, $matches)) {
+            $query = $this->normalizePharmacySeoQuery($query, $matches[1]);
+        } else {
+            $query = [];
+        }
+
+        return $this->buildTarget($path, $query);
+    }
+
+    /**
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private function requestComponentsForTarget(string $target): array
+    {
+        [$path, $query] = $this->splitTarget($target);
+
+        return [$path === '' ? '/' : '/' . $path, $query];
+    }
+
+    private function relativeOutputPathForTarget(string $target): string
+    {
+        [$path, $query] = $this->splitTarget($target);
+
+        if ($path === '') {
+            return '';
+        }
+
+        if (preg_match('/^apoteke\/([^\/]+)$/', $path, $matches)) {
+            $citySlug = $matches[1];
+
+            if ($this->queryFlagIsEnabled($query['dezurna_now'] ?? null) && !$this->queryFlagIsEnabled($query['is_24h'] ?? null)) {
+                return "__query/apoteke/{$citySlug}/dezurna_now";
+            }
+
+            if ($this->queryFlagIsEnabled($query['is_24h'] ?? null) && !$this->queryFlagIsEnabled($query['dezurna_now'] ?? null)) {
+                return "__query/apoteke/{$citySlug}/is_24h";
+            }
+        }
+
+        return $path;
+    }
+
+    /**
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private function splitTarget(string $target): array
+    {
+        [$path, $queryString] = array_pad(explode('?', trim($target, '/'), 2), 2, '');
+
+        $query = [];
+        if ($queryString !== '') {
+            parse_str($queryString, $query);
+        }
+
+        return [trim($path, '/'), is_array($query) ? $query : []];
+    }
+
+    /**
+     * @param array<string, string> $query
+     */
+    private function buildTarget(string $path, array $query): string
+    {
+        $normalizedPath = trim($path, '/');
+        if ($normalizedPath === '') {
+            return '';
+        }
+
+        if ($query === []) {
+            return $normalizedPath;
+        }
+
+        return $normalizedPath . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array<string, string>
+     */
+    private function normalizePharmacySeoQuery(array $query, string $citySlug): array
+    {
+        $hasDuty = $this->queryFlagIsEnabled($query['dezurna_now'] ?? null);
+        $has24Hour = $this->queryFlagIsEnabled($query['is_24h'] ?? null);
+
+        if ($hasDuty === $has24Hour) {
+            return [];
+        }
+
+        $normalized = [
+            'grad' => $citySlug,
+        ];
+
+        if ($hasDuty) {
+            $normalized['dezurna_now'] = '1';
+        }
+
+        if ($has24Hour) {
+            $normalized['is_24h'] = '1';
+        }
+
+        return $normalized;
+    }
+
+    private function queryFlagIsEnabled(mixed $value): bool
+    {
+        return in_array(
+            mb_strtolower(trim((string) $value)),
+            ['1', 'true', 'yes', 'on'],
+            true
+        );
     }
 
     private function removeEmptyDirectoriesUpward(string $directory, string $stopAt): void
