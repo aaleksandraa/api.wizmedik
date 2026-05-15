@@ -40,7 +40,10 @@ class ApprovedPharmacyImportService
         $admin = $this->resolveAdmin($adminEmail);
         $defaultCity = $this->stringValue($payload['city'] ?? null);
         $defaultCitySlug = $this->stringValue($payload['city_slug'] ?? null);
-        $importBatch = $this->stringValue($payload['import_batch'] ?? null) ?? $fallbackBatch ?? 'approved-pharmacies';
+        $importBatch = $this->limitedString(
+            $this->stringValue($payload['import_batch'] ?? null) ?? $fallbackBatch ?? 'approved-pharmacies',
+            120
+        ) ?? 'approved-pharmacies';
         $counts = [
             'inserted' => 0,
             'skipped' => 0,
@@ -135,18 +138,18 @@ class ApprovedPharmacyImportService
 
         return [
             'google_place_id' => $this->stringValue($record['google_place_id'] ?? $record['place_id'] ?? null),
-            'brand' => $this->stringValue($record['brand'] ?? $record['naziv_brenda'] ?? null) ?? $name,
-            'name' => $name,
-            'address' => $address,
+            'brand' => $this->limitedString($this->stringValue($record['brand'] ?? $record['naziv_brenda'] ?? null) ?? $name, 255),
+            'name' => $this->limitedString($name, 255),
+            'address' => $this->limitedString($address, 255),
             'city' => $city,
             'city_name' => $city->naziv,
-            'postal_code' => $this->stringValue($record['postal_code'] ?? $record['postanski_broj'] ?? null),
-            'phone' => $phone,
+            'postal_code' => $this->limitedString($this->stringValue($record['postal_code'] ?? $record['postanski_broj'] ?? null), 20),
+            'phone' => $this->limitedString($phone, 64),
             'email' => $this->normalizeEmail($record['email'] ?? null),
-            'website' => $this->stringValue($record['website'] ?? null),
-            'international_phone' => $this->stringValue($record['international_phone'] ?? null),
+            'website' => $this->urlValue($record['website'] ?? null, 255),
+            'international_phone' => $this->limitedString($this->stringValue($record['international_phone'] ?? null), 64),
             'short_description' => $this->stringValue($record['short_description'] ?? $record['kratki_opis'] ?? null),
-            'google_maps_link' => $this->stringValue($record['google_maps_link'] ?? $record['google_maps_url'] ?? null),
+            'google_maps_link' => $this->urlValue($record['google_maps_link'] ?? $record['google_maps_url'] ?? null, 500),
             'latitude' => $this->numericValue($record['latitude'] ?? $record['lat'] ?? null),
             'longitude' => $this->numericValue($record['longitude'] ?? $record['lng'] ?? null),
             'is_24h' => filter_var($record['is_24h'] ?? false, FILTER_VALIDATE_BOOLEAN),
@@ -384,6 +387,25 @@ class ApprovedPharmacyImportService
         $normalized = trim((string) $value);
 
         return $normalized === '' ? null : $normalized;
+    }
+
+    private function limitedString(?string $value, int $maxLength): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return mb_strlen($value) > $maxLength ? mb_substr($value, 0, $maxLength) : $value;
+    }
+
+    private function urlValue(mixed $value, int $maxLength): ?string
+    {
+        $url = $this->stringValue($value);
+        if ($url === null || mb_strlen($url) > $maxLength) {
+            return null;
+        }
+
+        return $url;
     }
 
     private function numericValue(mixed $value): ?float

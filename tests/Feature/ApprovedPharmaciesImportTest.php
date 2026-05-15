@@ -152,6 +152,32 @@ class ApprovedPharmaciesImportTest extends TestCase
         $this->assertSame(1, ApotekaPoslovnica::query()->count());
     }
 
+    public function test_approved_seeder_handles_long_import_batch_names(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin-import-long-batch@example.com',
+            'role' => 'admin',
+        ]);
+
+        $path = storage_path('framework/testing-pharmacy-import/long-batch-approved.json');
+        if (!is_dir(dirname($path))) {
+            mkdir(dirname($path), 0777, true);
+        }
+
+        $payload = $this->approvedPayload();
+        $payload['import_batch'] = str_repeat('very-long-import-batch-', 20);
+        file_put_contents($path, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        $this->setEnv('PHARMACY_IMPORT_ADMIN_EMAIL', $admin->email);
+        $this->setEnv('PHARMACY_IMPORT_FILE', $path);
+
+        $this->artisan('db:seed', ['--class' => 'ApprovedPharmaciesImportSeeder'])->assertSuccessful();
+
+        $branch = ApotekaPoslovnica::firstOrFail();
+        $this->assertLessThanOrEqual(120, mb_strlen((string) $branch->import_batch));
+        $this->assertSame(1, ApotekaPoslovnica::query()->count());
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>
