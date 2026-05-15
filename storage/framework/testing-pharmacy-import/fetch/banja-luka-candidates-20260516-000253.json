@@ -1,0 +1,36 @@
+{
+    "city": "Banja Luka",
+    "city_slug": "banja-luka",
+    "generated_at": "2026-05-15T22:02:53+00:00",
+    "queries": [
+        "apoteka Banja Luka",
+        "apoteke Banja Luka",
+        "ljekarna Banja Luka",
+        "pharmacy Banja Luka Bosnia and Herzegovina",
+        "apoteka 78000",
+        "pharmacy 78000 Bosnia and Herzegovina"
+    ],
+    "records": [
+        {
+            "google_place_id": "place-banja-luka-1",
+            "name": "Apoteka Test Banja Luka",
+            "brand": "Apoteka Test Banja Luka",
+            "address": "Gospodska 1, Banja Luka",
+            "city": "Banja Luka",
+            "city_slug": "banja-luka",
+            "phone": null,
+            "international_phone": null,
+            "website": null,
+            "google_maps_link": "https://maps.google.com/?cid=1",
+            "latitude": 44.7722,
+            "longitude": 17.191,
+            "types": [
+                "pharmacy",
+                "health"
+            ],
+            "opening_hours_json": null,
+            "working_hours": [],
+            "is_24h": false
+        }
+    ]
+}

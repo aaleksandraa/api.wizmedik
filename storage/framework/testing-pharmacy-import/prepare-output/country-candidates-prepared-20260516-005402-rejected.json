@@ -1,0 +1,26 @@
+{
+    "source_file": "C:\\Users\\aleks\\Desktop\\Projekti\\wizMedik\\zdravlje-bih-pomoc\\backend\\storage\\framework/testing-pharmacy-import/prepare\\country-candidates.json",
+    "generated_at": "2026-05-15T22:54:02+00:00",
+    "import_batch": "country-candidates-prepared-20260516-005402-approved",
+    "stats": {
+        "input_records": 2,
+        "approved": 1,
+        "rejected": 1,
+        "address_details_calls": 0,
+        "strict": true
+    },
+    "records": [
+        {
+            "google_place_id": "place-serbia",
+            "name": "Apoteka Srbija",
+            "city": "Banja Luka",
+            "city_slug": "banja-luka",
+            "address": "Kolarova 21",
+            "address_raw": "Kolarova 21, Bački Petrovac 21470, Serbia",
+            "formatted_address": "Kolarova 21, Bački Petrovac 21470, Serbia",
+            "postal_code": null,
+            "address_quality": "rejected",
+            "reject_reason": "non_ba_country"
+        }
+    ]
+}

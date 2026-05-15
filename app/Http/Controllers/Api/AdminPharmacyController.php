@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApotekaDezurstvo;
 use App\Models\ApotekaFirma;
 use App\Models\ApotekaPoslovnica;
 use App\Models\ApotekaRadnoVrijeme;
 use App\Models\Grad;
 use App\Services\AdminProfileAccessService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class AdminPharmacyController extends Controller
 {
@@ -108,6 +111,7 @@ class AdminPharmacyController extends Controller
             'ima_dostavu' => 'nullable|boolean',
             'ima_parking' => 'nullable|boolean',
             'pristup_invalidima' => 'nullable|boolean',
+            'is_dezurna' => 'nullable|boolean',
             'is_24h' => 'nullable|boolean',
             'radno_vrijeme' => 'nullable|array|min:1|max:7',
             'radno_vrijeme.*.day_of_week' => 'required_with:radno_vrijeme|integer|between:1,7|distinct',
@@ -177,6 +181,7 @@ class AdminPharmacyController extends Controller
             } else {
                 $this->createDefaultWorkingHours($branch->id);
             }
+            $this->syncCurrentDuty($branch, (bool) ($validated['is_dezurna'] ?? false));
 
             $this->profileAccessService->sync($firm, $validated, [
                 'relation_column' => 'owner_user_id',
@@ -238,6 +243,7 @@ class AdminPharmacyController extends Controller
             'ima_dostavu' => 'nullable|boolean',
             'ima_parking' => 'nullable|boolean',
             'pristup_invalidima' => 'nullable|boolean',
+            'is_dezurna' => 'sometimes|boolean',
             'is_24h' => 'sometimes|boolean',
             'is_verified' => 'sometimes|boolean',
             'radno_vrijeme' => 'nullable|array|min:1|max:7',
@@ -349,6 +355,10 @@ class AdminPharmacyController extends Controller
 
                 if ($request->has('radno_vrijeme') && !empty($validated['radno_vrijeme'])) {
                     $this->syncWorkingHours($branch->fresh(), $validated['radno_vrijeme']);
+                }
+
+                if ($request->has('is_dezurna')) {
+                    $this->syncCurrentDuty($branch->fresh(), (bool) $validated['is_dezurna']);
                 }
             }
         });
@@ -594,6 +604,63 @@ class AdminPharmacyController extends Controller
         }
     }
 
+    private function syncCurrentDuty(ApotekaPoslovnica $branch, bool $isDuty): void
+    {
+        $nowUtc = CarbonImmutable::now('Europe/Sarajevo')->setTimezone('UTC');
+
+        if (!$isDuty) {
+            ApotekaDezurstvo::query()
+                ->where('poslovnica_id', $branch->id)
+                ->where('status', 'confirmed')
+                ->where('starts_at', '<=', $nowUtc)
+                ->where('ends_at', '>', $nowUtc)
+                ->update([
+                    'status' => 'cancelled',
+                    'note' => 'Dezurstvo iskljuceno iz admin panela.',
+                ]);
+
+            return;
+        }
+
+        if (!$branch->grad_id) {
+            throw ValidationException::withMessages([
+                'is_dezurna' => 'Da biste oznacili apoteku kao dezurnu, poslovnica mora imati odabran grad iz liste.',
+            ]);
+        }
+
+        $endsAtUtc = CarbonImmutable::now('Europe/Sarajevo')
+            ->addDay()
+            ->setTimezone('UTC');
+
+        $activeDuty = ApotekaDezurstvo::query()
+            ->where('poslovnica_id', $branch->id)
+            ->where('status', 'confirmed')
+            ->where('starts_at', '<=', $nowUtc)
+            ->where('ends_at', '>', $nowUtc)
+            ->orderByDesc('ends_at')
+            ->first();
+
+        if ($activeDuty) {
+            if (CarbonImmutable::parse($activeDuty->ends_at)->lt($endsAtUtc)) {
+                $activeDuty->update(['ends_at' => $endsAtUtc]);
+            }
+
+            return;
+        }
+
+        ApotekaDezurstvo::create([
+            'poslovnica_id' => $branch->id,
+            'grad_id' => $branch->grad_id,
+            'starts_at' => $nowUtc->subMinutes(5),
+            'ends_at' => $endsAtUtc,
+            'tip' => 'continuous',
+            'is_nonstop' => false,
+            'source' => 'manual',
+            'status' => 'confirmed',
+            'note' => 'Dezurstvo ukljuceno iz admin panela.',
+        ]);
+    }
+
     private function normalizeEmail(?string $email): ?string
     {
         if ($email === null) {
@@ -609,6 +676,7 @@ class AdminPharmacyController extends Controller
         /** @var EloquentCollection<int, ApotekaPoslovnica> $branches */
         $branches = $firm->relationLoaded('poslovnice') ? $firm->poslovnice : collect();
         $mainBranch = $branches->first();
+        $transformedBranches = $branches->map(fn (ApotekaPoslovnica $branch) => $this->transformBranch($branch))->values();
 
         return [
             'id' => $firm->id,
@@ -630,8 +698,28 @@ class AdminPharmacyController extends Controller
             'updated_at' => $firm->updated_at,
             'poslovnice_count' => $firm->poslovnice_count ?? $branches->count(),
             'owner' => $firm->owner,
-            'glavna_poslovnica' => $mainBranch,
-            'poslovnice' => $branches->values(),
+            'glavna_poslovnica' => $mainBranch ? $this->transformBranch($mainBranch) : null,
+            'poslovnice' => $transformedBranches,
         ];
+    }
+
+    private function transformBranch(ApotekaPoslovnica $branch): array
+    {
+        $payload = $branch->toArray();
+        $payload['is_dezurna'] = $this->branchHasActiveDuty($branch);
+
+        return $payload;
+    }
+
+    private function branchHasActiveDuty(ApotekaPoslovnica $branch): bool
+    {
+        $nowUtc = CarbonImmutable::now('Europe/Sarajevo')->setTimezone('UTC');
+
+        return ApotekaDezurstvo::query()
+            ->where('poslovnica_id', $branch->id)
+            ->where('status', 'confirmed')
+            ->where('starts_at', '<=', $nowUtc)
+            ->where('ends_at', '>', $nowUtc)
+            ->exists();
     }
 }

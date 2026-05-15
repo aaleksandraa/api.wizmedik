@@ -1,0 +1,3 @@
+status,reject_reason,google_place_id,name,city,city_slug,address,postal_code,address_quality,address_raw,phone,website
+approved,,place-laktasi,"Apoteka Laktaši",Laktaši,laktasi,"Nemanjina 6",78250,fallback,"Nemanjina 6, Laktaši 78250, Bosnia and Herzegovina",,
+rejected,non_ba_country,place-serbia,"Apoteka Srbija",Petrovac,petrovac,"Kolarova 21",,rejected,"Kolarova 21, Bački Petrovac 21470, Serbia",,

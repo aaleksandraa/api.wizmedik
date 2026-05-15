@@ -1,0 +1,34 @@
+{
+    "city": "Banja Luka",
+    "city_slug": "banja-luka",
+    "import_batch": "banja-luka-approved-test",
+    "records": [
+        {
+            "google_place_id": "place-banja-luka-approved-1",
+            "name": "Apoteka Test Banja Luka",
+            "brand": "Apoteka Test Banja Luka",
+            "address": "Gospodska 1",
+            "phone": "+387 51 123 456",
+            "international_phone": "+387 51 123 456",
+            "website": "https:\/\/apoteka-test.example",
+            "google_maps_link": "https:\/\/maps.google.com\/?cid=1",
+            "latitude": 44.7722,
+            "longitude": 17.191,
+            "is_24h": false,
+            "working_hours": [
+                {
+                    "day_of_week": 1,
+                    "open_time": "08:00",
+                    "close_time": "20:00",
+                    "closed": false
+                },
+                {
+                    "day_of_week": 2,
+                    "open_time": "08:00",
+                    "close_time": "20:00",
+                    "closed": false
+                }
+            ]
+        }
+    ]
+}

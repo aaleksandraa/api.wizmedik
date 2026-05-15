@@ -41,10 +41,18 @@ class ApotekaPoslovnica extends Model
         'verified_by',
         'ocjena',
         'broj_ocjena',
+        'google_place_id',
+        'international_phone',
+        'opening_hours_json',
+        'source',
+        'imported_at',
+        'imported_by',
+        'import_batch',
     ];
 
     protected $casts = [
         'galerija_slike' => 'array',
+        'opening_hours_json' => 'array',
         'ima_dostavu' => 'boolean',
         'ima_parking' => 'boolean',
         'pristup_invalidima' => 'boolean',
@@ -52,6 +60,7 @@ class ApotekaPoslovnica extends Model
         'is_active' => 'boolean',
         'is_verified' => 'boolean',
         'verified_at' => 'datetime',
+        'imported_at' => 'datetime',
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
         'ocjena' => 'decimal:2',
@@ -143,4 +152,3 @@ class ApotekaPoslovnica extends Model
             });
     }
 }
-

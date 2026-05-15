@@ -1,0 +1,25 @@
+{
+    "source_file": "C:\\Users\\aleks\\Desktop\\Projekti\\wizMedik\\zdravlje-bih-pomoc\\backend\\storage\\framework/testing-pharmacy-import/prepare\\country-candidates.json",
+    "generated_at": "2026-05-15T22:54:02+00:00",
+    "import_batch": "country-candidates-prepared-20260516-005402-approved",
+    "stats": {
+        "input_records": 2,
+        "approved": 1,
+        "rejected": 1,
+        "address_details_calls": 0,
+        "strict": true
+    },
+    "records": [
+        {
+            "google_place_id": "place-laktasi",
+            "name": "Apoteka Laktaši",
+            "city": "Laktaši",
+            "city_slug": "laktasi",
+            "address": "Nemanjina 6",
+            "address_raw": "Nemanjina 6, Laktaši 78250, Bosnia and Herzegovina",
+            "formatted_address": "Nemanjina 6, Laktaši 78250, Bosnia and Herzegovina",
+            "postal_code": "78250",
+            "address_quality": "fallback"
+        }
+    ]
+}

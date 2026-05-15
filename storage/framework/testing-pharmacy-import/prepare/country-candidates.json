@@ -1,0 +1,18 @@
+{
+    "records": [
+        {
+            "google_place_id": "place-laktasi",
+            "name": "Apoteka Laktaši",
+            "city": "Banja Luka",
+            "city_slug": "banja-luka",
+            "address": "Nemanjina 6, Laktaši 78250, Bosnia and Herzegovina"
+        },
+        {
+            "google_place_id": "place-serbia",
+            "name": "Apoteka Srbija",
+            "city": "Banja Luka",
+            "city_slug": "banja-luka",
+            "address": "Kolarova 21, Bački Petrovac 21470, Serbia"
+        }
+    ]
+}

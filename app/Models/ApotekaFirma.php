@@ -29,11 +29,16 @@ class ApotekaFirma extends Model
         'is_active',
         'verified_at',
         'verified_by',
+        'source',
+        'imported_at',
+        'imported_by',
+        'import_batch',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'verified_at' => 'datetime',
+        'imported_at' => 'datetime',
     ];
 
     public function owner(): BelongsTo
@@ -71,4 +76,3 @@ class ApotekaFirma extends Model
         return $query->where('is_active', true)->where('status', 'verified');
     }
 }
-

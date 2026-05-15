@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Grad;
+use App\Models\ApotekaDezurstvo;
 use App\Models\ApotekaPoslovnica;
 use App\Models\RegistrationRequest;
 use App\Models\User;
@@ -84,6 +85,72 @@ class AdminPharmacyWorkingHoursTest extends TestCase
 
         $this->assertSame('09:00', substr((string) $branch->radnoVrijeme->firstWhere('day_of_week', 1)?->open_time, 0, 5));
         $this->assertSame('18:30', substr((string) $branch->radnoVrijeme->firstWhere('day_of_week', 1)?->close_time, 0, 5));
+    }
+
+    public function test_admin_can_mark_pharmacy_as_currently_on_duty(): void
+    {
+        Sanctum::actingAs($this->adminUser());
+        $city = $this->createCity('Tuzla');
+
+        $response = $this->postJson('/api/admin/pharmacies', [
+            'naziv_brenda' => 'Dezurna Apoteka Tuzla',
+            'telefon' => '+38763333444',
+            'grad_id' => $city->id,
+            'adresa' => 'Dezurna 1',
+            'status' => 'verified',
+            'is_active' => true,
+            'is_dezurna' => true,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.glavna_poslovnica.is_dezurna', true);
+
+        $branch = ApotekaPoslovnica::firstOrFail();
+
+        $this->assertDatabaseHas('apoteke_dezurstva', [
+            'poslovnica_id' => $branch->id,
+            'grad_id' => $city->id,
+            'status' => 'confirmed',
+            'source' => 'manual',
+        ]);
+
+        $publicResponse = $this->getJson('/api/apoteke?grad=tuzla&dezurna_now=1');
+
+        $publicResponse
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.is_dezurna', true);
+    }
+
+    public function test_admin_can_remove_current_duty_status(): void
+    {
+        Sanctum::actingAs($this->adminUser());
+        $city = $this->createCity('Mostar');
+
+        $createResponse = $this->postJson('/api/admin/pharmacies', [
+            'naziv_brenda' => 'Apoteka Mostar',
+            'telefon' => '+38763333555',
+            'grad_id' => $city->id,
+            'adresa' => 'Mostarska 1',
+            'status' => 'verified',
+            'is_active' => true,
+            'is_dezurna' => true,
+        ]);
+        $createResponse->assertCreated();
+
+        $firmId = (int) $createResponse->json('data.id');
+
+        $updateResponse = $this->putJson("/api/admin/pharmacies/{$firmId}", [
+            'is_dezurna' => false,
+        ]);
+
+        $updateResponse
+            ->assertOk()
+            ->assertJsonPath('data.glavna_poslovnica.is_dezurna', false);
+
+        $this->assertSame(0, ApotekaDezurstvo::query()->where('status', 'confirmed')->count());
+        $this->assertSame(1, ApotekaDezurstvo::query()->where('status', 'cancelled')->count());
     }
 
     public function test_self_service_pharmacy_registration_stores_selected_city_id_for_later_approval(): void

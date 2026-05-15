@@ -1,0 +1,28 @@
+{
+    "city": "Banja Luka",
+    "city_slug": "banja-luka",
+    "import_batch": "banja-luka-approved",
+    "records": [
+        {
+            "google_place_id": "example-google-place-id",
+            "name": "Apoteka Primjer Banja Luka",
+            "brand": "Apoteka Primjer Banja Luka",
+            "address": "Gospodska 1",
+            "phone": "+387 51 000 000",
+            "international_phone": "+387 51 000 000",
+            "website": "https://example.ba",
+            "google_maps_link": "https://www.google.com/maps/place/example",
+            "latitude": 44.7722,
+            "longitude": 17.1910,
+            "is_24h": false,
+            "working_hours": [
+                {
+                    "day_of_week": 1,
+                    "open_time": "08:00",
+                    "close_time": "20:00",
+                    "closed": false
+                }
+            ]
+        }
+    ]
+}
