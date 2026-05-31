@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -683,6 +684,10 @@ class AdminPharmacyController extends Controller
     {
         $oldSlug = trim((string) $oldSlug);
         if ($oldSlug === '') {
+            return;
+        }
+
+        if (!Schema::hasTable('apoteka_slug_redirects')) {
             return;
         }
 

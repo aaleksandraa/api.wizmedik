@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ApotekaController extends Controller
 {
@@ -85,16 +86,18 @@ class ApotekaController extends Controller
             ->first();
 
         if (!$branch) {
-            $redirectBranch = ApotekaPoslovnica::query()
-                ->publicVisible()
-                ->whereHas('slugRedirects', fn ($query) => $query->where('old_slug', $slug))
-                ->first();
+            if (Schema::hasTable('apoteka_slug_redirects')) {
+                $redirectBranch = ApotekaPoslovnica::query()
+                    ->publicVisible()
+                    ->whereHas('slugRedirects', fn ($query) => $query->where('old_slug', $slug))
+                    ->first();
 
-            if ($redirectBranch) {
-                return response()->json([
-                    'redirect_to' => '/apoteka/' . $redirectBranch->slug,
-                    'slug' => $redirectBranch->slug,
-                ]);
+                if ($redirectBranch) {
+                    return response()->json([
+                        'redirect_to' => '/apoteka/' . $redirectBranch->slug,
+                        'slug' => $redirectBranch->slug,
+                    ]);
+                }
             }
 
             return response()->json([

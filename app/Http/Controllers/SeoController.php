@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class SeoController extends Controller
@@ -2073,6 +2074,10 @@ HTML;
     {
         $path = trim($request->path(), '/');
         if (!preg_match('/^apoteka\/([^\/]+)$/', $path, $matches)) {
+            return null;
+        }
+
+        if (!Schema::hasTable('apoteka_slug_redirects')) {
             return null;
         }
 

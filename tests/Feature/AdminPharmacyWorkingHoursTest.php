@@ -10,6 +10,7 @@ use App\Models\RegistrationRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -124,6 +125,33 @@ class AdminPharmacyWorkingHoursTest extends TestCase
 
         $this->get('/apoteka/pharmacy-alipasin-most')
             ->assertRedirect('https://wizmedik.com/apoteka/apoteka-alipasin-most');
+    }
+
+    public function test_admin_rename_still_works_if_slug_redirect_table_is_not_deployed_yet(): void
+    {
+        Sanctum::actingAs($this->adminUser());
+        $city = $this->createCity('Sarajevo');
+
+        $createResponse = $this->postJson('/api/admin/pharmacies', [
+            'naziv_brenda' => 'Pharmacy Alipasin Most',
+            'telefon' => '+38761111111',
+            'grad_id' => $city->id,
+            'adresa' => 'Bulevar 1',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+        $createResponse->assertCreated();
+        $firmId = (int) $createResponse->json('data.id');
+
+        Schema::dropIfExists('apoteka_slug_redirects');
+
+        $this->putJson("/api/admin/pharmacies/{$firmId}", [
+            'naziv_brenda' => 'Apoteka Alipasin Most',
+            'telefon' => '+38761111111',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.glavna_poslovnica.naziv', 'Apoteka Alipasin Most')
+            ->assertJsonPath('data.glavna_poslovnica.slug', 'apoteka-alipasin-most');
     }
 
     public function test_admin_can_update_existing_pharmacy_working_hours(): void
