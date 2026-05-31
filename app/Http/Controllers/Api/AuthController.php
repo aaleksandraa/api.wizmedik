@@ -70,6 +70,7 @@ class AuthController extends Controller
                 'telefon' => $user->telefon,
                 'grad' => $user->grad,
                 'role' => $this->resolvePrimaryRole($user),
+                'analytics_id' => $this->analyticsId($user),
             ],
             'token' => $token,
         ], 201);
@@ -174,6 +175,7 @@ class AuthController extends Controller
                 'telefon' => $user->telefon,
                 'grad' => $user->grad,
                 'role' => $this->resolvePrimaryRole($user),
+                'analytics_id' => $this->analyticsId($user),
             ],
             'token' => $token,
         ]);
@@ -210,6 +212,7 @@ class AuthController extends Controller
                 'adresa' => $user->adresa,
                 'grad' => $user->grad,
                 'role' => $this->resolvePrimaryRole($user),
+                'analytics_id' => $this->analyticsId($user),
                 'permissions' => $user->getAllPermissions()->pluck('name'),
             ],
         ]);
@@ -249,6 +252,13 @@ class AuthController extends Controller
         }
 
         return $mappedRole;
+    }
+
+    private function analyticsId(User $user): string
+    {
+        $secret = (string) config('app.key');
+
+        return hash_hmac('sha256', 'wizmedik:user:' . $user->id, $secret);
     }
 
     /**
