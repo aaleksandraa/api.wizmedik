@@ -142,6 +142,11 @@ class ApotekaPoslovnica extends Model
         return $this->hasMany(ApotekaPosebnaPonuda::class, 'poslovnica_id');
     }
 
+    public function slugRedirects(): HasMany
+    {
+        return $this->hasMany(ApotekaSlugRedirect::class, 'poslovnica_id');
+    }
+
     public function scopePublicVisible($query)
     {
         return $query

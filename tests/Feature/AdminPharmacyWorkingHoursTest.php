@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Grad;
 use App\Models\ApotekaDezurstvo;
 use App\Models\ApotekaPoslovnica;
+use App\Models\ApotekaSlugRedirect;
 use App\Models\RegistrationRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,6 +52,78 @@ class AdminPharmacyWorkingHoursTest extends TestCase
         $this->assertSame('Sarajevo', $branch->grad_naziv);
         $this->assertSame('07:30', substr((string) $branch->radnoVrijeme->firstWhere('day_of_week', 1)?->open_time, 0, 5));
         $this->assertSame('21:00', substr((string) $branch->radnoVrijeme->firstWhere('day_of_week', 1)?->close_time, 0, 5));
+    }
+
+    public function test_admin_created_pharmacy_uses_brand_name_as_public_branch_name(): void
+    {
+        Sanctum::actingAs($this->adminUser());
+        $city = $this->createCity('Sarajevo');
+
+        $response = $this->postJson('/api/admin/pharmacies', [
+            'naziv_brenda' => 'Apoteka Alipasin Most',
+            'telefon' => '+38761111111',
+            'grad_id' => $city->id,
+            'adresa' => 'Bulevar 1',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+
+        $response
+            ->assertCreated()
+            ->assertJsonPath('data.glavna_poslovnica.naziv', 'Apoteka Alipasin Most')
+            ->assertJsonPath('data.glavna_poslovnica.slug', 'apoteka-alipasin-most');
+
+        $this->assertDatabaseHas('apoteke_poslovnice', [
+            'naziv' => 'Apoteka Alipasin Most',
+            'slug' => 'apoteka-alipasin-most',
+        ]);
+    }
+
+    public function test_admin_rename_updates_public_pharmacy_name_slug_and_redirects_old_slug(): void
+    {
+        Sanctum::actingAs($this->adminUser());
+        config(['app.frontend_url' => 'https://wizmedik.com']);
+        $city = $this->createCity('Sarajevo');
+
+        $createResponse = $this->postJson('/api/admin/pharmacies', [
+            'naziv_brenda' => 'Pharmacy Alipasin Most',
+            'telefon' => '+38761111111',
+            'grad_id' => $city->id,
+            'adresa' => 'Bulevar 1',
+            'status' => 'verified',
+            'is_active' => true,
+        ]);
+        $createResponse->assertCreated();
+        $firmId = (int) $createResponse->json('data.id');
+
+        $updateResponse = $this->putJson("/api/admin/pharmacies/{$firmId}", [
+            'naziv_brenda' => 'Apoteka Alipasin Most',
+            'telefon' => '+38761111111',
+        ]);
+
+        $updateResponse
+            ->assertOk()
+            ->assertJsonPath('data.naziv_brenda', 'Apoteka Alipasin Most')
+            ->assertJsonPath('data.glavna_poslovnica.naziv', 'Apoteka Alipasin Most')
+            ->assertJsonPath('data.glavna_poslovnica.slug', 'apoteka-alipasin-most');
+
+        $branch = ApotekaPoslovnica::firstOrFail();
+        $this->assertSame('Apoteka Alipasin Most', $branch->naziv);
+        $this->assertSame('apoteka-alipasin-most', $branch->slug);
+        $this->assertSame(1, ApotekaSlugRedirect::query()->where('old_slug', 'pharmacy-alipasin-most')->count());
+
+        $this->getJson('/api/apoteke/apoteka-alipasin-most')
+            ->assertOk()
+            ->assertJsonPath('naziv', 'Apoteka Alipasin Most')
+            ->assertJsonPath('slug', 'apoteka-alipasin-most');
+
+        $this->getJson('/api/apoteke/pharmacy-alipasin-most')
+            ->assertOk()
+            ->assertJsonPath('redirect_to', '/apoteka/apoteka-alipasin-most')
+            ->assertJsonPath('slug', 'apoteka-alipasin-most');
+
+        $this->get('/apoteka/pharmacy-alipasin-most')
+            ->assertRedirect('https://wizmedik.com/apoteka/apoteka-alipasin-most');
     }
 
     public function test_admin_can_update_existing_pharmacy_working_hours(): void

@@ -7,6 +7,7 @@ use App\Models\ApotekaDezurstvo;
 use App\Models\ApotekaFirma;
 use App\Models\ApotekaPoslovnica;
 use App\Models\ApotekaRadnoVrijeme;
+use App\Models\ApotekaSlugRedirect;
 use App\Models\Grad;
 use App\Services\AdminProfileAccessService;
 use Carbon\CarbonImmutable;
@@ -145,10 +146,7 @@ class AdminPharmacyController extends Controller
             ]);
 
             $city = $this->resolveCityFromPayload($validated);
-            $branchName = trim((string) ($validated['branch_naziv'] ?? ''));
-            if ($branchName === '') {
-                $branchName = $validated['naziv_brenda'] . ' - Glavna poslovnica';
-            }
+            $branchName = trim((string) $validated['naziv_brenda']);
 
             $branch = ApotekaPoslovnica::create([
                 'firma_id' => $firm->id,
@@ -292,11 +290,21 @@ class AdminPharmacyController extends Controller
             $branch = $firm->poslovnice->first();
             if ($branch) {
                 $branchData = [];
-                if ($request->has('branch_naziv')) {
-                    $branchName = trim((string) ($validated['branch_naziv'] ?? ''));
-                    if ($branchName !== '') {
+                if ($request->has('naziv_brenda') || $request->has('branch_naziv')) {
+                    $branchName = $request->has('naziv_brenda')
+                        ? trim((string) $validated['naziv_brenda'])
+                        : trim((string) ($validated['branch_naziv'] ?? ''));
+
+                    if ($branchName !== '' && $branchName !== $branch->naziv) {
+                        $oldSlug = $branch->slug;
+                        $newSlug = ApotekaPoslovnica::generateUniqueSlug($branchName, $branch->id);
+
                         $branchData['naziv'] = $branchName;
-                        $branchData['slug'] = ApotekaPoslovnica::generateUniqueSlug($branchName, $branch->id);
+                        $branchData['slug'] = $newSlug;
+
+                        if ($oldSlug !== $newSlug) {
+                            $this->rememberOldBranchSlug($branch, $oldSlug);
+                        }
                     }
                 }
                 if ($request->has('grad') || $request->has('grad_id')) {
@@ -669,6 +677,19 @@ class AdminPharmacyController extends Controller
 
         $normalized = mb_strtolower(trim($email));
         return $normalized === '' ? null : $normalized;
+    }
+
+    private function rememberOldBranchSlug(ApotekaPoslovnica $branch, ?string $oldSlug): void
+    {
+        $oldSlug = trim((string) $oldSlug);
+        if ($oldSlug === '') {
+            return;
+        }
+
+        ApotekaSlugRedirect::updateOrCreate(
+            ['old_slug' => $oldSlug],
+            ['poslovnica_id' => $branch->id]
+        );
     }
 
     private function transformFirm(ApotekaFirma $firm): array

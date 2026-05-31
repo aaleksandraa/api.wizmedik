@@ -20,6 +20,11 @@ class SeoController extends Controller
             return redirect($normalizedUrl, 301);
         }
 
+        $pharmacyProfileRedirect = $this->normalizePharmacyProfileRedirect($request);
+        if ($pharmacyProfileRedirect) {
+            return redirect($pharmacyProfileRedirect, 301);
+        }
+
         $path = trim($request->path(), '/');
         $metaTags = $this->getMetaTagsForPath($path, $request);
         $statusCode = $metaTags['status'] ?? 200;
@@ -2062,6 +2067,48 @@ HTML;
         }
 
         return null;
+    }
+
+    private function normalizePharmacyProfileRedirect(Request $request): ?string
+    {
+        $path = trim($request->path(), '/');
+        if (!preg_match('/^apoteka\/([^\/]+)$/', $path, $matches)) {
+            return null;
+        }
+
+        $slug = $matches[1];
+        $currentExists = DB::table('apoteke_poslovnice')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->where('apoteke_poslovnice.slug', $slug)
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->exists();
+
+        if ($currentExists) {
+            return null;
+        }
+
+        $currentSlug = DB::table('apoteka_slug_redirects')
+            ->join('apoteke_poslovnice', 'apoteke_poslovnice.id', '=', 'apoteka_slug_redirects.poslovnica_id')
+            ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
+            ->where('apoteka_slug_redirects.old_slug', $slug)
+            ->whereNull('apoteke_poslovnice.deleted_at')
+            ->whereNull('apoteke_firme.deleted_at')
+            ->where('apoteke_poslovnice.is_active', true)
+            ->where('apoteke_poslovnice.is_verified', true)
+            ->where('apoteke_firme.is_active', true)
+            ->where('apoteke_firme.status', 'verified')
+            ->value('apoteke_poslovnice.slug');
+
+        if (!is_string($currentSlug) || trim($currentSlug) === '' || $currentSlug === $slug) {
+            return null;
+        }
+
+        return $this->buildUrl("apoteka/{$currentSlug}");
     }
 
     private function queryValueToSlug(string $value): string

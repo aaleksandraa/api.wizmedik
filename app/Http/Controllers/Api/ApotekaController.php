@@ -85,6 +85,18 @@ class ApotekaController extends Controller
             ->first();
 
         if (!$branch) {
+            $redirectBranch = ApotekaPoslovnica::query()
+                ->publicVisible()
+                ->whereHas('slugRedirects', fn ($query) => $query->where('old_slug', $slug))
+                ->first();
+
+            if ($redirectBranch) {
+                return response()->json([
+                    'redirect_to' => '/apoteka/' . $redirectBranch->slug,
+                    'slug' => $redirectBranch->slug,
+                ]);
+            }
+
             return response()->json([
                 'message' => 'Apoteka nije pronadjena.',
             ], 404);
@@ -247,7 +259,7 @@ class ApotekaController extends Controller
 
         $lat = $request->input('lat');
         $lng = $request->input('lng');
-        $radiusKm = (float) ($request->input('radius_km', 10));
+        $radiusKm = $request->filled('radius_km') ? (float) $request->input('radius_km') : null;
 
         if ($lat !== null && $lng !== null) {
             $distanceSql = '(6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))';
@@ -255,8 +267,11 @@ class ApotekaController extends Controller
                 ->select('apoteke_poslovnice.*')
                 ->selectRaw($distanceSql . ' as distance_km', [$lat, $lng, $lat])
                 ->whereNotNull('latitude')
-                ->whereNotNull('longitude')
-                ->whereRaw($distanceSql . ' <= ?', [$lat, $lng, $lat, $radiusKm]);
+                ->whereNotNull('longitude');
+
+            if ($radiusKm !== null) {
+                $query->whereRaw($distanceSql . ' <= ?', [$lat, $lng, $lat, $radiusKm]);
+            }
         }
 
         $now = CarbonImmutable::now('Europe/Sarajevo');
