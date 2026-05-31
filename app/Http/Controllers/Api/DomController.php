@@ -8,6 +8,7 @@ use App\Http\Requests\DomRecenzijaRequest;
 use App\Models\Dom;
 use App\Models\DomUpit;
 use App\Models\DomRecenzija;
+use App\Models\ProfileSlugRedirect;
 use App\Models\TipDoma;
 use App\Models\NivoNjege;
 use App\Models\ProgramNjege;
@@ -209,6 +210,13 @@ class DomController extends Controller
             ->first();
 
             if (!$dom) {
+                if ($currentSlug = ProfileSlugRedirect::resolveCurrentSlug('dom', $slug, 'domovi_njega')) {
+                    return response()->json([
+                        'redirect_to' => "/dom-njega/{$currentSlug}",
+                        'slug' => $currentSlug,
+                    ]);
+                }
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Dom nije pronađen'

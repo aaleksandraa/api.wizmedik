@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Doktor;
 use App\Models\Klinika;
 use App\Models\KlinikaDoktorZahtjev;
+use App\Models\ProfileSlugRedirect;
 use App\Services\NotifikacijaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -87,6 +88,13 @@ class DoctorController extends Controller
             ->first();
 
         if (!$doktor) {
+            if ($currentSlug = ProfileSlugRedirect::resolveCurrentSlug('doktor', $slug, 'doktori')) {
+                return response()->json([
+                    'redirect_to' => "/doktor/{$currentSlug}",
+                    'slug' => $currentSlug,
+                ]);
+            }
+
             return response()->json([
                 'message' => 'Doktor nije pronađen',
                 'slug' => $slug

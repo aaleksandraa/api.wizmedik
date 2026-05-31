@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use App\Traits\InvalidatesCityCache;
+use App\Models\ProfileSlugRedirect;
 
 class Banja extends Model
 {
@@ -79,7 +80,7 @@ class Banja extends Model
         // Auto-generate slug
         static::creating(function ($banja) {
             if (empty($banja->slug)) {
-                $banja->slug = Str::slug($banja->naziv);
+                $banja->slug = static::generateUniqueSlug($banja->naziv);
             }
         });
 
@@ -90,12 +91,20 @@ class Banja extends Model
 
         // Audit log on update
         static::updating(function ($banja) {
+            $oldSlug = $banja->getOriginal('slug');
+
+            if ($banja->isDirty('naziv')) {
+                $banja->slug = static::generateUniqueSlug($banja->naziv, $banja->id);
+            }
+
             $original = $banja->getOriginal();
             $changes = $banja->getDirty();
 
             if (!empty($changes)) {
                 $banja->logAudit('update', $original, $changes);
             }
+
+            ProfileSlugRedirect::remember('banja', (int) $banja->id, $oldSlug, $banja->slug);
         });
 
         // Audit log on delete
@@ -325,5 +334,34 @@ class Banja extends Model
     public function getGlavneIndikacije()
     {
         return $this->indikacije()->wherePivot('prioritet', 1)->get();
+    }
+
+    private static function generateUniqueSlug(string $name, ?int $ignoreId = null): string
+    {
+        $baseSlug = Str::slug($name);
+        if ($baseSlug === '') {
+            $baseSlug = 'banja';
+        }
+
+        $slug = $baseSlug;
+        $suffix = 1;
+
+        while (static::slugExists($slug, $ignoreId)) {
+            $slug = "{$baseSlug}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
+    private static function slugExists(string $slug, ?int $ignoreId = null): bool
+    {
+        $query = static::query()->where('slug', $slug);
+
+        if ($ignoreId !== null) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        return $query->exists();
     }
 }

@@ -26,6 +26,11 @@ class SeoController extends Controller
             return redirect($pharmacyProfileRedirect, 301);
         }
 
+        $profileSlugRedirect = $this->normalizeProfileSlugRedirect($request);
+        if ($profileSlugRedirect) {
+            return redirect($profileSlugRedirect, 301);
+        }
+
         $path = trim($request->path(), '/');
         $metaTags = $this->getMetaTagsForPath($path, $request);
         $statusCode = $metaTags['status'] ?? 200;
@@ -2114,6 +2119,52 @@ HTML;
         }
 
         return $this->buildUrl("apoteka/{$currentSlug}");
+    }
+
+    private function normalizeProfileSlugRedirect(Request $request): ?string
+    {
+        $path = trim($request->path(), '/');
+
+        $routes = [
+            'doktor' => ['type' => 'doktor', 'table' => 'doktori', 'target' => 'doktor'],
+            'klinika' => ['type' => 'klinika', 'table' => 'klinike', 'target' => 'klinika'],
+            'banja' => ['type' => 'banja', 'table' => 'banje', 'target' => 'banja'],
+            'dom-njega' => ['type' => 'dom', 'table' => 'domovi_njega', 'target' => 'dom-njega'],
+            'lijekovi' => ['type' => 'lijek', 'table' => 'lijekovi', 'target' => 'lijekovi'],
+        ];
+
+        foreach ($routes as $prefix => $route) {
+            if (!preg_match('#^' . preg_quote($prefix, '#') . '/([^/]+)$#', $path, $matches)) {
+                continue;
+            }
+
+            if (!Schema::hasTable('profile_slug_redirects')) {
+                return null;
+            }
+
+            $slug = $matches[1];
+            $currentExists = DB::table($route['table'])
+                ->where('slug', $slug)
+                ->exists();
+
+            if ($currentExists) {
+                return null;
+            }
+
+            $currentSlug = DB::table('profile_slug_redirects')
+                ->join($route['table'], "{$route['table']}.id", '=', 'profile_slug_redirects.entity_id')
+                ->where('profile_slug_redirects.entity_type', $route['type'])
+                ->where('profile_slug_redirects.old_slug', $slug)
+                ->value("{$route['table']}.slug");
+
+            if (!is_string($currentSlug) || trim($currentSlug) === '' || $currentSlug === $slug) {
+                return null;
+            }
+
+            return $this->buildUrl("{$route['target']}/{$currentSlug}");
+        }
+
+        return null;
     }
 
     private function queryValueToSlug(string $value): string

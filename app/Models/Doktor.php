@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use App\Traits\InvalidatesCityCache;
+use App\Models\ProfileSlugRedirect;
 
 class Doktor extends Model
 {
@@ -321,8 +322,13 @@ class Doktor extends Model
         });
 
         static::updating(function ($doktor) {
+            $oldSlug = $doktor->getOriginal('slug');
+
             if ($doktor->isDirty(['ime', 'prezime'])) {
                 $baseSlug = Str::slug("{$doktor->ime}-{$doktor->prezime}");
+                if ($baseSlug === '') {
+                    $baseSlug = 'doktor';
+                }
 
                 // PostgreSQL compatible regex (using ~ operator)
                 $count = static::whereRaw("slug ~ ?", ["^{$baseSlug}(-[0-9]+)?$"])
@@ -331,6 +337,8 @@ class Doktor extends Model
 
                 $doktor->slug = $count > 0 ? "{$baseSlug}-{$count}" : $baseSlug;
             }
+
+            ProfileSlugRedirect::remember('doktor', (int) $doktor->id, $oldSlug, $doktor->slug);
         });
     }
 }

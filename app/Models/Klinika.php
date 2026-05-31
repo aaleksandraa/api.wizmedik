@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Traits\InvalidatesCityCache;
+use App\Models\ProfileSlugRedirect;
 
 class Klinika extends Model
 {
@@ -210,9 +211,13 @@ class Klinika extends Model
         });
 
         static::updating(function ($klinika) {
+            $oldSlug = $klinika->getOriginal('slug');
+
             if ($klinika->isDirty('naziv')) {
                 $klinika->slug = static::generateUniqueSlug($klinika->naziv, $klinika->id);
             }
+
+            ProfileSlugRedirect::remember('klinika', (int) $klinika->id, $oldSlug, $klinika->slug);
         });
     }
 

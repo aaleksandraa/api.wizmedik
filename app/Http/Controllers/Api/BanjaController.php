@@ -8,6 +8,7 @@ use App\Http\Requests\BanjaRecenzijaRequest;
 use App\Models\Banja;
 use App\Models\BanjaUpit;
 use App\Models\BanjaRecenzija;
+use App\Models\ProfileSlugRedirect;
 use App\Models\VrstaBanje;
 use App\Models\Indikacija;
 use App\Models\Terapija;
@@ -163,6 +164,13 @@ class BanjaController extends Controller
             ->first();
 
             if (!$banja) {
+                if ($currentSlug = ProfileSlugRedirect::resolveCurrentSlug('banja', $slug, 'banje')) {
+                    return response()->json([
+                        'redirect_to' => "/banja/{$currentSlug}",
+                        'slug' => $currentSlug,
+                    ]);
+                }
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Banja nije pronađena'

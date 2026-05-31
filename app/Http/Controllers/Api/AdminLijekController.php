@@ -88,6 +88,7 @@ class AdminLijekController extends Controller
             'opis' => 'nullable|string',
             'inn' => 'nullable|string|max:255',
             'jidl' => 'nullable|string|max:64',
+            'naziv' => 'nullable|string|max:255',
             'naziv_lijeka' => 'nullable|string|max:255',
             'proizvodjac' => 'nullable|string|max:255',
             'nosilac_dozvole' => 'nullable|string|max:255',

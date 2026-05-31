@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Lijek;
+use App\Models\ProfileSlugRedirect;
 use App\Support\LijekCacheVersion;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -149,6 +150,13 @@ class LijekController extends Controller
         });
 
         if (!$data) {
+            if ($currentSlug = ProfileSlugRedirect::resolveCurrentSlug('lijek', $slug, 'lijekovi')) {
+                return response()->json([
+                    'redirect_to' => "/lijekovi/{$currentSlug}",
+                    'slug' => $currentSlug,
+                ]);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Lijek nije pronadjen.',

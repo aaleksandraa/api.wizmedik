@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Lijek extends Model
 {
@@ -69,6 +70,27 @@ class Lijek extends Model
         'aktuelni_broj_indikacija' => 'integer',
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($lijek) {
+            if (empty($lijek->slug)) {
+                $lijek->slug = static::generateUniqueSlug($lijek->publicSlugName(), null);
+            }
+        });
+
+        static::updating(function ($lijek) {
+            $oldSlug = $lijek->getOriginal('slug');
+
+            if ($lijek->isDirty(['naziv', 'naziv_lijeka'])) {
+                $lijek->slug = static::generateUniqueSlug($lijek->publicSlugName(), $lijek->id);
+            }
+
+            ProfileSlugRedirect::remember('lijek', (int) $lijek->id, $oldSlug, $lijek->slug);
+        });
+    }
+
     public function fondZapisi(): HasMany
     {
         return $this->hasMany(LijekFondZapis::class, 'lijek_id');
@@ -121,5 +143,39 @@ class Lijek extends Model
     public function resolveListaPojasnjenje(): ?string
     {
         return $this->lista_rfzo_pojasnjenje ?: self::defaultListaPojasnjenje($this->aktuelna_lista_id);
+    }
+
+    private function publicSlugName(): string
+    {
+        return trim((string) ($this->naziv ?: $this->naziv_lijeka ?: $this->brend ?: ('lijek-' . ($this->lijek_id ?? ''))));
+    }
+
+    private static function generateUniqueSlug(string $name, ?int $ignoreId = null): string
+    {
+        $baseSlug = Str::slug($name);
+        if ($baseSlug === '') {
+            $baseSlug = 'lijek';
+        }
+
+        $slug = $baseSlug;
+        $suffix = 1;
+
+        while (static::slugExists($slug, $ignoreId)) {
+            $slug = "{$baseSlug}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
+    private static function slugExists(string $slug, ?int $ignoreId = null): bool
+    {
+        $query = static::query()->where('slug', $slug);
+
+        if ($ignoreId !== null) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        return $query->exists();
     }
 }

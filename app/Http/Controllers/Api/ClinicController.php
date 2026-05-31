@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Klinika;
+use App\Models\ProfileSlugRedirect;
 use App\Models\Specijalnost;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -132,6 +133,13 @@ class ClinicController extends Controller
             ->first();
 
         if (!$clinic) {
+            if ($currentSlug = ProfileSlugRedirect::resolveCurrentSlug('klinika', $slug, 'klinike')) {
+                return response()->json([
+                    'redirect_to' => "/klinika/{$currentSlug}",
+                    'slug' => $currentSlug,
+                ]);
+            }
+
             return response()->json([
                 'message' => 'Klinika nije pronaÄ‘ena',
                 'slug' => $slug,

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use App\Traits\InvalidatesCityCache;
+use App\Models\ProfileSlugRedirect;
 
 class Dom extends Model
 {
@@ -94,7 +95,7 @@ class Dom extends Model
         // Auto-generate slug
         static::creating(function ($dom) {
             if (empty($dom->slug)) {
-                $dom->slug = Str::slug($dom->naziv);
+                $dom->slug = static::generateUniqueSlug($dom->naziv);
             }
         });
 
@@ -105,12 +106,20 @@ class Dom extends Model
 
         // Audit log on update
         static::updating(function ($dom) {
+            $oldSlug = $dom->getOriginal('slug');
+
+            if ($dom->isDirty('naziv')) {
+                $dom->slug = static::generateUniqueSlug($dom->naziv, $dom->id);
+            }
+
             $original = $dom->getOriginal();
             $changes = $dom->getDirty();
 
             if (!empty($changes)) {
                 $dom->logAudit('update', $original, $changes);
             }
+
+            ProfileSlugRedirect::remember('dom', (int) $dom->id, $oldSlug, $dom->slug);
         });
 
         // Audit log on delete
@@ -350,5 +359,34 @@ class Dom extends Model
     public function getGlavneProgrameNjege()
     {
         return $this->programiNjege()->wherePivot('prioritet', 1)->get();
+    }
+
+    private static function generateUniqueSlug(string $name, ?int $ignoreId = null): string
+    {
+        $baseSlug = Str::slug($name);
+        if ($baseSlug === '') {
+            $baseSlug = 'dom-njega';
+        }
+
+        $slug = $baseSlug;
+        $suffix = 1;
+
+        while (static::slugExists($slug, $ignoreId)) {
+            $slug = "{$baseSlug}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
+    private static function slugExists(string $slug, ?int $ignoreId = null): bool
+    {
+        $query = static::query()->where('slug', $slug);
+
+        if ($ignoreId !== null) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        return $query->exists();
     }
 }
