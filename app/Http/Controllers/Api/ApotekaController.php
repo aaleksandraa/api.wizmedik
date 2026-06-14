@@ -40,6 +40,19 @@ class ApotekaController extends Controller
         ]);
 
         $items = $this->buildListingItems($request);
+        $dutyFallbackApplied = false;
+
+        if ($request->boolean('dezurna_now')) {
+            $dutyItems = $items->where('is_dezurna', true)->values();
+
+            if ($dutyItems->isNotEmpty()) {
+                $items = $dutyItems;
+            } else {
+                $items = $items->where('open_now', true)->values();
+                $dutyFallbackApplied = true;
+            }
+        }
+
         $sort = $request->string('sort')->toString() ?: 'open_first';
         $lat = $request->input('lat');
         $lng = $request->input('lng');
@@ -59,6 +72,9 @@ class ApotekaController extends Controller
             'last_page' => $lastPage,
             'total' => $total,
             'data' => $pageItems,
+            'filter_meta' => [
+                'duty_fallback_applied' => $dutyFallbackApplied,
+            ],
         ]);
     }
 
@@ -219,14 +235,23 @@ class ApotekaController extends Controller
 
     private function buildListingItems(Request $request): Collection
     {
+        $now = CarbonImmutable::now('Europe/Sarajevo');
+        $nowUtc = $now->setTimezone('UTC');
+
         $query = ApotekaPoslovnica::query()
             ->publicVisible()
             ->with([
                 'firma',
                 'grad',
                 'radnoVrijeme',
-                'radnoVrijemeIzuzeci',
-                'dezurstva',
+                'radnoVrijemeIzuzeci' => fn ($query) => $query->whereBetween('date', [
+                    $now->toDateString(),
+                    $now->addDays(7)->toDateString(),
+                ]),
+                'dezurstva' => fn ($query) => $query
+                    ->where('status', 'confirmed')
+                    ->where('starts_at', '<=', $nowUtc)
+                    ->where('ends_at', '>', $nowUtc),
                 'popusti',
                 'akcije',
                 'posebnePonude',
@@ -277,8 +302,6 @@ class ApotekaController extends Controller
             }
         }
 
-        $now = CarbonImmutable::now('Europe/Sarajevo');
-
         $items = $query->get()->map(function (ApotekaPoslovnica $branch) use ($now) {
             $status = $this->availabilityService->resolveStatus($branch, $now);
             $activeDiscounts = $this->activeDiscounts($branch, $now);
@@ -322,10 +345,6 @@ class ApotekaController extends Controller
 
         if ($request->boolean('open_now')) {
             $items = $items->where('open_now', true)->values();
-        }
-
-        if ($request->boolean('dezurna_now')) {
-            $items = $items->where('is_dezurna', true)->values();
         }
 
         if ($request->boolean('is_24h')) {

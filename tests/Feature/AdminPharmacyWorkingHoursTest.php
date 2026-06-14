@@ -8,6 +8,7 @@ use App\Models\ApotekaPoslovnica;
 use App\Models\ApotekaSlugRedirect;
 use App\Models\RegistrationRequest;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -221,7 +222,48 @@ class AdminPharmacyWorkingHoursTest extends TestCase
         $publicResponse
             ->assertOk()
             ->assertJsonPath('total', 1)
+            ->assertJsonPath('filter_meta.duty_fallback_applied', false)
             ->assertJsonPath('data.0.is_dezurna', true);
+    }
+
+    public function test_duty_filter_falls_back_to_pharmacies_open_now_when_no_duty_exists(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-06-15 12:00:00', 'Europe/Sarajevo'));
+
+        try {
+            Sanctum::actingAs($this->adminUser());
+            $city = $this->createCity('Trebinje');
+
+            $this->postJson('/api/admin/pharmacies', [
+                'naziv_brenda' => 'Otvorena Apoteka Trebinje',
+                'telefon' => '+38765111001',
+                'grad_id' => $city->id,
+                'adresa' => 'Centar 1',
+                'status' => 'verified',
+                'is_active' => true,
+                'radno_vrijeme' => $this->workingHoursPayload('08:00', '20:00'),
+            ])->assertCreated();
+
+            $this->postJson('/api/admin/pharmacies', [
+                'naziv_brenda' => 'Zatvorena Apoteka Trebinje',
+                'telefon' => '+38765111002',
+                'grad_id' => $city->id,
+                'adresa' => 'Centar 2',
+                'status' => 'verified',
+                'is_active' => true,
+                'radno_vrijeme' => $this->workingHoursPayload('13:00', '20:00'),
+            ])->assertCreated();
+
+            $this->getJson('/api/apoteke?grad=trebinje&dezurna_now=1')
+                ->assertOk()
+                ->assertJsonPath('total', 1)
+                ->assertJsonPath('filter_meta.duty_fallback_applied', true)
+                ->assertJsonPath('data.0.naziv', 'Otvorena Apoteka Trebinje')
+                ->assertJsonPath('data.0.open_now', true)
+                ->assertJsonPath('data.0.is_dezurna', false);
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
     }
 
     public function test_admin_can_remove_current_duty_status(): void
