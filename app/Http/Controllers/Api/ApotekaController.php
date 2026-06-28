@@ -11,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -235,6 +236,55 @@ class ApotekaController extends Controller
 
     private function buildListingItems(Request $request): Collection
     {
+        $items = $this->resolveComputedItems($request);
+
+        if ($request->boolean('open_now')) {
+            $items = $items->where('open_now', true)->values();
+        }
+
+        if ($request->boolean('is_24h')) {
+            $items = $items->where('is_24h', true)->values();
+        }
+
+        if ($request->boolean('pensioner_discount')) {
+            $items = $items->where('has_pensioner_discount', true)->values();
+        }
+
+        if ($request->boolean('has_actions')) {
+            $items = $items->where('active_actions_count', '>', 0)->values();
+        }
+
+        return $items->values();
+    }
+
+    /**
+     * Resolve the fully-computed branch listing (status, discounts, distance).
+     *
+     * The availability computation (status/open_now/duty/discount windows) is
+     * the expensive part and cannot be expressed safely in SQL. For non-geo
+     * listings we cache the computed set for a short TTL so the many concurrent
+     * visitors loading the same city listing reuse one computation. Geo queries
+     * are per-user-location and are computed directly to avoid cache explosion.
+     */
+    private function resolveComputedItems(Request $request): Collection
+    {
+        $lat = $request->input('lat');
+        $lng = $request->input('lng');
+
+        if ($lat !== null && $lng !== null) {
+            return $this->computeBranchItems($request);
+        }
+
+        $cacheKey = 'apoteke:listing:' . md5((string) json_encode([
+            'grad' => (string) $request->input('grad', ''),
+            'search' => trim((string) $request->input('search', '')),
+        ]));
+
+        return Cache::remember($cacheKey, 60, fn () => $this->computeBranchItems($request));
+    }
+
+    private function computeBranchItems(Request $request): Collection
+    {
         $now = CarbonImmutable::now('Europe/Sarajevo');
         $nowUtc = $now->setTimezone('UTC');
 
@@ -342,22 +392,6 @@ class ApotekaController extends Controller
                 'has_pensioner_discount' => $this->hasPensionerDiscount($activeDiscounts, $activeOffers),
             ];
         });
-
-        if ($request->boolean('open_now')) {
-            $items = $items->where('open_now', true)->values();
-        }
-
-        if ($request->boolean('is_24h')) {
-            $items = $items->where('is_24h', true)->values();
-        }
-
-        if ($request->boolean('pensioner_discount')) {
-            $items = $items->where('has_pensioner_discount', true)->values();
-        }
-
-        if ($request->boolean('has_actions')) {
-            $items = $items->where('active_actions_count', '>', 0)->values();
-        }
 
         return $items->values();
     }

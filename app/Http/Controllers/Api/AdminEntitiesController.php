@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesSorting;
 use App\Http\Controllers\Controller;
 use App\Models\Banja;
 use App\Models\Dom;
@@ -14,6 +15,8 @@ use Illuminate\Validation\Rule;
 
 class AdminEntitiesController extends Controller
 {
+    use ResolvesSorting;
+
     public function __construct(private AdminProfileAccessService $profileAccessService)
     {
     }
@@ -40,9 +43,11 @@ class AdminEntitiesController extends Controller
             $query->where('verifikovan', $request->boolean('verifikovan'));
         }
 
-        $query->orderBy(
-            $request->get('sort_by', 'created_at'),
-            $request->get('sort_order', 'desc')
+        $this->applySafeSort(
+            $query,
+            $request,
+            ['created_at', 'naziv', 'grad', 'aktivan', 'verifikovan'],
+            'created_at'
         );
 
         if ($request->per_page) {
@@ -182,9 +187,11 @@ class AdminEntitiesController extends Controller
             $query->where('verifikovan', $request->boolean('verifikovan'));
         }
 
-        $query->orderBy(
-            $request->get('sort_by', 'created_at'),
-            $request->get('sort_order', 'desc')
+        $this->applySafeSort(
+            $query,
+            $request,
+            ['created_at', 'naziv', 'grad', 'aktivan', 'verifikovan'],
+            'created_at'
         );
 
         if ($request->per_page) {
@@ -338,9 +345,11 @@ class AdminEntitiesController extends Controller
             $query->where('verifikovan', $request->boolean('verifikovan'));
         }
 
-        $query->orderBy(
-            $request->get('sort_by', 'created_at'),
-            $request->get('sort_order', 'desc')
+        $this->applySafeSort(
+            $query,
+            $request,
+            ['created_at', 'naziv', 'grad', 'aktivan', 'verifikovan'],
+            'created_at'
         );
 
         if ($request->per_page) {

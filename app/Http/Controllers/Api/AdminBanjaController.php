@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesSorting;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreBanjaRequest;
 use App\Http\Requests\UpdateBanjaRequest;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\DB;
 
 class AdminBanjaController extends Controller
 {
+    use ResolvesSorting;
+
     public function __construct()
     {
         $this->middleware(['auth:sanctum', 'role:admin']);
@@ -59,10 +62,13 @@ class AdminBanjaController extends Controller
                 $query->poGradu($request->grad);
             }
 
-            // Sorting
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
-            $query->orderBy($sortBy, $sortOrder);
+            // Sorting (allowlisted to prevent SQL injection via order-by column)
+            $this->applySafeSort(
+                $query,
+                $request,
+                ['created_at', 'naziv', 'grad', 'aktivan', 'verifikovan'],
+                'created_at'
+            );
 
             // Pagination
             $perPage = min($request->get('per_page', 20), 100);

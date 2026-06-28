@@ -28,7 +28,7 @@ class RecenzijaController extends Controller
 
         $user = auth()->user();
         
-        if (!$user || $user->tip !== 'pacijent') {
+        if (!$user || !$user->hasRole('patient')) {
             return response()->json(['error' => 'Samo pacijenti mogu ostavljati recenzije'], 403);
         }
 
@@ -45,6 +45,18 @@ class RecenzijaController extends Controller
 
         if ($termin->datum_vrijeme > now()) {
             return response()->json(['error' => 'Možete recenzirati samo prošle termine'], 403);
+        }
+
+        // Security: the review target must match the doctor/clinic of this appointment,
+        // otherwise a patient could inflate ratings for arbitrary entities.
+        $matchesTarget = match ($validated['recenziran_type']) {
+            'App\Models\Doktor' => (int) $validated['recenziran_id'] === (int) $termin->doktor_id,
+            'App\Models\Klinika' => (int) $validated['recenziran_id'] === (int) $termin->klinika_id,
+            default => false,
+        };
+
+        if (!$matchesTarget) {
+            return response()->json(['error' => 'Recenzija ne odgovara odabranom terminu'], 422);
         }
 
         // Provjeri da li već postoji recenzija
@@ -106,11 +118,11 @@ class RecenzijaController extends Controller
         $user = auth()->user();
 
         // Provjera dozvola
-        if ($user->tip === 'pacijent' && $recenzija->user_id !== $user->id) {
+        if ($user->hasRole('patient') && $recenzija->user_id !== $user->id) {
             return response()->json(['error' => 'Možete obrisati samo svoje recenzije'], 403);
         }
 
-        if ($user->tip !== 'admin' && $user->tip !== 'pacijent') {
+        if (!$user->hasRole('admin') && !$user->hasRole('patient')) {
             return response()->json(['error' => 'Nemate dozvolu za brisanje recenzija'], 403);
         }
 
@@ -145,7 +157,7 @@ class RecenzijaController extends Controller
         $canRespond = false;
 
         // Doktor može odgovoriti na recenzije svog profila
-        if ($user->tip === 'doktor' && $recenzija->recenziran_type === 'App\Models\Doktor') {
+        if ($user->hasRole('doctor') && $recenzija->recenziran_type === 'App\Models\Doktor') {
             $doktor = Doktor::where('user_id', $user->id)->first();
             if ($doktor && $doktor->id === $recenzija->recenziran_id) {
                 $canRespond = true;
@@ -153,7 +165,7 @@ class RecenzijaController extends Controller
         }
 
         // Klinika može odgovoriti na recenzije svog profila
-        if ($user->tip === 'klinika' && $recenzija->recenziran_type === 'App\Models\Klinika') {
+        if ($user->hasRole('clinic') && $recenzija->recenziran_type === 'App\Models\Klinika') {
             $klinika = Klinika::where('user_id', $user->id)->first();
             if ($klinika && $klinika->id === $recenzija->recenziran_id) {
                 $canRespond = true;
@@ -234,20 +246,21 @@ class RecenzijaController extends Controller
                 return null;
             }
 
-            // Dohvati sve recenzije
+            // Distribuciju računamo u bazi (GROUP BY) umjesto učitavanja svih
+            // redova i brojanja u PHP-u.
             $recenziranType = $type === 'doktor' ? 'App\Models\Doktor' : 'App\Models\Klinika';
-            $recenzije = Recenzija::where('recenziran_type', $recenziranType)
+            $counts = Recenzija::where('recenziran_type', $recenziranType)
                 ->where('recenziran_id', $id)
-                ->select('ocjena')
-                ->get();
+                ->selectRaw('ocjena, COUNT(*) as total')
+                ->groupBy('ocjena')
+                ->pluck('total', 'ocjena');
 
-            // Računaj distribuciju
             $distribution = [
-                5 => $recenzije->where('ocjena', 5)->count(),
-                4 => $recenzije->where('ocjena', 4)->count(),
-                3 => $recenzije->where('ocjena', 3)->count(),
-                2 => $recenzije->where('ocjena', 2)->count(),
-                1 => $recenzije->where('ocjena', 1)->count(),
+                5 => (int) ($counts[5] ?? 0),
+                4 => (int) ($counts[4] ?? 0),
+                3 => (int) ($counts[3] ?? 0),
+                2 => (int) ($counts[2] ?? 0),
+                1 => (int) ($counts[1] ?? 0),
             ];
 
             return [
@@ -273,7 +286,7 @@ class RecenzijaController extends Controller
     {
         $user = auth()->user();
         
-        if (!$user || $user->tip !== 'pacijent') {
+        if (!$user || !$user->hasRole('patient')) {
             return response()->json([
                 'can_review' => false, 
                 'reason' => 'Samo pacijenti mogu recenzirati'
@@ -351,7 +364,7 @@ class RecenzijaController extends Controller
     {
         $user = auth()->user();
         
-        if (!$user || $user->tip !== 'pacijent') {
+        if (!$user || !$user->hasRole('patient')) {
             return response()->json(['termini' => []]);
         }
 

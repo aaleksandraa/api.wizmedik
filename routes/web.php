@@ -43,7 +43,17 @@ Route::get('/storage/{folder}/{filename}', function ($folder, $filename) {
     $file = $disk->get($path);
     $mimeType = $disk->mimeType($path);
 
-    return response($file, 200)->header('Content-Type', $mimeType);
+    $response = response($file, 200)
+        ->header('Content-Type', $mimeType)
+        ->header('X-Content-Type-Options', 'nosniff');
+
+    // SVGs are sanitized on upload, but force download as an extra safety net
+    // so they can never be rendered as an inline document on our origin.
+    if (str_ends_with(strtolower($filename), '.svg')) {
+        $response->header('Content-Disposition', 'attachment');
+    }
+
+    return $response;
 })->where('folder', 'doctors|clinics|cities|covers|blog|laboratories|spas|logos|backgrounds')
     ->where('filename', '.*');
 

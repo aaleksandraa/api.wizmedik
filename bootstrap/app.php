@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -13,6 +14,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust the nginx reverse proxy so $request->ip(), scheme (https) and host
+        // are derived from the X-Forwarded-* headers it sets. The app is only
+        // reachable through nginx in production, so all proxies are trusted.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO
+        );
+
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
             'doctor' => \App\Http\Middleware\EnsureDoctor::class,
@@ -51,6 +63,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Report unhandled exceptions to Sentry. This is a no-op unless a
+        // SENTRY_LARAVEL_DSN/SENTRY_DSN is configured, so it is safe by default.
+        \Sentry\Laravel\Integration::handles($exceptions);
+
         // Production error handling - hide sensitive details only for true server failures.
         $exceptions->render(function (Throwable $e, $request) {
             if (!$request->is('api/*') || config('app.env') !== 'production') {

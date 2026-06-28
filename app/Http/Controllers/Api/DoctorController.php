@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesSorting;
 use App\Http\Controllers\Controller;
 use App\Models\Doktor;
 use App\Models\Klinika;
@@ -14,6 +15,8 @@ use Illuminate\Support\Facades\Hash;
 
 class DoctorController extends Controller
 {
+    use ResolvesSorting;
+
     /**
      * Get list of doctors with filters
      */
@@ -57,10 +60,13 @@ class DoctorController extends Controller
             $query->acceptingOnline();
         }
 
-        // Sorting
-        $sortBy = $request->get('sort_by', 'ocjena');
-        $sortOrder = $request->get('sort_order', 'desc');
-        $query->orderBy($sortBy, $sortOrder);
+        // Sorting (allowlisted to prevent SQL injection via order-by column)
+        $this->applySafeSort(
+            $query,
+            $request,
+            ['ocjena', 'broj_ocjena', 'ime', 'prezime', 'grad', 'created_at'],
+            'ocjena'
+        );
 
         // Pagination
         $doctors = $query->paginate($perPage);

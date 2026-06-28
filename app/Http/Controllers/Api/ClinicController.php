@@ -7,6 +7,7 @@ use App\Models\Klinika;
 use App\Models\ProfileSlugRedirect;
 use App\Models\Specijalnost;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ClinicController extends Controller
@@ -110,13 +111,31 @@ class ClinicController extends Controller
             }
         }
 
+        // The clinics listing page fetches the full set (limit=1000) to power
+        // client-side filtering + map. That query (all clinics + their doctors
+        // + specialties) is heavy, so cache it when no server-side filter is
+        // applied. Filtered requests always hit the database for fresh results.
+        $cacheable = ! $request->filled('grad')
+            && ! $request->filled('search')
+            && ! $request->filled('specijalnost');
+
         if ($request->has('limit')) {
             $limit = min((int) $request->get('limit'), 1000);
 
-            return response()->json($query->limit($limit)->get());
+            $result = $cacheable
+                ? Cache::remember("clinics:list:limit:{$limit}", now()->addMinutes(5), fn () => $query->limit($limit)->get())
+                : $query->limit($limit)->get();
+
+            return response()->json($result);
         }
 
-        return response()->json($query->paginate($perPage));
+        $page = (int) $request->get('page', 1);
+
+        $result = $cacheable
+            ? Cache::remember("clinics:list:pp:{$perPage}:p:{$page}", now()->addMinutes(5), fn () => $query->paginate($perPage))
+            : $query->paginate($perPage);
+
+        return response()->json($result);
     }
 
     public function show($slug)

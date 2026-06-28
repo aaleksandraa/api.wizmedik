@@ -58,11 +58,14 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var list<string>
      */
+    // NOTE: 'role' is intentionally NOT mass-assignable. Authorization is driven
+    // by Spatie roles (assignRole/syncRoles). The legacy `users.role` column is
+    // still populated for backward compatibility, but only via explicit, server
+    // controlled assignment ($user->role = ...), never from request input.
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role',
         'ime',
         'prezime',
         'telefon',
@@ -79,6 +82,8 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**

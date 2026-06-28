@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesSorting;
 use App\Http\Controllers\Controller;
 use App\Models\Klinika;
 use App\Services\AdminProfileAccessService;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class AdminClinicController extends Controller
 {
+    use ResolvesSorting;
+
     public function __construct(private AdminProfileAccessService $profileAccessService)
     {
     }
@@ -51,10 +54,13 @@ class AdminClinicController extends Controller
             $query->where('verifikovan', $request->boolean('verifikovan'));
         }
 
-        // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
-        $query->orderBy($sortBy, $sortOrder);
+        // Sorting (allowlisted to prevent SQL injection via order-by column)
+        $this->applySafeSort(
+            $query,
+            $request,
+            ['created_at', 'naziv', 'grad', 'aktivan', 'verifikovan'],
+            'created_at'
+        );
 
         // Pagination
         $clinics = $query->paginate($perPage);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesSorting;
 use App\Http\Controllers\Controller;
 use App\Models\Laboratorija;
 use App\Models\KategorijaAnalize;
@@ -22,6 +23,8 @@ use Illuminate\Support\Str;
  */
 class AdminLaboratorijaController extends Controller
 {
+    use ResolvesSorting;
+
     /**
      * Get all laboratories with filters and pagination
      */
@@ -56,10 +59,13 @@ class AdminLaboratorijaController extends Controller
                 $query->where('active', $request->active === 'true');
             }
 
-            // Sorting
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
-            $query->orderBy($sortBy, $sortOrder);
+            // Sorting (allowlisted to prevent SQL injection via order-by column)
+            $this->applySafeSort(
+                $query,
+                $request,
+                ['created_at', 'naziv', 'grad'],
+                'created_at'
+            );
 
             $perPage = $request->get('per_page', 20);
             $laboratories = $query->paginate($perPage);

@@ -237,6 +237,13 @@ class AuthController extends Controller
             default => $legacyRole !== '' ? $legacyRole : 'patient',
         };
 
+        // Security: never auto-elevate to admin from the legacy column. Admin must
+        // be granted explicitly via Spatie roles. This prevents privilege
+        // escalation if users.role is ever tampered with.
+        if ($mappedRole === 'admin') {
+            return 'patient';
+        }
+
         if ($mappedRole !== '' && Role::where('name', $mappedRole)->exists()) {
             try {
                 $user->assignRole($mappedRole);

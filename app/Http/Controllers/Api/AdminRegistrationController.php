@@ -232,7 +232,7 @@ class AdminRegistrationController extends Controller
      */
     public function updateSettings(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'doctor_registration_enabled' => 'required|boolean',
             'doctor_registration_free' => 'required|boolean',
             'doctor_registration_price' => 'nullable|numeric|min:0',
@@ -270,7 +270,8 @@ class AdminRegistrationController extends Controller
             'registration_expiry_days' => 'required|integer|min:1|max:30',
         ]);
 
-        foreach ($request->all() as $key => $value) {
+        // Only persist validated keys so arbitrary settings cannot be injected.
+        foreach ($validated as $key => $value) {
             if (is_bool($value)) {
                 $value = $value ? 'true' : 'false';
             }
@@ -369,11 +370,14 @@ class AdminRegistrationController extends Controller
                 : $registrationRequest->naziv,
             'email' => $registrationRequest->email,
             'password' => $registrationRequest->password, // Already hashed
-            'role' => $roleName, // Keep for backward compatibility
             'email_verified_at' => now(),
         ]);
 
-        // ✅ CRITICAL: Assign Spatie Permission role
+        // Keep legacy users.role column in sync (not mass-assignable on purpose).
+        $user->role = $roleName;
+        $user->save();
+
+        // ✅ CRITICAL: Assign Spatie Permission role (source of truth)
         $user->assignRole($roleName);
 
         if ($registrationRequest->type === 'doctor') {

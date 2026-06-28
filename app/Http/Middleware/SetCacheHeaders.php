@@ -31,6 +31,20 @@ class SetCacheHeaders
         // Cache public API responses
         $path = $request->path();
 
+        // Never publicly cache time-sensitive endpoints (live availability,
+        // on-duty data, etc.). Stale slot data here could cause double-booking.
+        $neverCache = [
+            'available-slots',
+            'booked-slots',
+            'guest-visits',
+        ];
+        foreach ($neverCache as $fragment) {
+            if (str_contains($path, $fragment)) {
+                $response->headers->set('Cache-Control', 'no-cache, private');
+                return $response;
+            }
+        }
+
         // Images - 1 year cache
         if (preg_match('/\.(jpg|jpeg|png|gif|webp|svg)$/i', $path)) {
             $response->headers->set('Cache-Control', 'public, max-age=31536000, immutable');
@@ -38,16 +52,22 @@ class SetCacheHeaders
             return $response;
         }
 
-        // Public data endpoints - 5 minutes cache
+        // Public data endpoints - 5 minutes cache.
+        // NOTE: these must match the real API route prefixes in routes/api.php
+        // (which are English). They previously used Bosnian names that never
+        // matched, so these endpoints were silently served as no-cache.
         $publicEndpoints = [
-            'api/doktori',
-            'api/klinike',
+            'api/doctors',
+            'api/clinics',
             'api/laboratorije',
             'api/banje',
             'api/domovi-njega',
-            'api/specijalnosti',
-            'api/gradovi',
-            'api/blog/posts',
+            'api/specialties',
+            'api/cities',
+            'api/apoteke',
+            'api/lijekovi',
+            'api/mkb10',
+            'api/blog',
         ];
 
         foreach ($publicEndpoints as $endpoint) {
@@ -70,13 +90,16 @@ class SetCacheHeaders
             return $response;
         }
 
-        // Profile pages - 10 minutes cache
+        // Profile/detail pages - 10 minutes cache.
+        // Real detail routes use slugs/ids under the English prefixes.
         $profileEndpoints = [
-            'api/doktor/',
-            'api/klinika/',
-            'api/laboratorija/',
-            'api/banja/',
-            'api/dom-njega/',
+            'api/doctors/',
+            'api/clinics/',
+            'api/laboratorije/',
+            'api/banje/',
+            'api/domovi-njega/',
+            'api/apoteke/',
+            'api/lijekovi/',
         ];
 
         foreach ($profileEndpoints as $endpoint) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\ResolvesSorting;
 use App\Http\Controllers\Controller;
 use App\Models\Doktor;
 use Illuminate\Http\Request;
@@ -9,6 +10,8 @@ use Illuminate\Http\JsonResponse;
 
 class AdminDoctorController extends Controller
 {
+    use ResolvesSorting;
+
     /**
      * Get all doctors (including inactive and unverified) for admin panel
      */
@@ -51,10 +54,13 @@ class AdminDoctorController extends Controller
             $query->where('verifikovan', $request->boolean('verifikovan'));
         }
 
-        // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
-        $query->orderBy($sortBy, $sortOrder);
+        // Sorting (allowlisted to prevent SQL injection via order-by column)
+        $this->applySafeSort(
+            $query,
+            $request,
+            ['created_at', 'ocjena', 'broj_ocjena', 'ime', 'prezime', 'grad', 'aktivan', 'verifikovan'],
+            'created_at'
+        );
 
         // Pagination
         $doctors = $query->paginate($perPage);

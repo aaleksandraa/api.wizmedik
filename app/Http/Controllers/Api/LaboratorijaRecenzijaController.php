@@ -144,7 +144,7 @@ class LaboratorijaRecenzijaController extends Controller
         $user = auth()->user();
 
         // Samo vlasnik ili admin može obrisati
-        if (!$user || ($recenzija->user_id !== $user->id && $user->tip !== 'admin')) {
+        if (!$user || ($recenzija->user_id !== $user->id && !$user->hasRole('admin'))) {
             return response()->json(['error' => 'Nemate dozvolu za brisanje ove recenzije'], 403);
         }
 

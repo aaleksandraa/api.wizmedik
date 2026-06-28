@@ -66,7 +66,25 @@ class ServiceController extends Controller
         }
         $service = Usluga::where('doktor_id', $doktor->id)->findOrFail($id);
 
-        $service->update($request->all());
+        $validated = $request->validate([
+            'naziv' => 'sometimes|required|string',
+            'opis' => 'nullable|string',
+            'cijena' => 'nullable|numeric',
+            'cijena_popust' => 'nullable|numeric',
+            'trajanje_minuti' => 'sometimes|required|integer|min:5',
+            'aktivan' => 'boolean',
+            'kategorija_id' => [
+                'nullable',
+                'integer',
+                // The category must belong to this doctor.
+                \Illuminate\Validation\Rule::exists('doktor_kategorije_usluga', 'id')
+                    ->where('doktor_id', $doktor->id),
+            ],
+            'redoslijed' => 'nullable|integer',
+        ]);
+
+        // Never allow reassigning a service to another doctor via mass assignment.
+        $service->update($validated);
 
         return response()->json(['message' => 'Service updated', 'service' => $service]);
     }

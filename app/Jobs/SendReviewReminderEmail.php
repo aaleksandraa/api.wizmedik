@@ -24,7 +24,7 @@ class SendReviewReminderEmail implements ShouldQueue
 
     public function handle(): void
     {
-        if ($this->termin->user && $this->termin->user->tip === 'pacijent') {
+        if ($this->termin->user && $this->termin->user->hasRole('patient')) {
             $existingRecenzija = Recenzija::where('user_id', $this->termin->user_id)
                 ->where('termin_id', $this->termin->id)
                 ->first();

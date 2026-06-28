@@ -55,7 +55,7 @@ class AdminMkb10Controller extends Controller
             ], 422);
         }
 
-        $kategorija = Mkb10Kategorija::create($request->all());
+        $kategorija = Mkb10Kategorija::create($validator->validated());
 
         return response()->json([
             'success' => true,
@@ -86,7 +86,7 @@ class AdminMkb10Controller extends Controller
             ], 422);
         }
 
-        $kategorija->update($request->all());
+        $kategorija->update($validator->validated());
 
         return response()->json([
             'success' => true,
@@ -139,7 +139,7 @@ class AdminMkb10Controller extends Controller
             ], 422);
         }
 
-        $podkategorija = Mkb10Podkategorija::create($request->all());
+        $podkategorija = Mkb10Podkategorija::create($validator->validated());
 
         return response()->json([
             'success' => true,
@@ -169,7 +169,7 @@ class AdminMkb10Controller extends Controller
             ], 422);
         }
 
-        $podkategorija->update($request->all());
+        $podkategorija->update($validator->validated());
 
         return response()->json([
             'success' => true,
@@ -245,7 +245,7 @@ class AdminMkb10Controller extends Controller
             ], 422);
         }
 
-        $dijagnoza = Mkb10Dijagnoza::create($request->all());
+        $dijagnoza = Mkb10Dijagnoza::create($validator->validated());
 
         return response()->json([
             'success' => true,
@@ -278,7 +278,7 @@ class AdminMkb10Controller extends Controller
             ], 422);
         }
 
-        $dijagnoza->update($request->all());
+        $dijagnoza->update($validator->validated());
 
         return response()->json([
             'success' => true,

@@ -93,7 +93,8 @@ Route::get('/verify-email/{token}', [RegistrationController::class, 'verifyEmail
 Route::get('/register/verify/{token}', [RegistrationController::class, 'verifyEmail']); // Alias for email link
 Route::post('/verify-email-code', [RegistrationController::class, 'verifyEmailWithCode'])
     ->middleware('throttle:10,60');
-Route::post('/register/verify-code', [RegistrationController::class, 'verifyEmailWithCode']); // Alias
+Route::post('/register/verify-code', [RegistrationController::class, 'verifyEmailWithCode'])
+    ->middleware('throttle:10,60'); // Alias - same limit as /verify-email-code
 Route::post('/resend-verification', [RegistrationController::class, 'resendVerification'])
     ->middleware('throttle:3,60');
 Route::post('/register/resend-verification', [RegistrationController::class, 'resendVerification'])
@@ -116,8 +117,12 @@ Route::post('/appointments/guest', [AppointmentController::class, 'storeGuest'])
     ->middleware(['throttle:10,15', 'detect.bots']);
 
 // Public calendar sync route (iCal feed)
-Route::get('/calendar/ical/{token}.ics', [CalendarSyncController::class, 'generateICalFeed']);
-Route::get('/calendar/ical/{token}', [CalendarSyncController::class, 'generateICalFeed']);
+// The token in the URL is a capability secret (PHI access), so throttle to
+// prevent scraping/brute-force enumeration. Legit clients refresh every few minutes.
+Route::middleware('throttle:30,1')->group(function () {
+    Route::get('/calendar/ical/{token}.ics', [CalendarSyncController::class, 'generateICalFeed']);
+    Route::get('/calendar/ical/{token}', [CalendarSyncController::class, 'generateICalFeed']);
+});
 
 // Public lookup routes
 Route::get('/cities', [CityController::class, 'index']);
@@ -127,7 +132,8 @@ Route::get('/clinics/{slug}', [ClinicController::class, 'show']);
 Route::get('/specialties', [SpecialtyController::class, 'index']);
 Route::get('/specialties/with-counts', [SpecialtyController::class, 'withCounts']);
 Route::get('/specialties/search-data', [SpecialtyController::class, 'searchData']);
-Route::get('/specialties/smart-search/{query}', [SpecialtyController::class, 'smartSearch']);
+Route::get('/specialties/smart-search/{query}', [SpecialtyController::class, 'smartSearch'])
+    ->middleware('throttle:120,1');
 Route::get('/specialties/{specialtySlug}/services/{serviceSlug}', [SpecialtyServicePageController::class, 'showBySlugs']);
 Route::get('/specialties/{slug}', [SpecialtyController::class, 'show']);
 
@@ -213,7 +219,8 @@ Route::get('/apoteke/{slug}', [\App\Http\Controllers\Api\ApotekaController::clas
 // Public MKB-10 routes
 Route::get('/mkb10/kategorije', [\App\Http\Controllers\Api\Mkb10Controller::class, 'kategorije']);
 Route::get('/mkb10/statistika', [\App\Http\Controllers\Api\Mkb10Controller::class, 'statistika']);
-Route::get('/mkb10/search', [\App\Http\Controllers\Api\Mkb10Controller::class, 'pretraga']);
+Route::get('/mkb10/search', [\App\Http\Controllers\Api\Mkb10Controller::class, 'pretraga'])
+    ->middleware('throttle:120,1');
 Route::get('/mkb10/dijagnoze', [\App\Http\Controllers\Api\Mkb10Controller::class, 'dijagnoze']);
 Route::get('/mkb10/dijagnoze/{kod}', [\App\Http\Controllers\Api\Mkb10Controller::class, 'dijagnoza']);
 Route::get('/mkb10/podkategorije/{kategorijaId}', [\App\Http\Controllers\Api\Mkb10Controller::class, 'podkategorije']);
@@ -228,7 +235,8 @@ Route::get('/laboratorije/kategorije/all', [\App\Http\Controllers\Api\Laboratori
 Route::get('/laboratorije/statistics', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getAllStatistics']);
 Route::get('/laboratorije/popularne-analize', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getPopularneAnalize']);
 Route::get('/laboratorije/analize-na-akciji', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getAnalizenaAkciji']);
-Route::get('/laboratorije/search-analize', [\App\Http\Controllers\Api\LaboratorijaController::class, 'searchAnalize']);
+Route::get('/laboratorije/search-analize', [\App\Http\Controllers\Api\LaboratorijaController::class, 'searchAnalize'])
+    ->middleware('throttle:120,1');
 Route::get('/laboratorije/grad/{grad}', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getByGrad']);
 Route::get('/laboratorije/{slug}', [\App\Http\Controllers\Api\LaboratorijaController::class, 'show']);
 Route::get('/laboratorije/{id}/analize', [\App\Http\Controllers\Api\LaboratorijaController::class, 'getAnalize']);
@@ -353,9 +361,11 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('throttle:20,60'); // 20 responses per 60 minutes
     Route::get('/recenzije/termin/{terminId}/can-review', [RecenzijaController::class, 'canReview']);
 
-    // Upload
-    Route::post('/upload/image', [UploadController::class, 'uploadImage']);
-    Route::delete('/upload/image', [UploadController::class, 'deleteImage']);
+    // Upload - image processing (re-encode + sanitize) is CPU/disk heavy, so cap it.
+    Route::post('/upload/image', [UploadController::class, 'uploadImage'])
+        ->middleware('throttle:60,1');
+    Route::delete('/upload/image', [UploadController::class, 'deleteImage'])
+        ->middleware('throttle:60,1');
 
     // Notifikacije
     Route::get('/notifikacije', [NotifikacijaController::class, 'getAll']);
@@ -719,6 +729,11 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/profile', [AdminController::class, 'getProfile']);
     Route::put('/profile', [AdminController::class, 'updateProfile']);
     Route::put('/password', [AdminController::class, 'changePassword']);
+
+    Route::get('/database-backup/status', [\App\Http\Controllers\Api\AdminDatabaseBackupController::class, 'status']);
+    Route::get('/database-backup/download', [\App\Http\Controllers\Api\AdminDatabaseBackupController::class, 'download']);
+    Route::post('/database-backup/run', [\App\Http\Controllers\Api\AdminDatabaseBackupController::class, 'run'])
+        ->middleware('throttle:3,60');
 
     // Admin Doctor Management
     Route::get('/doctors', [\App\Http\Controllers\Api\AdminDoctorController::class, 'index']);

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\BlogPost;
 use App\Models\BlogSettings;
 use App\Models\SiteSetting;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class HomepageController extends Controller
 {
@@ -18,10 +20,36 @@ class HomepageController extends Controller
     public function getData()
     {
         try {
-            Log::info('Homepage API called - starting data fetch');
+            $response = Cache::remember('homepage:data:v2', now()->addMinutes(5), function () {
+                return $this->buildHomepageData();
+            });
 
-            // Start with basic response structure
-            $response = [
+            return response()->json($response);
+        } catch (\Throwable $e) {
+            Log::error('Homepage API fatal error: ' . $e->getMessage());
+
+            $payload = [
+                'error' => 'Homepage API failed',
+                'message' => 'Doslo je do greske na serveru. Molimo pokusajte ponovo.',
+            ];
+
+            if ($this->shouldExposeErrorDetails()) {
+                $payload['debug_message'] = $e->getMessage();
+                $payload['file'] = $e->getFile();
+                $payload['line'] = $e->getLine();
+                $payload['trace'] = $e->getTraceAsString();
+            }
+
+            return response()->json($payload, 500);
+        }
+    }
+
+    private function buildHomepageData(): array
+    {
+        Log::info('Homepage API cache miss - building data');
+
+        // Start with basic response structure
+        $response = [
                 'status' => 'OK',
                 'timestamp' => now(),
                 'settings' => [
@@ -53,23 +81,9 @@ class HomepageController extends Controller
 
             Log::info('Basic response structure created');
 
-            // Test database connection first
-            try {
-                $dbTest = DB::connection()->getPdo();
-                Log::info('Database connection successful');
-            } catch (\Exception $e) {
-                Log::error('Database connection failed: ' . $e->getMessage());
-                $payload = array_merge($response, [
-                    'error' => 'Database connection failed',
-                    'message' => 'Privremeni problem sa ucitavanjem podataka.',
-                ]);
-
-                if ($this->shouldExposeErrorDetails()) {
-                    $payload['debug_message'] = $e->getMessage();
-                }
-
-                return response()->json($payload, 500);
-            }
+            // Test database connection first. Let failures bubble up to
+            // getData() so a transient DB error is never cached.
+            DB::connection()->getPdo();
 
             // Try to get doctors (safest table)
             try {
@@ -212,7 +226,9 @@ class HomepageController extends Controller
                         'naslov' => $post->naslov,
                         'slug' => $post->slug,
                         'kratak_opis' => $post->excerpt,
-                        'sadrzaj' => $post->sadrzaj,
+                        // Homepage cards only need a short preview; ship a
+                        // stripped snippet instead of the full article body.
+                        'sadrzaj' => Str::limit(strip_tags((string) $post->sadrzaj), 200),
                         'slika_url' => $post->thumbnail_url,
                         'doktor' => $post->doktor ? [
                             'id' => $post->doktor->id,
@@ -284,26 +300,7 @@ class HomepageController extends Controller
 
             Log::info('Homepage API completed successfully');
 
-            return response()->json($response);
-
-        } catch (\Exception $e) {
-            Log::error('Homepage API fatal error: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
-
-            $payload = [
-                'error' => 'Homepage API failed',
-                'message' => 'Doslo je do greske na serveru. Molimo pokusajte ponovo.',
-            ];
-
-            if ($this->shouldExposeErrorDetails()) {
-                $payload['debug_message'] = $e->getMessage();
-                $payload['file'] = $e->getFile();
-                $payload['line'] = $e->getLine();
-                $payload['trace'] = $e->getTraceAsString();
-            }
-
-            return response()->json($payload, 500);
-        }
+        return $response;
     }
 
     /**
@@ -312,9 +309,9 @@ class HomepageController extends Controller
     public function clearCache()
     {
         try {
-            // No cache in this simple version
-            Log::info('Cache clear requested (no cache in simple version)');
-            return response()->json(['message' => 'Cache cleared (simple version)']);
+            Cache::forget('homepage:data:v2');
+            Log::info('Homepage cache cleared');
+            return response()->json(['message' => 'Cache cleared']);
         } catch (\Exception $e) {
             Log::error('Homepage cache clear failed: ' . $e->getMessage());
 

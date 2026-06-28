@@ -1,24 +1,30 @@
-# Supervisor Configuration for Laravel
+# Supervisor Configuration for Laravel (wizMedik)
 # Copy to: /etc/supervisor/conf.d/zdravlje-bih.conf
 # Update supervisor: sudo supervisorctl reread
 # Start: sudo supervisorctl update
 # Check status: sudo supervisorctl status
+#
+# This project processes its queues with Laravel Horizon (see config/horizon.php).
+# Run ONLY Horizon for queue processing - do not also start a plain
+# "php artisan queue:work" against the same Redis queues, or the two will
+# compete for the same jobs.
 
-# Laravel Queue Worker
-[program:zdravlje-bih-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/zdravlje-bih/backend/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+# Laravel Horizon (queue processing)
+[program:zdravlje-bih-horizon]
+process_name=%(program_name)s
+command=php /var/www/zdravlje-bih/backend/artisan horizon
 autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
 user=www-data
-numprocs=2
+numprocs=1
 redirect_stderr=true
-stdout_logfile=/var/www/zdravlje-bih/backend/storage/logs/worker.log
+stdout_logfile=/var/www/zdravlje-bih/backend/storage/logs/horizon.log
 stopwaitsecs=3600
 
-# Laravel Scheduler (optional, if not using cron)
+# Laravel Scheduler (required for horizon:snapshot metrics + app scheduled tasks)
+# Alternatively run via cron: * * * * * php artisan schedule:run
 [program:zdravlje-bih-scheduler]
 process_name=%(program_name)s
 command=php /var/www/zdravlje-bih/backend/artisan schedule:work

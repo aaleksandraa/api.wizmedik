@@ -86,7 +86,7 @@ class MedicalCalendarController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $event = MedicalCalendar::create($request->all());
+        $event = MedicalCalendar::create($validator->validated());
         return response()->json($event, 201);
     }
 
@@ -110,7 +110,7 @@ class MedicalCalendarController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $event->update($request->all());
+        $event->update($validator->validated());
         return response()->json($event);
     }
 
@@ -176,7 +176,13 @@ class MedicalCalendarController extends Controller
 
         try {
             libxml_use_internal_errors(true);
-            $xml = simplexml_load_string($xmlContent, 'SimpleXMLElement', LIBXML_NOCDATA);
+            // Harden against XXE / entity expansion: disallow network access and
+            // do not substitute external entities.
+            $xml = simplexml_load_string(
+                $xmlContent,
+                'SimpleXMLElement',
+                LIBXML_NOCDATA | LIBXML_NONET
+            );
         } catch (Throwable $e) {
             Log::error('Medical calendar XML parse exception.', [
                 'message' => $e->getMessage(),

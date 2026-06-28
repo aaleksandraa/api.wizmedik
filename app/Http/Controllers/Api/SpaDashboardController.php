@@ -158,9 +158,11 @@ class SpaDashboardController extends Controller
         try {
             $banja = Banja::where('user_id', auth()->id())->firstOrFail();
 
-            $paket = $banja->paketi()->create($request->all());
+            $paket = $banja->paketi()->create($this->validatePaket($request));
 
             return response()->json(['success' => true, 'data' => $paket]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Neispravni podaci', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Greška pri kreiranju paketa'], 500);
         }
@@ -174,9 +176,11 @@ class SpaDashboardController extends Controller
         try {
             $banja = Banja::where('user_id', auth()->id())->firstOrFail();
             $paket = $banja->paketi()->findOrFail($id);
-            $paket->update($request->all());
+            $paket->update($this->validatePaket($request));
 
             return response()->json(['success' => true, 'data' => $paket]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Neispravni podaci', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Greška pri ažuriranju paketa'], 500);
         }
@@ -260,9 +264,11 @@ class SpaDashboardController extends Controller
         try {
             $banja = Banja::where('user_id', auth()->id())->firstOrFail();
 
-            $terapija = $banja->customTerapije()->create($request->all());
+            $terapija = $banja->customTerapije()->create($this->validateCustomTerapija($request));
 
             return response()->json(['success' => true, 'data' => $terapija]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Neispravni podaci', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Greška'], 500);
         }
@@ -276,9 +282,11 @@ class SpaDashboardController extends Controller
         try {
             $banja = Banja::where('user_id', auth()->id())->firstOrFail();
             $terapija = $banja->customTerapije()->findOrFail($id);
-            $terapija->update($request->all());
+            $terapija->update($this->validateCustomTerapija($request));
 
             return response()->json(['success' => true, 'data' => $terapija]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Neispravni podaci', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Greška'], 500);
         }
@@ -297,6 +305,42 @@ class SpaDashboardController extends Controller
         } catch (\Exception $e) {
             return response()->json(['message' => 'Greška'], 500);
         }
+    }
+
+    /**
+     * Validate paket payload. Never accepts banja_id from the client.
+     *
+     * @return array<string, mixed>
+     */
+    private function validatePaket(Request $request): array
+    {
+        return $request->validate([
+            'naziv' => 'required|string|max:255',
+            'opis' => 'nullable|string',
+            'trajanje_dana' => 'nullable|integer|min:0',
+            'cijena' => 'nullable|numeric|min:0',
+            'ukljuceno' => 'nullable|array',
+            'ukljuceno.*' => 'nullable|string',
+            'aktivan' => 'boolean',
+            'redoslijed' => 'nullable|integer',
+        ]);
+    }
+
+    /**
+     * Validate custom terapija payload. Never accepts banja_id from the client.
+     *
+     * @return array<string, mixed>
+     */
+    private function validateCustomTerapija(Request $request): array
+    {
+        return $request->validate([
+            'naziv' => 'required|string|max:255',
+            'opis' => 'nullable|string',
+            'cijena' => 'nullable|numeric|min:0',
+            'trajanje_minuta' => 'nullable|integer|min:0',
+            'redoslijed' => 'nullable|integer',
+            'aktivan' => 'boolean',
+        ]);
     }
 
     /**

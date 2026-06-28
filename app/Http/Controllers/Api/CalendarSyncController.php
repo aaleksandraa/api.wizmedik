@@ -251,7 +251,10 @@ class CalendarSyncController extends Controller
         return response($ical, 200)
             ->header('Content-Type', 'text/calendar; charset=utf-8')
             ->header('Content-Disposition', 'inline; filename="wizmedik-calendar.ics"')
-            ->header('Cache-Control', 'public, max-age=300, must-revalidate')
+            // Feed is per-doctor private (patient data). Keep it out of shared caches
+            // and out of search engines even though access is via a secret token URL.
+            ->header('Cache-Control', 'private, max-age=300, must-revalidate')
+            ->header('X-Robots-Tag', 'noindex, nofollow')
             ->header('ETag', $etag)
             ->header('Last-Modified', $lastModified)
             ->header('X-Content-Type-Options', 'nosniff');

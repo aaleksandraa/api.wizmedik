@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use enshrined\svgSanitize\Sanitizer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,15 @@ use RuntimeException;
 
 class UploadController extends Controller
 {
+    /**
+     * Folders the upload/delete endpoints are allowed to write to and remove from.
+     * Used both for validation and to constrain deletions to image folders only.
+     */
+    private const ALLOWED_FOLDERS = [
+        'doctors', 'clinics', 'cities', 'covers', 'blog', 'laboratories',
+        'spas', 'logos', 'backgrounds', 'pharmacies', 'care-homes',
+    ];
+
     public function uploadImage(Request $request)
     {
         try {
@@ -20,7 +30,7 @@ class UploadController extends Controller
                 // modern mobile formats like HEIC/HEIF/AVIF can fail the generic image
                 // validator even though they are legitimate user uploads.
                 'image'  => 'required|file|max:5120', // 5MB max
-                'folder' => 'required|in:doctors,clinics,cities,covers,blog,laboratories,spas,logos,backgrounds,pharmacies,care-homes',
+                'folder' => 'required|in:' . implode(',', self::ALLOWED_FOLDERS),
             ]);
 
             $folder = $request->folder;
@@ -30,6 +40,27 @@ class UploadController extends Controller
 
             // Security: Verify it's actually an image
             $mimeType = $imageFile->getMimeType();
+
+            // Hard block obviously dangerous content types regardless of extension,
+            // so a script/HTML file renamed to .jpg can never be stored.
+            $blockedMimeTypes = [
+                'text/html', 'application/xhtml+xml', 'text/xml', 'application/xml',
+                'application/javascript', 'text/javascript',
+                'application/x-php', 'application/x-httpd-php', 'text/x-php',
+                'application/x-msdownload', 'application/x-sh',
+            ];
+            if (
+                in_array($mimeType, $blockedMimeTypes, true)
+                || str_starts_with((string) $mimeType, 'text/')
+            ) {
+                return response()->json([
+                    'message' => 'Odabrani fajl nije podržana slika.',
+                    'errors' => [
+                        'image' => ['Podržani formati su JPG, PNG, WEBP, SVG, HEIC, HEIF i AVIF.'],
+                    ],
+                ], 422);
+            }
+
             $allowedMimes = [
                 'image/jpeg',
                 'image/png',
@@ -64,21 +95,30 @@ class UploadController extends Controller
                 ], 422);
             }
 
-            // SVG: save directly without raster processing
-            if ($extension === 'svg') {
-                $stored = $this->storeOriginalUpload($request, $imageFile, $folder, $baseFilename, 'svg');
+            // SVG: sanitize before storing to neutralize embedded scripts/XSS.
+            // We never store raw SVG bytes from an upload on the public disk.
+            if ($extension === 'svg' || $mimeType === 'image/svg+xml') {
+                $rawSvg = (string) file_get_contents($imageFile->getRealPath());
+                $cleanSvg = $this->sanitizeSvg($rawSvg);
 
-                \Log::info('SVG uploaded successfully', [
-                    'path' => $stored['path'],
-                    'url'  => $stored['url'],
-                    'folder' => $folder,
-                    'base_url' => $request->getSchemeAndHttpHost(),
-                ]);
+                if ($cleanSvg === null) {
+                    return response()->json([
+                        'message' => 'SVG datoteka nije ispravna ili sadrži nedozvoljen sadržaj.',
+                        'errors' => [
+                            'image' => ['SVG datoteka nije mogla biti sigurno obrađena.'],
+                        ],
+                    ], 422);
+                }
+
+                $publicPath = "{$folder}/{$baseFilename}.svg";
+                Storage::disk('public')->put($publicPath, $cleanSvg);
+
+                $url = $this->buildPublicUrl($request, $publicPath);
 
                 return response()->json([
                     'message' => 'Image uploaded successfully',
-                    'url'     => $stored['url'],
-                    'path'    => $stored['path'],
+                    'url'     => $url,
+                    'path'    => $publicPath,
                 ]);
             }
 
@@ -325,18 +365,82 @@ class UploadController extends Controller
         return rtrim($request->getSchemeAndHttpHost(), '/') . Storage::url($publicPath);
     }
 
+    /**
+     * Sanitize raw SVG markup, stripping scripts, event handlers and external
+     * references. Returns null if the input is empty or cannot be sanitized.
+     */
+    private function sanitizeSvg(string $rawSvg): ?string
+    {
+        if (trim($rawSvg) === '') {
+            return null;
+        }
+
+        try {
+            $sanitizer = new Sanitizer();
+            $sanitizer->removeRemoteReferences(true);
+            $clean = $sanitizer->sanitize($rawSvg);
+
+            if (! is_string($clean) || trim($clean) === '') {
+                return null;
+            }
+
+            return $clean;
+        } catch (\Throwable $e) {
+            \Log::warning('SVG sanitization failed', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
 
     public function deleteImage(Request $request)
     {
         $request->validate([
-            'path' => 'required|string',
+            'path' => 'required|string|max:255',
         ]);
 
-        if (Storage::disk('public')->exists($request->path)) {
-            Storage::disk('public')->delete($request->path);
+        $path = (string) $request->input('path');
+
+        // Accept full URLs too (frontend sometimes stores the absolute URL):
+        // reduce to the storage-relative path before validating.
+        if (str_contains($path, '://')) {
+            $parsedPath = parse_url($path, PHP_URL_PATH) ?: '';
+            $path = preg_replace('#^/?storage/#', '', ltrim($parsedPath, '/')) ?? '';
+        }
+
+        if (! $this->isSafeImagePath($path)) {
+            return response()->json([
+                'message' => 'Neispravna putanja slike.',
+            ], 422);
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
             return response()->json(['message' => 'Image deleted']);
         }
 
         return response()->json(['message' => 'Image not found'], 404);
+    }
+
+    /**
+     * Allow deletion only of image files inside the known upload folders,
+     * blocking path traversal and removal of arbitrary files on the disk.
+     */
+    private function isSafeImagePath(string $path): bool
+    {
+        if ($path === '' || str_contains($path, '..') || str_contains($path, "\0") || str_contains($path, '\\')) {
+            return false;
+        }
+
+        if (str_starts_with($path, '/')) {
+            return false;
+        }
+
+        $folderPattern = implode('|', array_map('preg_quote', self::ALLOWED_FOLDERS));
+
+        // {folder}/{optional-subfolder}/{filename}.{image-ext}
+        return (bool) preg_match(
+            '#^(' . $folderPattern . ')/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.(jpg|jpeg|png|webp|svg|heic|heif|avif)$#i',
+            $path
+        );
     }
 }

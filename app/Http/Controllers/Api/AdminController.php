@@ -5,14 +5,50 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\{User, Doktor, Klinika, Grad, Specijalnost};
 use App\Services\AdminProfileAccessService;
+use enshrined\svgSanitize\Sanitizer;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
 {
     public function __construct(private AdminProfileAccessService $profileAccessService)
     {
+    }
+
+    /**
+     * Store a specialty icon safely: allowlisted extension and, for SVG,
+     * sanitized markup so no script/XSS payload is persisted on the public disk.
+     * Returns the storage-relative path.
+     */
+    private function storeSpecialtyIcon(UploadedFile $file, int $specialtyId): string
+    {
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        $allowed = ['jpeg', 'jpg', 'png', 'gif', 'webp', 'svg'];
+        if (! in_array($extension, $allowed, true)) {
+            $extension = 'png';
+        }
+
+        $filename = 'specialty_' . $specialtyId . '_' . time() . '.' . $extension;
+        $path = 'specialties/icons/' . $filename;
+
+        if ($extension === 'svg' || $file->getMimeType() === 'image/svg+xml') {
+            $sanitizer = new Sanitizer();
+            $sanitizer->removeRemoteReferences(true);
+            $clean = $sanitizer->sanitize((string) file_get_contents($file->getRealPath()));
+
+            if (! is_string($clean) || trim($clean) === '') {
+                abort(422, 'SVG ikona nije mogla biti sigurno obrađena.');
+            }
+
+            Storage::disk('public')->put($path, $clean);
+
+            return $path;
+        }
+
+        return $file->storeAs('specialties/icons', $filename, 'public');
     }
 
     // Users Management
@@ -697,12 +733,15 @@ class AdminController extends Controller
 
         // Handle icon upload if present
         if ($request->hasFile('icon')) {
+            $request->validate([
+                'icon' => 'required|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            ]);
+
             $file = $request->file('icon');
             // Create temporary specialty to get ID
             $tempSpecialty = Specijalnost::create(array_merge($validated, ['icon_url' => null]));
 
-            $filename = 'specialty_' . $tempSpecialty->id . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('specialties/icons', $filename, 'public');
+            $path = $this->storeSpecialtyIcon($file, $tempSpecialty->id);
             $tempSpecialty->update(['icon_url' => url('/storage/' . $path)]);
 
             // Clear specialty caches
@@ -807,8 +846,7 @@ class AdminController extends Controller
         // Handle icon upload
         if ($request->hasFile('icon')) {
             $file = $request->file('icon');
-            $filename = 'specialty_' . $specijalnost->id . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('specialties/icons', $filename, 'public');
+            $path = $this->storeSpecialtyIcon($file, $specijalnost->id);
             $validated['icon_url'] = url('/storage/' . $path);
 
             // Delete old uploaded icon if exists (not predefined icons)

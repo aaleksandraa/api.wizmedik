@@ -38,6 +38,16 @@ return [
             'report' => false,
         ],
 
+        // Private disk for sensitive uploads (e.g. registration documents).
+        // Never web-accessible; files must be streamed through authorized controllers.
+        'private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
