@@ -1,0 +1,14 @@
+{
+    "entity_type": "care_home",
+    "city": "Banja Luka",
+    "city_slug": "banja-luka",
+    "import_batch": "banja-luka-care-home-approved-test",
+    "records": [
+        {
+            "google_place_id": "place-banja-luka-care-home-1",
+            "name": "Dom za starije Test Banja Luka",
+            "address": "Ulica Test 10",
+            "phone": "+387 51 444 555"
+        }
+    ]
+}

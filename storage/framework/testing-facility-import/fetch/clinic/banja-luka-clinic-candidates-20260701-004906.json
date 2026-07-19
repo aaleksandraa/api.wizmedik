@@ -1,0 +1,84 @@
+{
+    "entity_type": "clinic",
+    "city": "Banja Luka",
+    "city_slug": "banja-luka",
+    "generated_at": "2026-06-30T22:49:06+00:00",
+    "queries": {
+        "banja-luka": [
+            "hospital Banja Luka",
+            "klinika Banja Luka",
+            "bolnica Banja Luka",
+            "dom zdravlja Banja Luka",
+            "dental clinic Banja Luka Bosnia and Herzegovina",
+            "physiotherapist Banja Luka"
+        ]
+    },
+    "stats": {
+        "text_calls": 1,
+        "detail_calls": 0,
+        "city_count": 1,
+        "rejected_by_classifier": 0
+    },
+    "records": [
+        {
+            "google_place_id": "place-banja-luka-clinic-1",
+            "name": "Klinika Test Banja Luka",
+            "address": "Bulevar Vojvode Stepe Stepanovica 1, Banja Luka",
+            "city": "Banja Luka",
+            "city_slug": "banja-luka",
+            "phone": null,
+            "international_phone": null,
+            "website": null,
+            "google_maps_link": "https://maps.google.com/?cid=clinic1",
+            "latitude": 44.7722,
+            "longitude": 17.191,
+            "types": [
+                "hospital",
+                "health"
+            ],
+            "primary_type": "hospital",
+            "entity_type": "clinic",
+            "search_query": "hospital Banja Luka",
+            "opening_hours_json": null,
+            "working_hours": [],
+            "radno_vrijeme": {
+                "ponedeljak": {
+                    "open": "08:00",
+                    "close": "16:00",
+                    "closed": false
+                },
+                "utorak": {
+                    "open": "08:00",
+                    "close": "16:00",
+                    "closed": false
+                },
+                "sreda": {
+                    "open": "08:00",
+                    "close": "16:00",
+                    "closed": false
+                },
+                "cetvrtak": {
+                    "open": "08:00",
+                    "close": "16:00",
+                    "closed": false
+                },
+                "petak": {
+                    "open": "08:00",
+                    "close": "16:00",
+                    "closed": false
+                },
+                "subota": {
+                    "open": "08:00",
+                    "close": "16:00",
+                    "closed": false
+                },
+                "nedelja": {
+                    "open": "08:00",
+                    "close": "16:00",
+                    "closed": true
+                }
+            },
+            "is_24h": false
+        }
+    ]
+}

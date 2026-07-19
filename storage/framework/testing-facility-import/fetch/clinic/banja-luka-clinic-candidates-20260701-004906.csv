@@ -1,0 +1,2 @@
+google_place_id,entity_type,name,address,city,phone,international_phone,website,latitude,longitude,google_maps_link,primary_type
+place-banja-luka-clinic-1,clinic,"Klinika Test Banja Luka","Bulevar Vojvode Stepe Stepanovica 1, Banja Luka","Banja Luka",,,,44.7722,17.191,https://maps.google.com/?cid=clinic1,hospital

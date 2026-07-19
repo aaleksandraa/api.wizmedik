@@ -1,0 +1,18 @@
+{
+    "entity_type": "clinic",
+    "city": "Banja Luka",
+    "city_slug": "banja-luka",
+    "import_batch": "banja-luka-clinic-approved-test",
+    "records": [
+        {
+            "google_place_id": "shared-place-id",
+            "name": "Klinika Test Banja Luka",
+            "address": "Bulevar Vojvode Stepe Stepanovica 1",
+            "phone": "+387 51 222 333",
+            "website": "https:\/\/klinika-test.example",
+            "google_maps_link": "https:\/\/maps.google.com\/?cid=clinic1",
+            "latitude": 44.7722,
+            "longitude": 17.191
+        }
+    ]
+}
