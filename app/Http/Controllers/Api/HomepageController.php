@@ -20,7 +20,7 @@ class HomepageController extends Controller
     public function getData()
     {
         try {
-            $response = Cache::remember('homepage:data:v2', now()->addMinutes(5), function () {
+            $response = Cache::remember('homepage:data:v3', now()->addMinutes(5), function () {
                 return $this->buildHomepageData();
             });
 
@@ -108,9 +108,36 @@ class HomepageController extends Controller
                     ->where('aktivan', true)
                     ->where('verifikovan', true)
                     ->whereNull('deleted_at')
-                    ->select('id', 'slug', 'naziv', 'grad', 'adresa')
-                    ->limit(4)
+                    ->select('id', 'slug', 'naziv', 'grad', 'adresa', 'telefon', 'email', 'website', 'slike', 'radno_vrijeme', 'ocjena', 'broj_ocjena')
+                    ->selectSub(
+                        DB::table('doktori')
+                            ->selectRaw('count(*)')
+                            ->whereColumn('doktori.klinika_id', 'klinike.id')
+                            ->where('doktori.aktivan', true)
+                            ->whereNull('doktori.deleted_at'),
+                        'broj_doktora'
+                    )
+                    ->limit(6)
                     ->get();
+
+                $clinicSpecialties = DB::table('klinika_specijalnost')
+                    ->join('specijalnosti', 'specijalnosti.id', '=', 'klinika_specijalnost.specijalnost_id')
+                    ->whereIn('klinika_specijalnost.klinika_id', $clinics->pluck('id'))
+                    ->select('klinika_specijalnost.klinika_id', 'specijalnosti.id', 'specijalnosti.naziv')
+                    ->get()
+                    ->groupBy('klinika_id');
+
+                $clinics = $clinics->map(function ($clinic) use ($clinicSpecialties) {
+                    // Raw query builder returns JSON columns as strings.
+                    $clinic->slike = $this->decodeJsonColumn($clinic->slike, []);
+                    $clinic->radno_vrijeme = $this->decodeJsonColumn($clinic->radno_vrijeme, null);
+                    $clinic->specijalnosti = $clinicSpecialties->get($clinic->id, collect())
+                        ->map(fn ($row) => ['id' => $row->id, 'naziv' => $row->naziv])
+                        ->take(3)
+                        ->values();
+
+                    return $clinic;
+                });
 
                 $response['clinics'] = $clinics->toArray();
                 Log::info('Clinics loaded: ' . count($clinics));
@@ -309,7 +336,7 @@ class HomepageController extends Controller
     public function clearCache()
     {
         try {
-            Cache::forget('homepage:data:v2');
+            Cache::forget('homepage:data:v3');
             Log::info('Homepage cache cleared');
             return response()->json(['message' => 'Cache cleared']);
         } catch (\Exception $e) {
@@ -327,5 +354,14 @@ class HomepageController extends Controller
     private function shouldExposeErrorDetails(): bool
     {
         return app()->environment(['local', 'testing']) || (bool) config('app.debug');
+    }
+
+    private function decodeJsonColumn($value, $fallback)
+    {
+        if (is_string($value)) {
+            return json_decode($value, true) ?? $fallback;
+        }
+
+        return $value ?? $fallback;
     }
 }

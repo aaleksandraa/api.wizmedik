@@ -114,13 +114,13 @@ class SettingsController extends Controller
     public function getClinicCardSettings()
     {
         return response()->json([
-            'variant' => SiteSetting::get('clinic_card_variant', 'classic'),
+            'variant' => SiteSetting::get('clinic_card_variant', 'wizmedik'),
             'showImage' => SiteSetting::get('clinic_card_show_image', 'true') === 'true',
             'showDescription' => SiteSetting::get('clinic_card_show_description', 'true') === 'true',
             'showAddress' => SiteSetting::get('clinic_card_show_address', 'true') === 'true',
             'showPhone' => SiteSetting::get('clinic_card_show_phone', 'true') === 'true',
-            'showEmail' => SiteSetting::get('clinic_card_show_email', 'false') === 'true',
-            'showWebsite' => SiteSetting::get('clinic_card_show_website', 'false') === 'true',
+            'showEmail' => SiteSetting::get('clinic_card_show_email', 'true') === 'true',
+            'showWebsite' => SiteSetting::get('clinic_card_show_website', 'true') === 'true',
             'showWorkingHours' => SiteSetting::get('clinic_card_show_working_hours', 'true') === 'true',
             'showDoctorsCount' => SiteSetting::get('clinic_card_show_doctors_count', 'true') === 'true',
             'showDistance' => SiteSetting::get('clinic_card_show_distance', 'true') === 'true',

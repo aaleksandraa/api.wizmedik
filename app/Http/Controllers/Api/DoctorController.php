@@ -27,8 +27,8 @@ class DoctorController extends Controller
 
         $query = Doktor::query()
             ->select([
-                'id', 'ime', 'prezime', 'slug', 'specijalnost', 'grad',
-                'ocjena', 'broj_ocjena', 'slika_profila', 'klinika_id',
+                'id', 'ime', 'prezime', 'slug', 'specijalnost', 'grad', 'lokacija',
+                'telefon', 'email', 'public_email', 'ocjena', 'broj_ocjena', 'slika_profila', 'klinika_id',
                 'prihvata_online'
             ])
             ->with([

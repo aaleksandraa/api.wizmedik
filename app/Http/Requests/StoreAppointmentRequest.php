@@ -25,13 +25,15 @@ class StoreAppointmentRequest extends FormRequest
             'razlog' => ['nullable', 'string', 'max:500'],
             'napomene' => ['nullable', 'string', 'max:1000'],
             'usluga_id' => ['nullable', 'integer', 'exists:usluge,id'],
-            'trajanje_minuti' => ['nullable', 'integer', 'min:15', 'max:240'],
+            // Client may send duration for UX, but backend recalculates from usluga.
+            'trajanje_minuti' => ['nullable', 'integer', 'min:5', 'max:240'],
 
             // Guest booking fields
             'guest_ime' => ['required_without:user_id', 'string', 'max:100', 'regex:/^[\p{L}\s\-]+$/u'],
             'guest_prezime' => ['required_without:user_id', 'string', 'max:100', 'regex:/^[\p{L}\s\-]+$/u'],
             'guest_telefon' => ['required_without:user_id', 'string', 'regex:/^[\+]?[0-9\s\-\(\)]{9,20}$/'],
-            'guest_email' => ['nullable', 'email:rfc,dns', 'max:255'],
+            // Avoid email:dns — DNS lookups can hang the booking request for tens of seconds.
+            'guest_email' => ['nullable', 'email:rfc', 'max:255'],
 
             'gostovanje_id' => ['nullable', 'integer', 'exists:klinika_doktor_gostovanja,id'],
             'klinika_id' => ['nullable', 'integer', 'exists:klinike,id'],
@@ -58,12 +60,20 @@ class StoreAppointmentRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $guestEmail = $this->input('guest_email', $this->input('email'));
+        if (is_string($guestEmail)) {
+            $guestEmail = trim($guestEmail);
+        }
+        if ($guestEmail === '' || $guestEmail === null) {
+            $guestEmail = null;
+        }
+
         // Backward compatibility for payloads that still use ime/prezime/telefon/email
         $this->merge([
             'guest_ime' => $this->input('guest_ime', $this->input('ime')),
             'guest_prezime' => $this->input('guest_prezime', $this->input('prezime')),
             'guest_telefon' => $this->input('guest_telefon', $this->input('telefon')),
-            'guest_email' => $this->input('guest_email', $this->input('email')),
+            'guest_email' => $guestEmail,
             // Support both napomena and napomene keys
             'napomene' => $this->input('napomene', $this->input('napomena')),
         ]);

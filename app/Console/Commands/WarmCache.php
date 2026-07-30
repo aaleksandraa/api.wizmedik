@@ -37,14 +37,14 @@ class WarmCache extends Command
             // Forget only the keys we are about to rebuild - never flush the
             // whole cache store (that would wipe every other app cache too).
             $this->info('Forgetting warmed keys...');
-            Cache::forget('homepage:data:v2');
+            Cache::forget('homepage:data:v3');
             Cache::forget('clinics:list:limit:1000');
         }
 
         $this->info('Warming homepage cache...');
         try {
             app(HomepageController::class)->getData();
-            $this->info('  homepage:data:v2 ready');
+            $this->info('  homepage:data:v3 ready');
         } catch (\Throwable $e) {
             $this->error('  homepage warm failed: ' . $e->getMessage());
         }

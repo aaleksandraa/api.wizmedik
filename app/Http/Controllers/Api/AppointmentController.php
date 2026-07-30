@@ -105,16 +105,7 @@ class AppointmentController extends Controller
             return response()->json(['error' => $e->getMessage(), 'message' => $e->getMessage()], 409);
         }
 
-        // Send notifications (must not break booking response)
-        try {
-            $termin->load(['doktor.klinika', 'user', 'usluga', 'gostovanje.klinika']);
-            NotifikacijaService::terminZakazan($termin);
-        } catch (\Throwable $notificationError) {
-            Log::error('Appointment notification failed after booking', [
-                'termin_id' => $termin->id,
-                'error' => $notificationError->getMessage(),
-            ]);
-        }
+        $this->notifyAppointmentCreated($termin->id, true);
 
         return response()->json($termin->load(['doktor', 'usluga', 'gostovanje.klinika']), 201);
     }
@@ -175,16 +166,7 @@ class AppointmentController extends Controller
             return response()->json(['error' => $e->getMessage(), 'message' => $e->getMessage()], 409);
         }
 
-        // Send notifications (must not break booking response)
-        try {
-            $termin->load(['doktor.klinika', 'usluga', 'gostovanje.klinika']);
-            NotifikacijaService::terminZakazan($termin);
-        } catch (\Throwable $notificationError) {
-            Log::error('Guest appointment notification failed after booking', [
-                'termin_id' => $termin->id,
-                'error' => $notificationError->getMessage(),
-            ]);
-        }
+        $this->notifyAppointmentCreated($termin->id, false);
 
         return response()->json($termin->load(['doktor', 'usluga', 'gostovanje.klinika']), 201);
     }
@@ -255,16 +237,7 @@ class AppointmentController extends Controller
             return response()->json(['error' => $e->getMessage(), 'message' => $e->getMessage()], 409);
         }
 
-        // Send notifications (must not break booking response)
-        try {
-            $termin->load(['doktor.klinika', 'usluga']);
-            NotifikacijaService::terminZakazan($termin);
-        } catch (\Throwable $notificationError) {
-            Log::error('Manual appointment notification failed after booking', [
-                'termin_id' => $termin->id,
-                'error' => $notificationError->getMessage(),
-            ]);
-        }
+        $this->notifyAppointmentCreated($termin->id, false);
 
         return response()->json($termin->load(['doktor', 'usluga']), 201);
     }
@@ -344,9 +317,49 @@ class AppointmentController extends Controller
 
         $termin->update(['status' => 'otkazan']);
 
-        // Send cancellation notifications
-        NotifikacijaService::terminOtkazan($termin, $cancelledBy);
+        // Email can be slow (SMTP); respond first, notify after the response is sent.
+        $terminId = $termin->id;
+        dispatch(function () use ($terminId, $cancelledBy) {
+            try {
+                $termin = Termin::with(['doktor.klinika', 'user', 'usluga'])->find($terminId);
+                if ($termin) {
+                    NotifikacijaService::terminOtkazan($termin, $cancelledBy);
+                }
+            } catch (\Throwable $notificationError) {
+                Log::error('Appointment cancellation notification failed', [
+                    'termin_id' => $terminId,
+                    'error' => $notificationError->getMessage(),
+                ]);
+            }
+        })->afterResponse();
 
         return response()->json(['message' => 'Termin je uspješno otkazan']);
+    }
+
+    /**
+     * SMTP mail is slow/unreliable in some environments. Never block the booking HTTP response on it.
+     */
+    private function notifyAppointmentCreated(int $terminId, bool $withUser = false): void
+    {
+        dispatch(function () use ($terminId, $withUser) {
+            try {
+                $with = ['doktor.klinika', 'usluga', 'gostovanje.klinika'];
+                if ($withUser) {
+                    $with[] = 'user';
+                }
+
+                $termin = Termin::with($with)->find($terminId);
+                if (!$termin) {
+                    return;
+                }
+
+                NotifikacijaService::terminZakazan($termin);
+            } catch (\Throwable $notificationError) {
+                Log::error('Appointment notification failed after booking', [
+                    'termin_id' => $terminId,
+                    'error' => $notificationError->getMessage(),
+                ]);
+            }
+        })->afterResponse();
     }
 }

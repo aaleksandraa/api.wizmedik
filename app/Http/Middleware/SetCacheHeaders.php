@@ -72,6 +72,11 @@ class SetCacheHeaders
 
         foreach ($publicEndpoints as $endpoint) {
             if (str_starts_with($path, $endpoint)) {
+                if (app()->environment('local')) {
+                    $response->headers->set('Cache-Control', 'no-cache, private');
+                    return $response;
+                }
+
                 $response->headers->set('Cache-Control', 'public, max-age=300, s-maxage=600');
                 $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 300) . ' GMT');
                 return $response;
@@ -112,6 +117,11 @@ class SetCacheHeaders
 
         // Homepage data - 5 minutes cache
         if (str_contains($path, 'api/homepage')) {
+            if (app()->environment('local')) {
+                $response->headers->set('Cache-Control', 'no-cache, private');
+                return $response;
+            }
+
             $response->headers->set('Cache-Control', 'public, max-age=300, s-maxage=600');
             $response->headers->set('Expires', gmdate('D, d M Y H:i:s', time() + 300) . ' GMT');
             return $response;

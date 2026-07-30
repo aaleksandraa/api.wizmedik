@@ -58,6 +58,7 @@ class DatabaseSeeder extends Seeder
             SpecialtiesSeeder::class,
             ClinicsSeeder::class,
             DoctorsSeeder::class,
+            DoctorServicesSeeder::class,
 
             // Laboratory system
             KategorijeAnalizaSeeder::class,
