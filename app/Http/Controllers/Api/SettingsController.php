@@ -487,4 +487,29 @@ class SettingsController extends Controller
 
         return response()->json(['message' => 'Template ažuriran']);
     }
+
+    /**
+     * Get AdSense settings (public)
+     */
+    public function getAdSenseSettings()
+    {
+        return response()->json([
+            'enabled' => SiteSetting::get('adsense_enabled', 'false') === 'true',
+            'client' => SiteSetting::get('adsense_client', 'ca-pub-1407310093643341'),
+        ]);
+    }
+
+    /**
+     * Update AdSense settings (admin only)
+     */
+    public function updateAdSenseSettings(Request $request)
+    {
+        $request->validate([
+            'enabled' => 'required|boolean',
+        ]);
+
+        SiteSetting::set('adsense_enabled', $request->enabled ? 'true' : 'false');
+
+        return response()->json(['message' => 'AdSense postavke ažurirane']);
+    }
 }

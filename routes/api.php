@@ -152,6 +152,7 @@ Route::get('/settings/specialty-template', [SettingsController::class, 'getSpeci
 Route::get('/settings/blog-typography', [SettingsController::class, 'getBlogTypography']);
 Route::get('/settings/listing-template', [SettingsController::class, 'getListingTemplate']);
 Route::get('/settings/cookie', [SettingsController::class, 'getCookieSettings']);
+Route::get('/settings/adsense', [SettingsController::class, 'getAdSenseSettings']);
 Route::get('/settings/privacy-policy', [SettingsController::class, 'getPrivacyPolicy']);
 Route::get('/settings/terms-of-service', [SettingsController::class, 'getTermsOfService']);
 
@@ -693,6 +694,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/settings/privacy-policy', [SettingsController::class, 'updatePrivacyPolicy']);
         Route::put('/settings/terms-of-service', [SettingsController::class, 'updateTermsOfService']);
         Route::put('/settings/cookie', [SettingsController::class, 'updateCookieSettings']);
+        Route::put('/settings/adsense', [SettingsController::class, 'updateAdSenseSettings']);
 
         // Laboratory Management
         Route::get('/laboratorije', [\App\Http\Controllers\Api\AdminLaboratorijaController::class, 'index']);
