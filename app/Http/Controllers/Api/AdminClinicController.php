@@ -41,8 +41,14 @@ class AdminClinicController extends Controller
             $query->byCity($request->grad);
         }
 
-        if ($request->has('search')) {
-            $query->where('naziv', 'ilike', '%'.$request->search.'%');
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('naziv', 'ilike', "%{$search}%")
+                    ->orWhere('grad', 'ilike', "%{$search}%")
+                    ->orWhere('adresa', 'ilike', "%{$search}%")
+                    ->orWhere('telefon', 'ilike', "%{$search}%");
+            });
         }
 
         // Admin-specific filters

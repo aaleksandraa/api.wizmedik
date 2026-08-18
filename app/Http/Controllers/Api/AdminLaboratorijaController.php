@@ -35,10 +35,12 @@ class AdminLaboratorijaController extends Controller
                 ->withCount(['analize', 'paketi']);
 
             // Search
-            if ($request->has('search')) {
-                $search = $request->search;
+            if ($request->filled('search')) {
+                $search = trim((string) $request->search);
                 $query->where(function($q) use ($search) {
                     $q->where('naziv', 'ILIKE', "%{$search}%")
+                      ->orWhere('grad', 'ILIKE', "%{$search}%")
+                      ->orWhere('adresa', 'ILIKE', "%{$search}%")
                       ->orWhere('email', 'ILIKE', "%{$search}%")
                       ->orWhere('telefon', 'LIKE', "%{$search}%");
                 });

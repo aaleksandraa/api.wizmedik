@@ -41,7 +41,7 @@ class AdminDoctorController extends Controller
             $query->where('klinika_id', $request->klinika_id);
         }
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $query->search($request->search);
         }
 

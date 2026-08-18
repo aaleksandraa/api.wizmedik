@@ -223,6 +223,7 @@ class Doktor extends Model
               ->orWhere('prezime', 'ilike', "%{$search}%")
               ->orWhere('specijalnost', 'ilike', "%{$search}%")
               ->orWhere('grad', 'ilike', "%{$search}%")
+              ->orWhere('telefon', 'ilike', "%{$search}%")
               ->orWhereRaw("CONCAT(ime, ' ', prezime) ILIKE ?", ["%{$search}%"]);
         });
     }

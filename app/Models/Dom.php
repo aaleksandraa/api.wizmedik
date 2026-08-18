@@ -227,7 +227,10 @@ class Dom extends Model
         return $query->where(function ($q) use ($term) {
             $q->where('naziv', 'ILIKE', "%{$term}%")
               ->orWhere('opis', 'ILIKE', "%{$term}%")
-              ->orWhere('grad', 'ILIKE', "%{$term}%");
+              ->orWhere('grad', 'ILIKE', "%{$term}%")
+              ->orWhere('adresa', 'ILIKE', "%{$term}%")
+              ->orWhere('email', 'ILIKE', "%{$term}%")
+              ->orWhere('telefon', 'ILIKE', "%{$term}%");
         });
     }
 

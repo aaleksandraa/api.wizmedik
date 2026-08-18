@@ -491,11 +491,23 @@ class AdminEntitiesController extends Controller
         $query = Pitanje::with('user:id,ime,prezime,email')
             ->orderBy('created_at', 'desc');
 
-        if ($request->per_page) {
-            return response()->json($query->paginate($request->per_page));
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('naslov', 'ilike', "%{$search}%")
+                    ->orWhere('sadrzaj', 'ilike', "%{$search}%")
+                    ->orWhere('ime_korisnika', 'ilike', "%{$search}%")
+                    ->orWhereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where('ime', 'ilike', "%{$search}%")
+                            ->orWhere('prezime', 'ilike', "%{$search}%")
+                            ->orWhere('email', 'ilike', "%{$search}%");
+                    });
+            });
         }
 
-        return response()->json($query->get());
+        $perPage = min((int) $request->get('per_page', 20), 100);
+
+        return response()->json($query->paginate($perPage));
     }
 
     public function updateQuestion(Request $request, int $id)
