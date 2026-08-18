@@ -53,10 +53,16 @@ class DoctorNameNormalizer
         }
 
         $parts = preg_split('/\s+/u', $stripped) ?: [];
+        if ($this->isAllCaps($stripped)) {
+            $parts = array_map(
+                fn (string $part) => mb_convert_case($part, MB_CASE_TITLE, 'UTF-8'),
+                $parts
+            );
+        }
         $ime = $parts[0] ?? null;
         $prezime = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : null;
 
-        $matchKey = mb_strtolower($stripped);
+        $matchKey = mb_strtolower(trim(implode(' ', $parts)));
         $asciiKey = $this->ascii($matchKey);
 
         return [
@@ -66,6 +72,13 @@ class DoctorNameNormalizer
             'match_key' => $matchKey,
             'ascii_key' => $asciiKey,
         ];
+    }
+
+    private function isAllCaps(string $value): bool
+    {
+        return $value !== ''
+            && $value === mb_strtoupper($value, 'UTF-8')
+            && (bool) preg_match('/\p{L}/u', $value);
     }
 
     public function ascii(string $value): string

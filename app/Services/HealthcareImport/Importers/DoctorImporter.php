@@ -3,6 +3,7 @@
 namespace App\Services\HealthcareImport\Importers;
 
 use App\Models\Doktor;
+use App\Models\Klinika;
 use App\Services\HealthcareImport\Matchers\DoctorMatcher;
 use App\Services\HealthcareImport\Normalizers\DoctorNameNormalizer;
 use App\Services\HealthcareImport\Normalizers\PhoneNormalizer;
@@ -43,12 +44,12 @@ class DoctorImporter extends AbstractSheetImporter
                 : null;
             $clinic = $klinikaId ? $this->context->resolveClinic($klinikaId) : null;
 
-            if (!$clinic) {
-                $this->record('03_DOCTORS', $row, 'review', 'doctor', $externalId, $raw, $parsed, [], [], null, [], 'missing_affiliation');
+            if ($institutionExternalId && !$clinic) {
+                $this->record('03_DOCTORS', $row, 'review', 'doctor', $externalId, $raw, $parsed, [], [], null, [], 'institution_not_imported');
                 continue;
             }
 
-            if ($this->isClaimed($clinic)) {
+            if ($clinic && $this->isClaimed($clinic)) {
                 $this->record('03_DOCTORS', $row, 'review', 'doctor', $externalId, $raw, $parsed, [], [], $clinic, [], 'claimed_clinic');
                 continue;
             }
@@ -61,6 +62,9 @@ class DoctorImporter extends AbstractSheetImporter
                 $warnings[] = 'specialty_unmapped';
             }
 
+            $location = $this->resolvePractice($raw, $clinic, $phones);
+            $warnings = array_merge($warnings, $location['warnings']);
+
             $profileUrl = $urls->normalize($this->string($raw['Profile URL'] ?? null));
             $normalized = [
                 'ime' => $parsed['ime'],
@@ -68,12 +72,24 @@ class DoctorImporter extends AbstractSheetImporter
                 'match_key' => $parsed['match_key'],
                 'specijalnost' => $specialtySource ?? 'Nepoznata',
                 'specijalnost_id' => $specialtyMatch['id'] ?? null,
-                'klinika_id' => $clinic->id,
-                'grad' => $clinic->grad,
-                'lokacija' => $clinic->adresa,
-                'telefon' => $phones->normalize($clinic->telefon) ?? $clinic->telefon,
+                'klinika_id' => $clinic?->id,
+                'grad' => $location['grad'],
+                'lokacija' => $location['lokacija'],
+                'telefon' => $location['telefon'],
                 'profile_url' => $profileUrl,
+                'standalone' => $clinic === null,
             ];
+
+            $missing = [];
+            foreach (['grad', 'lokacija', 'telefon'] as $required) {
+                if ($this->isEmpty($normalized[$required])) {
+                    $missing[] = $required;
+                }
+            }
+            if ($missing !== []) {
+                $this->record('03_DOCTORS', $row, 'failed', 'doctor', $externalId, $raw, $normalized, $warnings, $missing, null, [], 'missing_required');
+                continue;
+            }
 
             $mappedId = $externalId ? $this->context->mappedId('doctor', $externalId) : null;
             $existing = $mappedId ? $this->context->resolveDoctor($mappedId) : null;
@@ -99,14 +115,17 @@ class DoctorImporter extends AbstractSheetImporter
                     continue;
                 }
 
-                $changed = $this->fillEmpty($existing, [
-                    'klinika_id' => $clinic->id,
-                    'grad' => $clinic->grad,
-                    'lokacija' => $clinic->adresa,
+                $fill = [
+                    'grad' => $normalized['grad'],
+                    'lokacija' => $normalized['lokacija'],
                     'telefon' => $normalized['telefon'],
                     'specijalnost' => $normalized['specijalnost'],
                     'specijalnost_id' => $normalized['specijalnost_id'],
-                ]);
+                ];
+                if ($clinic) {
+                    $fill['klinika_id'] = $clinic->id;
+                }
+                $changed = $this->fillEmpty($existing, $fill);
                 if (!$this->context->dryRun && $changed) {
                     $existing->save();
                 }
@@ -122,9 +141,9 @@ class DoctorImporter extends AbstractSheetImporter
                 'prezime' => $parsed['prezime'],
                 'specijalnost' => $normalized['specijalnost'],
                 'specijalnost_id' => $normalized['specijalnost_id'],
-                'klinika_id' => $clinic->id,
-                'grad' => $clinic->grad,
-                'lokacija' => $clinic->adresa,
+                'klinika_id' => $clinic?->id,
+                'grad' => $normalized['grad'],
+                'lokacija' => $normalized['lokacija'],
                 'telefon' => $normalized['telefon'],
                 'aktivan' => true,
                 'verifikovan' => true,
@@ -146,8 +165,83 @@ class DoctorImporter extends AbstractSheetImporter
                 $doctor->id = $id;
             }
 
-            $this->record('03_DOCTORS', $row, $warnings !== [] ? 'review' : 'create', 'doctor', $externalId, $raw, $normalized, $warnings, [], $doctor->id ? $doctor : null, [], $warnings[0] ?? null);
+            $qualityWarnings = array_values(array_filter(
+                $warnings,
+                fn (string $warning) => $warning !== 'standalone_doctor'
+            ));
+            $action = $qualityWarnings !== [] ? 'review' : 'create';
+            $this->record('03_DOCTORS', $row, $action, 'doctor', $externalId, $raw, $normalized, $warnings, [], $doctor->id ? $doctor : null, [], $qualityWarnings[0] ?? null);
         }
+    }
+
+    /**
+     * @return array{grad:?string,lokacija:?string,telefon:?string,warnings:list<string>}
+     */
+    private function resolvePractice(array $raw, ?Klinika $clinic, PhoneNormalizer $phones): array
+    {
+        if ($clinic) {
+            return [
+                'grad' => $clinic->grad,
+                'lokacija' => $clinic->adresa,
+                'telefon' => $phones->normalize($clinic->telefon) ?? $clinic->telefon,
+                'warnings' => [],
+            ];
+        }
+
+        $warnings = ['standalone_doctor'];
+        $cityRaw = $this->string($raw['Grad'] ?? null) ?? $this->inferCityFromSource($raw);
+        $cityMatch = $this->context->cities->match($cityRaw);
+        $grad = $cityMatch['naziv'] ?? $cityRaw;
+        if ($cityRaw && !$cityMatch) {
+            $warnings[] = 'city_unmapped';
+        }
+
+        $lokacija = $this->string($raw['Adresa'] ?? null)
+            ?? $this->string($raw['Lokacija'] ?? null)
+            ?? $grad;
+        if ($this->string($raw['Adresa'] ?? null) === null && $this->string($raw['Lokacija'] ?? null) === null && $grad) {
+            $warnings[] = 'standalone_address_from_city';
+        }
+
+        $telefon = $phones->normalize($this->string($raw['Telefon'] ?? null) ?? $this->string($raw['Telefon normalizovan'] ?? null))
+            ?? $this->string($raw['Telefon'] ?? null);
+
+        if ($this->isEmpty($telefon) && $this->isPublicRegistryWithoutContacts($raw)) {
+            $telefon = (string) config('healthcare-import.unpublished_phone', 'nije javno');
+            $warnings[] = 'phone_not_published';
+        }
+
+        return [
+            'grad' => $grad,
+            'lokacija' => $lokacija,
+            'telefon' => $telefon,
+            'warnings' => $warnings,
+        ];
+    }
+
+    private function inferCityFromSource(array $raw): ?string
+    {
+        $hints = (array) config('healthcare-import.standalone_source_cities', []);
+        $source = mb_strtolower((string) ($raw['Primary source'] ?? ''));
+        $notes = mb_strtolower((string) ($raw['Napomene'] ?? ''));
+
+        foreach ($hints as $needle => $city) {
+            $needle = mb_strtolower((string) $needle);
+            if ($needle !== '' && (str_contains($source, $needle) || str_contains($notes, $needle))) {
+                return (string) $city;
+            }
+        }
+
+        return null;
+    }
+
+    private function isPublicRegistryWithoutContacts(array $raw): bool
+    {
+        $type = mb_strtolower((string) ($raw['Source type'] ?? ''));
+        $notes = mb_strtolower((string) ($raw['Napomene'] ?? ''));
+
+        return $type === 'health_insurance_registry'
+            || str_contains($notes, 'bez privatnih kontakt');
     }
 
     private function attachSpecialty(Doktor $doctor, ?int $specialtyId): void

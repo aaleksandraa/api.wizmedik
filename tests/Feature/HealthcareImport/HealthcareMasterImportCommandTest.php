@@ -76,10 +76,11 @@ class HealthcareMasterImportCommandTest extends TestCase
         ])->assertSuccessful();
 
         $this->assertSame(1, Klinika::query()->count());
-        $this->assertSame(1, Doktor::query()->count());
+        $this->assertSame(2, Doktor::query()->count());
 
         $clinic = Klinika::query()->firstOrFail();
-        $doctor = Doktor::query()->firstOrFail();
+        $doctor = Doktor::query()->where('prezime', 'Arambašić')->firstOrFail();
+        $solo = Doktor::query()->where('prezime', 'Solo')->firstOrFail();
 
         $this->assertTrue((bool) $clinic->aktivan);
         $this->assertTrue((bool) $clinic->verifikovan);
@@ -95,6 +96,12 @@ class HealthcareMasterImportCommandTest extends TestCase
         $this->assertSame($clinic->id, $doctor->klinika_id);
         $this->assertTrue($clinic->specijalnosti()->where('slug', 'gastroenterologija')->exists());
 
+        $this->assertNull($solo->klinika_id);
+        $this->assertTrue((bool) $solo->aktivan);
+        $this->assertTrue((bool) $solo->verifikovan);
+        $this->assertSame('Sarajevo', $solo->grad);
+        $this->assertFalse((bool) $solo->prihvata_online);
+
         $this->artisan('wizmedik:import-healthcare-master', [
             'file' => $path,
             '--force' => true,
@@ -102,7 +109,7 @@ class HealthcareMasterImportCommandTest extends TestCase
         ])->assertSuccessful();
 
         $this->assertSame(1, Klinika::query()->count());
-        $this->assertSame(1, Doktor::query()->count());
+        $this->assertSame(2, Doktor::query()->count());
     }
 
     public function test_claimed_profile_is_not_overwritten(): void
@@ -223,8 +230,9 @@ class HealthcareMasterImportCommandTest extends TestCase
         ]);
 
         $this->addSheet($spreadsheet, '03_DOCTORS', [
-            ['Doctor ID', 'Ime i prezime / javna titula', 'Profesionalna titula', 'Primarna specijalnost', 'Subspecijalnost / uža oblast', 'Profile URL', 'Primary source', 'Source type', 'Confidence', 'Public professional data only', 'Napomene'],
-            ['DOC-TEST-001', 'dr Pavle Arambašić', 'dr', 'Gastroenterologija', 'Hepatologija', null, 'https://test.example', 'official_website', 'high', 'YES', 'public'],
+            ['Doctor ID', 'Ime i prezime / javna titula', 'Profesionalna titula', 'Primarna specijalnost', 'Subspecijalnost / uža oblast', 'Profile URL', 'Primary source', 'Source type', 'Confidence', 'Public professional data only', 'Napomene', 'Grad', 'Adresa', 'Telefon'],
+            ['DOC-TEST-001', 'dr Pavle Arambašić', 'dr', 'Gastroenterologija', 'Hepatologija', null, 'https://test.example', 'official_website', 'high', 'YES', 'public', null, null, null],
+            ['DOC-TEST-SOLO', 'dr Ana Solo', 'dr', 'Gastroenterologija', null, null, 'https://solo.example', 'official_website', 'high', 'YES', 'samostalna ordinacija', 'Sarajevo', 'Titova 12', '+387 33 999 111'],
         ]);
 
         $this->addSheet($spreadsheet, '04_DOCTOR_INSTITUTIONS', [

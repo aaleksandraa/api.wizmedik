@@ -26,6 +26,17 @@ return [
         'rehabilitation_center',
     ],
 
+    /*
+     * Host/fragment from Excel Primary source or Napomene → existing gradovi.naziv.
+     * Used only for doctors without a clinic affiliation.
+     */
+    'standalone_source_cities' => [
+        'zzotk.ba' => 'Tuzla',
+        'zzo tk' => 'Tuzla',
+    ],
+
+    'unpublished_phone' => 'nije javno',
+
     'forbidden_tables' => [
         'apoteke_firme',
         'apoteke_poslovnice',

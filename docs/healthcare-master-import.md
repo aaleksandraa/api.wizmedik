@@ -17,6 +17,7 @@ Importer **ne mijenja** kolone na `klinike` / `doktori`. Provenance i Excel ID-j
 - Produkcioni import se ne pokreće dok se eksplicitno ne odobri.
 - Postojeći unclaimed profil se ne dira bez `--update-existing` (ni prazna polja, ni specijalnosti, ni radno vrijeme).
 - Claimed profil (`user_id` popunjen) se ne pregazi; novi doktori se ne vežu na claimed kliniku.
+- Doktor **ne mora** imati kliniku (`klinika_id` nullable). Samostalni doktor je validan javni profil.
 - Pravi import ide u **jednoj** DB transakciji: ili sve klinike/doktori iz tog run-a, ili rollback.
 
 ## Excel Tip → akcija
@@ -50,8 +51,8 @@ Importer **ne mijenja** kolone na `klinike` / `doktori`. Provenance i Excel ID-j
 | `03_DOCTORS.Ime i prezime / javna titula` | Doktor | `doktori` | `ime`,`prezime` | DoctorNameNormalizer | da | — | failed ako se ne može splitati |
 | `03_DOCTORS.Primarna specijalnost` | Doktor | `doktori` | `specijalnost` | trim | da | affiliation specialty | string uvijek; FK samo uz siguran slug |
 | `05 Canonical candidate` | Specijalnost | `doktor_specijalnost` / `specijalnost_id` | — | SpecialtyMatcher | ne | alias mapa | exact/alias CREATE veze; candidate/fuzzy REVIEW; nikad novi slug |
-| `04 Doctor ID + Institution ID` | Doktor | `doktori` | `klinika_id` | prva affiliation | za insert | — | 563 bez veze → REVIEW, bez inserta; 2+ klinike → REVIEW |
-| doktor telefon/grad/lokacija | Doktor | `doktori` | `telefon`,`grad`,`lokacija` | s primarne klinike | da | — | Excel ih nema |
+| `04 Doctor ID + Institution ID` | Doktor | `doktori` | `klinika_id` | prva affiliation | ne | samostalni doktor | `klinika_id` je nullable; bez veze → samostalni profil ako ima grad/lokacija/telefon; 2+ klinike → REVIEW |
+| doktor telefon/grad/lokacija | Doktor | `doktori` | `telefon`,`grad`,`lokacija` | s klinike ili sa 03 kolona / izvora | da | ZZO TK → Tuzla + `nije javno` | Excel 03 nema kontakt; admin i DB zahtijevaju ova polja |
 | `doktori.mjesto/opstina` | Doktor | `doktori` | `mjesto`,`opstina` | — | ne | — | Excel nema → prazno |
 | `09 Working hours raw` | Klinika | `klinike` | `radno_vrijeme` | WorkingHours parser | ne | — | parse OK → fill empty; inače REVIEW |
 | doktor radno vrijeme | Doktor | `doktori` | `radno_vrijeme` | — | ne | — | Excel nema → prazno |
@@ -90,17 +91,17 @@ php artisan migrate --path=database/migrations/2026_08_18_230002_create_import_e
 
 Te migracije **ne diraju** `klinike`, `doktori`, `apoteke_*` ni `lijekovi`.
 
-Očekivano u dry-run: stotine REVIEW (candidate specijalnosti, doktori bez klinike, raw hours, extra affiliations). Broj `klinike`/`doktori`/`apoteke_*` ostaje isti.
+Očekivano u dry-run: stotine REVIEW (candidate specijalnosti, samostalni ZZO doktori bez adrese, raw hours). Broj `klinike`/`doktori`/`apoteke_*` ostaje isti.
 
-Lokalni dry-run 2026-08-19 (baza `wizmedik` ostala nepromijenjena: 5 klinika, 11 doktora, 0 apoteka, 0 lijekova):
+Lokalni dry-run 2026-08-19 nakon samostalnih doktora (baza `wizmedik` ostala nepromijenjena: 5 klinika, 11 doktora, 0 apoteka, 0 lijekova):
 
 | Sheet | Rows | Create | Skip | Review | Failed |
 |-------|------|--------|------|--------|--------|
 | 01_INSTITUTIONS | 696 | 579 | 56 | 9 | 57 missing_required |
 | 03_DOCTORS | 1372 | 469 | 0 | 870 | 33 name_unparsed |
-| 05_DOCTOR_SPECIALITIES | 1384 | — | 382 | 504 specialty_unmapped | 0 |
+| 05_DOCTOR_SPECIALITIES | 1384 | — | 181 | 504 specialty_unmapped | 0 |
 | 07_INST_SERVICES | 71 | — | — | 71 unsupported | 0 |
 
-Glavni REVIEW razlozi: `specialty_unmapped` (825), `missing_affiliation` (746), `hours_unparsed` (68). Dry-run nije upisao ni audit tabele.
+Od 870 REVIEW na doktorima: 521 samostalni (`standalone_address_from_city`, `klinika_id` null), 183 ustanova nije uvezena, 166 nepoznata specijalnost. `missing_affiliation` više nije razlog za blokadu. Dry-run nije upisao ni audit tabele.
 
 Produkcijski import (bez `--dry-run`) **ne pokretati** dok se ne odobri.

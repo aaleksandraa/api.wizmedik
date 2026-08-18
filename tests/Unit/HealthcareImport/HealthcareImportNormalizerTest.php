@@ -50,4 +50,12 @@ class HealthcareImportNormalizerTest extends TestCase
     {
         $this->assertNull((new WorkingHoursParser())->parse('službeni header; kontakt stranica prikazuje i 09:00-17:00'));
     }
+
+    public function test_all_caps_registry_name_is_title_cased(): void
+    {
+        $parsed = (new DoctorNameNormalizer())->parse('ABDIBEGOVIĆ DŽENITA');
+
+        $this->assertSame('Abdibegović', $parsed['ime']);
+        $this->assertSame('Dženita', $parsed['prezime']);
+    }
 }
