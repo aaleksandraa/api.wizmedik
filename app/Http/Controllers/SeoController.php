@@ -85,9 +85,9 @@ class SeoController extends Controller
         $outputDirs = array_values(array_unique($outputDirs));
         $outputCandidates = [];
         foreach ($outputDirs as $dir) {
-            // If output base is httpdocs, prefer the actual frontend docroot template (httpdocs/dist/index.html)
-            $outputCandidates[] = $dir . DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR . 'index.html';
+            // Prefer live webroot shell so prerendered pages reference currently deployed hashes.
             $outputCandidates[] = $dir . DIRECTORY_SEPARATOR . 'index.html';
+            $outputCandidates[] = $dir . DIRECTORY_SEPARATOR . 'dist' . DIRECTORY_SEPARATOR . 'index.html';
         }
 
         $candidates = [

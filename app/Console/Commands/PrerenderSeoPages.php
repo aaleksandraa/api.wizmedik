@@ -57,6 +57,7 @@ class PrerenderSeoPages extends Command
         if ($templatePath !== null) {
             config(['app.seo_index_template_path' => $templatePath]);
             $this->info("Using SEO template: {$templatePath}");
+            $this->assertTemplateAssetsExist($templatePath, $primaryOutputDir);
         } else {
             $this->warn("Could not resolve a build template inside {$primaryOutputDir}; falling back to controller template discovery.");
         }
@@ -320,51 +321,83 @@ class PrerenderSeoPages extends Command
     }
 
     /**
+     * Mirror outputs receive sitemap files only. Never replace live assets/ or root index.html
+     * from a potentially stale build directory during scheduled prerender runs.
+     *
      * @param array<int, string> $outputDirs
      */
     private function syncPrimaryBuildArtifactsToMirrorOutputs(string $primaryOutputDir, array $outputDirs): void
     {
-        $sourceAssetsDir = rtrim($primaryOutputDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'assets';
-        $topLevelEntries = @scandir($primaryOutputDir);
-
-        if (!is_array($topLevelEntries)) {
-            return;
-        }
-
         foreach ($outputDirs as $outputDir) {
             if ($this->normalizePath($outputDir) === $this->normalizePath($primaryOutputDir)) {
                 continue;
             }
 
             if (!is_dir($outputDir) || !is_writable($outputDir)) {
-                $this->warn("Skipping build artifact sync for unavailable mirror output: {$outputDir}");
+                $this->warn("Skipping mirror sync for unavailable output: {$outputDir}");
                 continue;
             }
 
-            if (is_dir($sourceAssetsDir)) {
-                $targetAssetsDir = $outputDir . DIRECTORY_SEPARATOR . 'assets';
-                $this->deletePathRecursively($targetAssetsDir);
-                $this->copyDirectoryRecursively($sourceAssetsDir, $targetAssetsDir);
+            $this->syncSitemapArtifacts($primaryOutputDir, $outputDir);
+            $this->info("Mirrored sitemap artifacts to {$outputDir}");
+        }
+    }
+
+    private function syncSitemapArtifacts(string $sourceDir, string $targetDir): void
+    {
+        $entries = @scandir($sourceDir);
+        if (!is_array($entries)) {
+            return;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
             }
 
-            foreach ($topLevelEntries as $entry) {
-                if ($entry === '.' || $entry === '..' || $entry === 'assets') {
-                    continue;
-                }
-
-                $sourcePath = $primaryOutputDir . DIRECTORY_SEPARATOR . $entry;
-                $targetPath = $outputDir . DIRECTORY_SEPARATOR . $entry;
-
-                if (!is_file($sourcePath)) {
-                    continue;
-                }
-
-                if (!@copy($sourcePath, $targetPath)) {
-                    throw new \RuntimeException("Failed to copy build artifact '{$entry}' to '{$outputDir}'.");
-                }
+            if (!preg_match('/^sitemap(?:-[A-Za-z0-9-]+)?\.xml$/i', $entry)) {
+                continue;
             }
 
-            $this->info("Mirrored build artifacts to {$outputDir}");
+            $sourcePath = $sourceDir . DIRECTORY_SEPARATOR . $entry;
+            if (!is_file($sourcePath)) {
+                continue;
+            }
+
+            $targetPath = $targetDir . DIRECTORY_SEPARATOR . $entry;
+            if (!@copy($sourcePath, $targetPath)) {
+                throw new \RuntimeException("Failed to copy sitemap '{$entry}' to '{$targetDir}'.");
+            }
+        }
+    }
+
+    private function assertTemplateAssetsExist(string $templatePath, string $outputDir): void
+    {
+        $html = file_get_contents($templatePath);
+        if (!is_string($html) || trim($html) === '') {
+            throw new \RuntimeException("SEO template is empty: {$templatePath}");
+        }
+
+        $assetsDir = rtrim($outputDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'assets';
+        if (!is_dir($assetsDir)) {
+            throw new \RuntimeException("Missing assets directory for SEO template validation: {$assetsDir}");
+        }
+
+        preg_match('/\/assets\/index-[^"\']+\.js/', $html, $jsMatch);
+        preg_match('/\/assets\/index-[^"\']+\.css/', $html, $cssMatch);
+
+        foreach ([$jsMatch[0] ?? null, $cssMatch[0] ?? null] as $assetPath) {
+            if (!is_string($assetPath) || $assetPath === '') {
+                continue;
+            }
+
+            $fileName = basename($assetPath);
+            $fullPath = $assetsDir . DIRECTORY_SEPARATOR . $fileName;
+            if (!is_file($fullPath)) {
+                throw new \RuntimeException(
+                    "SEO template references missing asset '{$fileName}'. Deploy a fresh frontend build before prerender."
+                );
+            }
         }
     }
 
