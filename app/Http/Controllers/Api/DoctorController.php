@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Concerns\ResolvesSorting;
+use App\Http\Controllers\Concerns\SortsByDistance;
 use App\Http\Controllers\Controller;
 use App\Models\Doktor;
 use App\Models\Klinika;
 use App\Models\KlinikaDoktorZahtjev;
 use App\Models\ProfileSlugRedirect;
+use App\Models\Specijalnost;
 use App\Services\NotifikacijaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +18,7 @@ use Illuminate\Support\Facades\Hash;
 class DoctorController extends Controller
 {
     use ResolvesSorting;
+    use SortsByDistance;
 
     /**
      * Get list of doctors with filters
@@ -23,13 +26,13 @@ class DoctorController extends Controller
     public function index(Request $request)
     {
         // Limit per_page to prevent performance issues
-        $perPage = min($request->get('per_page', 15), 100);
+        $perPage = min((int) $request->get('per_page', 15), 100);
 
         $query = Doktor::query()
             ->select([
                 'id', 'ime', 'prezime', 'slug', 'specijalnost', 'grad', 'lokacija',
                 'telefon', 'email', 'public_email', 'ocjena', 'broj_ocjena', 'slika_profila', 'klinika_id',
-                'prihvata_online'
+                'prihvata_online', 'latitude', 'longitude'
             ])
             ->with([
                 'specijalnostModel:id,naziv,slug',
@@ -39,20 +42,19 @@ class DoctorController extends Controller
             ->aktivan()
             ->verifikovan();
 
-        // Filters
-        if ($request->has('grad')) {
-            $query->byCity($request->grad);
+        if ($request->filled('grad')) {
+            $cityValue = trim((string) $request->grad);
+            $normalizedCity = mb_strtolower(str_replace('-', ' ', $cityValue));
+            $query->whereRaw('LOWER(grad) = ?', [$normalizedCity]);
         }
 
-        if ($request->has('specijalnost')) {
-            $query->bySpecialty($request->specijalnost);
-        }
+        $this->applySpecialtyFilter($query, $request);
 
         if ($request->has('klinika_id')) {
             $query->where('klinika_id', $request->klinika_id);
         }
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $query->search($request->search);
         }
 
@@ -60,18 +62,119 @@ class DoctorController extends Controller
             $query->acceptingOnline();
         }
 
-        // Sorting (allowlisted to prevent SQL injection via order-by column)
-        $this->applySafeSort(
-            $query,
-            $request,
-            ['ocjena', 'broj_ocjena', 'ime', 'prezime', 'grad', 'created_at'],
-            'ocjena'
-        );
+        if (! $this->applyDistanceSort($query, $request, 'doktori')) {
+            $sortBy = (string) $request->get('sort_by', 'ime');
+            if ($sortBy === 'name') {
+                $sortBy = 'ime';
+            }
+            if ($sortBy === 'rating') {
+                $sortBy = 'ocjena';
+            }
+            $request->merge(['sort_by' => $sortBy]);
 
-        // Pagination
+            $this->applySafeSort(
+                $query,
+                $request,
+                ['ocjena', 'broj_ocjena', 'ime', 'prezime', 'grad', 'created_at'],
+                'ime',
+                'asc'
+            );
+            $query->orderBy('doktori.id');
+        }
+
         $doctors = $query->paginate($perPage);
 
         return response()->json($doctors);
+    }
+
+    private function applySpecialtyFilter($query, Request $request): void
+    {
+        $values = [];
+
+        if ($request->filled('specijalnost_id')) {
+            foreach (preg_split('/\s*,\s*/', (string) $request->specijalnost_id, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $id) {
+                if (is_numeric($id)) {
+                    $values[] = (string) ((int) $id);
+                }
+            }
+        } elseif ($request->filled('specijalnost')) {
+            $values = preg_split('/\s*,\s*/', (string) $request->specijalnost, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+
+        if ($values === []) {
+            return;
+        }
+
+        $expandChildren = count($values) === 1;
+        $specialtyIds = [];
+        foreach ($values as $value) {
+            $specialtyIds = array_merge($specialtyIds, $this->resolveSpecialtyIds($value, $expandChildren));
+        }
+        $specialtyIds = array_values(array_unique(array_map('intval', $specialtyIds)));
+
+        if ($specialtyIds === []) {
+            return;
+        }
+
+        $specialtyNames = Specijalnost::query()
+            ->whereIn('id', $specialtyIds)
+            ->pluck('naziv')
+            ->map(fn ($name) => mb_strtolower((string) $name))
+            ->values()
+            ->all();
+
+        $query->where(function ($builder) use ($specialtyIds, $specialtyNames) {
+            $builder->whereIn('specijalnost_id', $specialtyIds)
+                ->orWhereHas('specijalnosti', function ($specialtyQuery) use ($specialtyIds) {
+                    $specialtyQuery->whereIn('specijalnosti.id', $specialtyIds);
+                });
+
+            if ($specialtyNames !== []) {
+                $builder->orWhereIn(DB::raw('LOWER(specijalnost)'), $specialtyNames);
+            }
+        });
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function resolveSpecialtyIds(string $value, bool $includeChildren = true): array
+    {
+        $normalizedValue = trim($value);
+        if ($normalizedValue === '') {
+            return [];
+        }
+
+        $decodedName = str_replace('-', ' ', urldecode($normalizedValue));
+
+        $baseSpecialty = Specijalnost::query()
+            ->where('aktivan', true)
+            ->where(function ($query) use ($normalizedValue, $decodedName) {
+                if (is_numeric($normalizedValue)) {
+                    $query->orWhere('id', (int) $normalizedValue);
+                }
+
+                $query->orWhere('slug', $normalizedValue)
+                    ->orWhereRaw('LOWER(naziv) = ?', [mb_strtolower($decodedName)]);
+            })
+            ->first();
+
+        if (! $baseSpecialty) {
+            return [];
+        }
+
+        $ids = [(int) $baseSpecialty->id];
+
+        if ($includeChildren) {
+            $childIds = Specijalnost::query()
+                ->where('parent_id', $baseSpecialty->id)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $ids = array_merge($ids, $childIds);
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**
