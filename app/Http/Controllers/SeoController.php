@@ -31,6 +31,11 @@ class SeoController extends Controller
             return redirect($profileSlugRedirect, 301);
         }
 
+        $careHomeProfileRedirect = $this->normalizeCareHomeProfilePathRedirect($request);
+        if ($careHomeProfileRedirect) {
+            return redirect($careHomeProfileRedirect, 301);
+        }
+
         $path = trim($request->path(), '/');
         $metaTags = $this->getMetaTagsForPath($path, $request);
         $statusCode = $metaTags['status'] ?? 200;
@@ -2119,6 +2124,40 @@ HTML;
         }
 
         return $this->buildUrl("apoteka/{$currentSlug}");
+    }
+
+    private function normalizeCareHomeProfilePathRedirect(Request $request): ?string
+    {
+        $path = trim($request->path(), '/');
+        if (!preg_match('/^domovi-njega\/([^\/]+)$/', $path, $matches)) {
+            return null;
+        }
+
+        $slug = $matches[1];
+        if ($slug === 'vodic') {
+            return null;
+        }
+
+        $isCitySlug = DB::table('gradovi')
+            ->where('slug', $slug)
+            ->exists();
+
+        if ($isCitySlug) {
+            return null;
+        }
+
+        $isCareHomeSlug = DB::table('domovi_njega')
+            ->where('slug', $slug)
+            ->whereNull('deleted_at')
+            ->where('aktivan', true)
+            ->where('verifikovan', true)
+            ->exists();
+
+        if (!$isCareHomeSlug) {
+            return null;
+        }
+
+        return $this->buildUrl("dom-njega/{$slug}");
     }
 
     private function normalizeProfileSlugRedirect(Request $request): ?string

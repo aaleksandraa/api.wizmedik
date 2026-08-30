@@ -239,7 +239,7 @@ class Dom extends Model
      */
     public function getUrlAttribute()
     {
-        return "/domovi-njega/{$this->slug}";
+        return "/dom-njega/{$this->slug}";
     }
 
     public function getFormattedPriceAttribute()
