@@ -28,9 +28,15 @@ class ImportWizMedikDomovi extends Command
 
     public function handle(): int
     {
-        $path = $this->argument('file');
-        if (!is_file($path)) {
-            $this->error("File not found: {$path}");
+        $argument = (string) $this->argument('file');
+        $path = $this->resolveImportFilePath($argument);
+        if ($path === null) {
+            $importsDir = $this->defaultImportDirectory();
+            $this->error("File not found: {$argument}");
+            $this->line("Expected directory: {$importsDir}");
+            $this->line('Upload JSON from docs/banjadomovi/ to that folder, e.g.:');
+            $this->line('  mkdir -p storage/app/imports');
+            $this->line('  # then copy wizmedik_domovi_import_approved_v12.json and wizmedik_banje_import_approved_v12.json');
 
             return self::FAILURE;
         }

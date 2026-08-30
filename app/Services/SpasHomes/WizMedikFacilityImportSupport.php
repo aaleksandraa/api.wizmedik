@@ -186,4 +186,27 @@ trait WizMedikFacilityImportSupport
 
         return $query->exists();
     }
+
+    protected function resolveImportFilePath(string $path): ?string
+    {
+        $candidates = array_unique(array_filter([
+            $path,
+            base_path($path),
+            storage_path('app/imports/' . basename($path)),
+            storage_path('app/' . ltrim($path, '/')),
+        ]));
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    protected function defaultImportDirectory(): string
+    {
+        return storage_path('app/imports');
+    }
 }
