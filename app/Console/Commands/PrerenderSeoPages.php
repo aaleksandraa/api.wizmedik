@@ -423,6 +423,7 @@ class PrerenderSeoPages extends Command
                 throw new \RuntimeException("Failed to read sitemap '{$entry}'.");
             }
 
+            $targetPath = $targetDir . DIRECTORY_SEPARATOR . $entry;
             (new AtomicFilePublisher())->publish($targetPath, $contents);
         }
     }

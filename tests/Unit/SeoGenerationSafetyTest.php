@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Console\Commands\PrerenderSeoPages;
 use App\Services\Seo\AtomicFilePublisher;
 use App\Services\Seo\DoctorSnapshotHtml;
 use App\Services\Seo\SeoPrerenderPolicy;
@@ -138,6 +139,28 @@ class SeoGenerationSafetyTest extends TestCase
         $this->assertStringContainsString('href="https://wizmedik.com/doktor/ana-ivic?x=1&amp;y=2"', $html);
         $this->assertStringNotContainsString('<script>', $html);
         $this->assertSame('', DoctorSnapshotHtml::render($this->doctor('', 'Ivić', '', '', ''), 'https://wizmedik.com/doktor/x', 'https://wizmedik.com/doktori', 'x'));
+    }
+
+    public function test_prerender_mirror_sync_publishes_sitemap_files_to_the_target_directory(): void
+    {
+        $this->directory = $this->makeDirectory();
+        $source = $this->directory . DIRECTORY_SEPARATOR . 'primary';
+        $mirror = $this->directory . DIRECTORY_SEPARATOR . 'mirror';
+        mkdir($source);
+        mkdir($mirror);
+
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'sitemap.xml', '<sitemapindex/>');
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'sitemap-doctors.xml', '<urlset doctors/>');
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'index.html', '<html>ignore</html>');
+
+        $command = new PrerenderSeoPages();
+        $method = new \ReflectionMethod($command, 'syncSitemapArtifacts');
+        $method->setAccessible(true);
+        $method->invoke($command, $source, $mirror);
+
+        $this->assertSame('<sitemapindex/>', file_get_contents($mirror . DIRECTORY_SEPARATOR . 'sitemap.xml'));
+        $this->assertSame('<urlset doctors/>', file_get_contents($mirror . DIRECTORY_SEPARATOR . 'sitemap-doctors.xml'));
+        $this->assertFileDoesNotExist($mirror . DIRECTORY_SEPARATOR . 'index.html');
     }
 
     public function test_scheduler_passes_the_output_directory_without_manual_shell_escaping(): void
