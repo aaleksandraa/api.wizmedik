@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BlogPost;
+use App\Services\Seo\SitemapXml;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -29,20 +30,12 @@ class SitemapController extends Controller
 
     private function xmlEscape(?string $value): string
     {
-        return htmlspecialchars((string) $value, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        return SitemapXml::escape($value);
     }
 
-    private function xmlDate($value): string
+    private function xmlDate($value): ?string
     {
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format('c');
-        }
-
-        if (empty($value)) {
-            return now()->format('c');
-        }
-
-        return date('c', strtotime((string) $value));
+        return SitemapXml::lastModified($value);
     }
 
     private function appendUrl(
@@ -54,7 +47,10 @@ class SitemapController extends Controller
     ): void {
         $xml .= '<url>';
         $xml .= '<loc>' . $this->xmlEscape($loc) . '</loc>';
-        $xml .= '<lastmod>' . $this->xmlDate($lastmod) . '</lastmod>';
+        $formattedLastModified = $this->xmlDate($lastmod);
+        if ($formattedLastModified !== null) {
+            $xml .= '<lastmod>' . $formattedLastModified . '</lastmod>';
+        }
         $xml .= '<changefreq>' . $changefreq . '</changefreq>';
         $xml .= '<priority>' . $priority . '</priority>';
         $xml .= '</url>';
@@ -206,7 +202,6 @@ class SitemapController extends Controller
         foreach ($sitemaps as $sitemap) {
             $xml .= '<sitemap>';
             $xml .= '<loc>' . $this->xmlEscape($baseUrl . '/' . $sitemap) . '</loc>';
-            $xml .= '<lastmod>' . now()->format('c') . '</lastmod>';
             $xml .= '</sitemap>';
         }
 
@@ -248,13 +243,11 @@ class SitemapController extends Controller
             ['url' => '/impressum', 'priority' => '0.5', 'changefreq' => 'yearly'],
         ];
 
-        $lastmod = now()->format('c');
-
         foreach ($pages as $page) {
             $this->appendUrl(
                 $xml,
                 $baseUrl . $page['url'],
-                $lastmod,
+                null,
                 $page['changefreq'],
                 $page['priority']
             );
@@ -373,15 +366,6 @@ class SitemapController extends Controller
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-
-        // Keep category listing discoverable even when there are no detail pages yet.
-        $this->appendUrl(
-            $xml,
-            $baseUrl . '/specijalnosti',
-            now(),
-            'weekly',
-            '0.9'
-        );
 
         $pages = DB::table('specialty_service_pages')
             ->join('specijalnosti', 'specijalnosti.id', '=', 'specialty_service_pages.specialty_id')
@@ -562,15 +546,6 @@ class SitemapController extends Controller
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
-        // Listing page itself should also exist in this vertical sitemap.
-        $this->appendUrl(
-            $xml,
-            $baseUrl . '/lijekovi',
-            now(),
-            'daily',
-            '0.9'
-        );
-
         $medicines = DB::table('lijekovi')
             ->whereNotNull('slug')
             ->where('slug', '!=', '')
@@ -598,15 +573,6 @@ class SitemapController extends Controller
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-
-        // Listing page itself should also exist in this vertical sitemap.
-        $this->appendUrl(
-            $xml,
-            $baseUrl . '/apoteke',
-            now(),
-            'daily',
-            '0.8'
-        );
 
         $pharmacies = DB::table('apoteke_poslovnice')
             ->join('apoteke_firme', 'apoteke_firme.id', '=', 'apoteke_poslovnice.firma_id')
@@ -867,7 +833,10 @@ class SitemapController extends Controller
             $xml .= '<url>';
             $xml .= '<loc>' . $this->xmlEscape($baseUrl . '/blog/' . $post->slug) . '</loc>';
 
-            $xml .= '<lastmod>' . $this->xmlDate($post->updated_at ?? $post->published_at) . '</lastmod>';
+            $blogLastModified = $this->xmlDate($post->updated_at ?? $post->published_at);
+            if ($blogLastModified !== null) {
+                $xml .= '<lastmod>' . $blogLastModified . '</lastmod>';
+            }
 
             $xml .= '<changefreq>monthly</changefreq>';
             $xml .= '<priority>0.6</priority>';
@@ -901,15 +870,6 @@ class SitemapController extends Controller
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>';
         $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-
-        // Listing page itself should also exist in this vertical sitemap.
-        $this->appendUrl(
-            $xml,
-            $baseUrl . '/pitanja',
-            now(),
-            'daily',
-            '0.7'
-        );
 
         $questions = DB::table('pitanja')
             ->where('je_javno', true)

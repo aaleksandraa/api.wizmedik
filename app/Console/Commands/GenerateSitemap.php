@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Http\Controllers\SitemapController;
+use App\Services\Seo\AtomicFilePublisher;
 use Illuminate\Console\Command;
 
 class GenerateSitemap extends Command
@@ -35,8 +36,7 @@ class GenerateSitemap extends Command
         foreach ($outputDirs as $outputDir) {
             if (!is_dir($outputDir)) {
                 $this->error("Output directory not found: {$outputDir}");
-                $this->info('Specify output directory with --output option');
-                $this->info('Example: php artisan sitemap:generate --output=/var/www/html');
+                $this->error('Set SITEMAP_OUTPUT_PATH to the directory Apache serves. Previous files were not changed.');
                 return self::FAILURE;
             }
 
@@ -71,6 +71,7 @@ class GenerateSitemap extends Command
             'sitemap-pitanja.xml' => 'questions',
         ]);
 
+        $publisher = new AtomicFilePublisher();
         $successCount = 0;
         $errorCount = 0;
 
@@ -84,7 +85,7 @@ class GenerateSitemap extends Command
                 $primaryFilePath = null;
                 foreach ($outputDirs as $outputDir) {
                     $filePath = "{$outputDir}/{$filename}";
-                    file_put_contents($filePath, $content);
+                    $publisher->publish($filePath, $content);
                     if ($primaryFilePath === null) {
                         $primaryFilePath = $filePath;
                     }
@@ -98,24 +99,7 @@ class GenerateSitemap extends Command
             } catch (\Throwable $e) {
                 $this->error("   Failed: {$filename}");
                 $this->error('   Error: ' . $e->getMessage());
-
-                $emptyXml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-                if ($filename === 'sitemap.xml') {
-                    $emptyXml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-                    $emptyXml .= '<!-- This sitemap is empty due to generation error -->' . "\n";
-                    $emptyXml .= '</sitemapindex>';
-                } else {
-                    $emptyXml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-                    $emptyXml .= '<!-- This sitemap is empty due to generation error -->' . "\n";
-                    $emptyXml .= '</urlset>';
-                }
-
-                foreach ($outputDirs as $outputDir) {
-                    $filePath = "{$outputDir}/{$filename}";
-                    file_put_contents($filePath, $emptyXml);
-                }
-
-                $this->warn('   Created empty sitemap to prevent 404 errors');
+                $this->warn('   Previous sitemap file was left unchanged.');
                 $errorCount++;
             }
         }

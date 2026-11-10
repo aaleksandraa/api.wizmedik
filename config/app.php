@@ -66,6 +66,8 @@ return [
 
     'sitemap_schedule_timezone' => env('SITEMAP_SCHEDULE_TIMEZONE', 'Europe/Sarajevo'),
 
+    'seo_prerender_schedule_time' => env('SEO_PRERENDER_SCHEDULE_TIME', '03:10'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

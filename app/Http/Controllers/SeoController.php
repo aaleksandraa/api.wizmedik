@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use App\Services\Seo\DoctorSnapshotHtml;
 
 class SeoController extends Controller
 {
@@ -61,6 +62,10 @@ class SeoController extends Controller
             $metaTags['title'],
             $html
         );
+
+        if (!empty($metaTags['snapshot'])) {
+            $html = $this->injectSeoSnapshot($html, (string) $metaTags['snapshot']);
+        }
 
         return response($html, $statusCode)->header('Content-Type', 'text/html');
     }
@@ -827,6 +832,7 @@ class SeoController extends Controller
         return [
             'title' => "<title>{$title}</title>",
             'meta' => $this->buildMetaTags($title, $description, $image, $url, 'profile'),
+            'snapshot' => DoctorSnapshotHtml::render($doctor, $url, $this->buildUrl('doktori'), $slug),
         ];
     }
 
@@ -1690,7 +1696,17 @@ HTML;
 
     private function getBaseUrl(): string
     {
-        return rtrim(config('app.frontend_url', 'https://wizmedik.com'), '/');
+        $frontendUrl = trim((string) config('app.frontend_url', ''));
+        $fallbackUrl = 'https://wizmedik.com';
+        $baseUrl = $frontendUrl !== '' ? $frontendUrl : $fallbackUrl;
+        $host = strtolower((string) parse_url($baseUrl, PHP_URL_HOST));
+        $isLocalHost = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+
+        if (app()->environment('production') && $isLocalHost) {
+            $baseUrl = $fallbackUrl;
+        }
+
+        return rtrim($baseUrl, '/');
     }
 
     private function buildUrl(string $path): string
@@ -2325,11 +2341,24 @@ HTML;
         return $url . '?' . http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
     }
 
+    private function injectSeoSnapshot(string $html, string $snapshot): string
+    {
+        if (str_contains($html, 'id="seo-snapshot"') || str_contains($html, "id='seo-snapshot'")) {
+            return $html;
+        }
+
+        $replacement = $snapshot . "\n    <div id=\"root\"></div>";
+        $updated = preg_replace('/<div id="root"><\/div>/', $replacement, $html, 1);
+
+        return is_string($updated) ? $updated : $html;
+    }
+
     private function stripExistingSeoTags(string $html): string
     {
         $patterns = [
             '/\s*<meta[^>]+name=(["\'])description\1[^>]*>\s*/i',
             '/\s*<meta[^>]+name=(["\'])robots\1[^>]*>\s*/i',
+            '/\s*<meta[^>]+name=(["\'])googlebot\1[^>]*>\s*/i',
             '/\s*<link[^>]+rel=(["\'])canonical\1[^>]*>\s*/i',
             '/\s*<meta[^>]+property=(["\'])og:[^"\']+\1[^>]*>\s*/i',
             '/\s*<meta[^>]+name=(["\'])twitter:[^"\']+\1[^>]*>\s*/i',

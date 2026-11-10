@@ -8,17 +8,19 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command(
-    'sitemap:generate --output=' . escapeshellarg((string) config('app.sitemap_output_path'))
-)
+$seoOutputPath = (string) config('app.sitemap_output_path');
+
+Schedule::command('sitemap:generate', [
+    '--output' => $seoOutputPath,
+])
     ->dailyAt((string) config('app.sitemap_schedule_time'))
     ->timezone((string) config('app.sitemap_schedule_timezone'))
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/sitemap-schedule.log'));
 
-Schedule::command(
-    'seo:prerender-pages --output=' . escapeshellarg((string) config('app.sitemap_output_path'))
-)
+Schedule::command('seo:prerender-pages', [
+    '--output' => $seoOutputPath,
+])
     ->dailyAt((string) config('app.seo_prerender_schedule_time', '03:10'))
     ->timezone((string) config('app.sitemap_schedule_timezone'))
     ->withoutOverlapping()

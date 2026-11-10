@@ -4,12 +4,15 @@ namespace App\Console\Commands;
 
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\SitemapController;
+use App\Services\Seo\AtomicFilePublisher;
+use App\Services\Seo\SeoPrerenderPolicy;
 use Illuminate\Console\Command;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class PrerenderSeoPages extends Command
 {
+    private bool $sitemapCollectionFailed = false;
     /**
      * The name and signature of the console command.
      *
@@ -40,6 +43,7 @@ class PrerenderSeoPages extends Command
         foreach ($outputDirs as $outputDir) {
             if (!is_dir($outputDir)) {
                 $this->error("Output directory not found: {$outputDir}");
+                $this->error('Set SITEMAP_OUTPUT_PATH to the directory Apache serves. Previous files were not changed.');
                 return self::FAILURE;
             }
 
@@ -63,9 +67,15 @@ class PrerenderSeoPages extends Command
         }
 
         $pathsFromOptions = $this->normalizeSpecificPathsOption();
+        $this->sitemapCollectionFailed = false;
         $paths = !empty($pathsFromOptions)
             ? $pathsFromOptions
             : $this->collectPathsFromSitemaps();
+
+        if ($this->sitemapCollectionFailed) {
+            $this->error('Sitemap collection failed. Previous prerendered HTML was left unchanged.');
+            return self::FAILURE;
+        }
 
         if (empty($pathsFromOptions)) {
             $paths = array_values(array_unique(array_merge($paths, $this->additionalStaticPaths())));
@@ -76,6 +86,7 @@ class PrerenderSeoPages extends Command
         }
 
         $max = (int) $this->option('max');
+        $fullReconciliation = empty($pathsFromOptions) && $max === 0;
         if ($max > 0 && count($paths) > $max) {
             $paths = array_slice($paths, 0, $max);
         }
@@ -85,12 +96,12 @@ class PrerenderSeoPages extends Command
             return self::SUCCESS;
         }
 
-        $this->deleteStalePrerenderedPaths($outputDirs, $paths);
-
         $seoController = app(SeoController::class);
+        $publisher = new AtomicFilePublisher();
         $rendered = 0;
         $skipped = 0;
         $errors = 0;
+        $blockedPaths = [];
 
         foreach ($paths as $path) {
             $display = $this->displayPrerenderTarget($path);
@@ -100,12 +111,14 @@ class PrerenderSeoPages extends Command
                 $response = $seoController->index($request);
                 $status = $response->getStatusCode();
 
-                if ($status >= 400) {
+                if (!SeoPrerenderPolicy::shouldPublish($status)) {
                     $this->warn("Skip {$display} (status {$status})");
                     $skipped++;
+                    $blockedPaths[] = $path;
                     continue;
                 }
 
+                $html = (string) $response->getContent();
                 foreach ($outputDirs as $outputDir) {
                     $targetFile = $this->targetFilePath($outputDir, $path);
                     $targetDir = dirname($targetFile);
@@ -115,10 +128,7 @@ class PrerenderSeoPages extends Command
                         }
                     }
 
-                    $bytes = @file_put_contents($targetFile, (string) $response->getContent());
-                    if ($bytes === false) {
-                        throw new \RuntimeException("Failed to write file: {$targetFile}");
-                    }
+                    $publisher->publish($targetFile, $html);
                 }
                 $rendered++;
             } catch (\Throwable $e) {
@@ -127,8 +137,23 @@ class PrerenderSeoPages extends Command
             }
         }
 
-        $this->syncPrimaryBuildArtifactsToMirrorOutputs($primaryOutputDir, $outputDirs);
-        $this->writePrerenderManifest($outputDirs, $paths);
+        if ($errors === 0 && !$fullReconciliation) {
+            $this->deleteRenderedPaths($outputDirs, $blockedPaths);
+        }
+
+        if (SeoPrerenderPolicy::allowsStaleDeletion($fullReconciliation, false, $errors)) {
+            try {
+                $this->syncPrimaryBuildArtifactsToMirrorOutputs($primaryOutputDir, $outputDirs);
+                $this->writePrerenderManifest($outputDirs, $paths);
+                $this->deleteRenderedPaths($outputDirs, $blockedPaths);
+                $this->deleteStalePrerenderedPaths($outputDirs, $paths, $blockedPaths);
+            } catch (\Throwable $e) {
+                $errors++;
+                $this->error('SEO publication did not finish. Previous prerendered pages were preserved. ' . $e->getMessage());
+            }
+        } elseif ($errors > 0) {
+            $this->error('Prerender writes failed. Existing HTML for pages that were not replaced was preserved.');
+        }
 
         $this->newLine();
         $this->info("Rendered: {$rendered}");
@@ -222,8 +247,9 @@ class PrerenderSeoPages extends Command
                 $response = $controller->{$method}();
                 $xml = (string) $response->getContent();
             } catch (\Throwable $e) {
-                $this->warn("Sitemap method {$method} failed: {$e->getMessage()}");
-                continue;
+                $this->sitemapCollectionFailed = true;
+                $this->error("Sitemap source {$method} failed. Reconciliation stopped: {$e->getMessage()}");
+                return [];
             }
 
             if (!preg_match_all('/<loc>([^<]+)<\/loc>/i', $xml, $matches)) {
@@ -284,22 +310,50 @@ class PrerenderSeoPages extends Command
     }
 
     /**
+     * Remove confirmed non-public route files. The application shell at the output root is never removed.
+     *
      * @param array<int, string> $outputDirs
      * @param array<int, string> $paths
      */
-    private function deleteStalePrerenderedPaths(array $outputDirs, array $paths): void
+    private function deleteRenderedPaths(array $outputDirs, array $paths): void
+    {
+        foreach ($outputDirs as $outputDir) {
+            foreach ($paths as $path) {
+                if ($this->relativeOutputPathForTarget($path) === '') {
+                    continue;
+                }
+
+                $targetFile = $this->targetFilePath($outputDir, $path);
+                if (is_file($targetFile) && basename($targetFile) === 'index.html') {
+                    @unlink($targetFile);
+                    $this->removeEmptyDirectoriesUpward(dirname($targetFile), $outputDir);
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<int, string> $outputDirs
+     * @param array<int, string> $paths
+     * @param array<int, string> $blockedPaths
+     */
+    private function deleteStalePrerenderedPaths(array $outputDirs, array $paths, array $blockedPaths = []): void
     {
         $currentPaths = array_values(array_filter(
             array_map(fn (string $path) => $this->relativeOutputPathForTarget($path), $paths),
             fn (string $path) => $path !== ''
         ));
+        $blocked = array_fill_keys(array_map(
+            fn (string $path) => $this->relativeOutputPathForTarget($path),
+            $blockedPaths
+        ), true);
         $currentPathMap = array_fill_keys($currentPaths, true);
 
         foreach ($outputDirs as $outputDir) {
             $generatedPaths = $this->collectGeneratedRouteDirectories($outputDir);
             $stalePaths = array_values(array_filter(
                 $generatedPaths,
-                fn (string $path) => !isset($currentPathMap[$path])
+                fn (string $path) => !isset($currentPathMap[$path]) || isset($blocked[$path])
             ));
 
             if (empty($stalePaths)) {
@@ -364,10 +418,12 @@ class PrerenderSeoPages extends Command
                 continue;
             }
 
-            $targetPath = $targetDir . DIRECTORY_SEPARATOR . $entry;
-            if (!@copy($sourcePath, $targetPath)) {
-                throw new \RuntimeException("Failed to copy sitemap '{$entry}' to '{$targetDir}'.");
+            $contents = @file_get_contents($sourcePath);
+            if (!is_string($contents)) {
+                throw new \RuntimeException("Failed to read sitemap '{$entry}'.");
             }
+
+            (new AtomicFilePublisher())->publish($targetPath, $contents);
         }
     }
 
@@ -552,13 +608,10 @@ class PrerenderSeoPages extends Command
             throw new \RuntimeException('Failed to encode prerender manifest.');
         }
 
+        $publisher = new AtomicFilePublisher();
         foreach ($outputDirs as $outputDir) {
             $manifestPath = $outputDir . DIRECTORY_SEPARATOR . '.seo-prerendered-paths.json';
-            $bytes = @file_put_contents($manifestPath, $manifestJson . PHP_EOL);
-
-            if ($bytes === false) {
-                throw new \RuntimeException("Failed to write prerender manifest: {$manifestPath}");
-            }
+            $publisher->publish($manifestPath, $manifestJson . PHP_EOL);
         }
     }
 

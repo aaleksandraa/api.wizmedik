@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\SeoController;
+use App\Services\Seo\AtomicFilePublisher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -58,11 +59,13 @@ class SeoStaticPageService
                     continue;
                 }
 
-                $bytes = @file_put_contents($targetFile, $html);
-                if ($bytes === false) {
+                try {
+                    (new AtomicFilePublisher())->publish($targetFile, $html);
+                } catch (\Throwable $e) {
                     Log::warning('SEO prerender failed: cannot write target file', [
                         'target_file' => $targetFile,
                         'path' => $normalizedPath,
+                        'message' => $e->getMessage(),
                     ]);
                     continue;
                 }
