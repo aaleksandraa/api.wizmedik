@@ -47,7 +47,7 @@ class LogoSettingsController extends Controller
             $isHeartIconEnabled = false;
         }
 
-        $isHeartIconHeaderEnabled = true; // default true
+        $isHeartIconHeaderEnabled = false;
         if ($showHeartIconHeader === '0' || $showHeartIconHeader === 'false' || $showHeartIconHeader === false || $showHeartIconHeader === 0) {
             $isHeartIconHeaderEnabled = false;
         }
